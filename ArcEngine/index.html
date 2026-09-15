@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>ArcEngine</title>
+    <script src="libs/simplex-noise.js"></script>
+    <script src="libs/babylon.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #222;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        #world3d {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            outline: none;
+            touch-action: none;
+        }
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            background: #222;
+            z-index: 1000;
+        }
+        .loading-text {
+            font: 14px system-ui, sans-serif;
+            color: #c8d0d8;
+            text-align: center;
+            min-height: 1em;
+        }
+        .loading-bar {
+            width: min(220px, 70vw);
+            height: 10px;
+            background: #444;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .loading-progress {
+            height: 100%;
+            width: 0%;
+            background: #7cc0c7;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="world3d"></canvas>
+    <div id="loading-screen">
+        <div class="loading-bar"><div class="loading-progress"></div></div>
+        <div class="loading-text"></div>
+    </div>
+
+    <!-- Порядок значим: Constants.js первым (остальные читают его глобалы), main.js последним -->
+    <script src="Constants.js"></script>
+    <script src="Objects.js"></script>
+    <script src="World3D.js"></script>
+    <script src="Terrain3D.js"></script>
+    <script src="CameraControl.js"></script>
+    <script src="Model3D.js"></script>
+    <script src="Location3D.js"></script>
+    <script src="main.js"></script>
+    <script>
+        // Долгий тап и ПКМ не должны открывать меню браузера.
+        document.addEventListener('contextmenu', e => e.preventDefault());
+    </script>
+</body>
+</html>

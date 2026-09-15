@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ArcEngine — editor</title>
+    <link rel="stylesheet" href="./editor.css">
+</head>
+<body>
+    <!-- Тексты разметки — английские по умолчанию; data-i18n* подменяет их на
+         язык из переключателя (i18n.js). -->
+    <header id="topbar">
+        <div id="brand">ARCENGINE <span data-i18n="brand">editor</span></div>
+        <div id="server-status">
+            <span id="server-dot"></span>
+            <span id="server-label" data-i18n="server.checking">checking server…</span>
+        </div>
+        <div id="lang-switch" class="mode-tabs" role="group" data-i18n-title="lang.title" title="Interface language">
+            <button data-lang="en">EN</button>
+            <button data-lang="ru">RU</button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ЛЕВАЯ ПАНЕЛЬ: локация в 3D -->
+        <section id="view-pane">
+            <div id="view-toolbar">
+                <div class="mode-tabs" id="camera-modes">
+                    <button data-camera="free" data-i18n="cam.free" data-i18n-title="cam.freeTitle">Free camera</button>
+                    <button data-camera="game" data-i18n="cam.game" data-i18n-title="cam.gameTitle">Game camera</button>
+                </div>
+                <div class="toolbar-group">
+                    <button id="btn-home" data-i18n="cam.home" data-i18n-title="cam.homeTitle">↺ Reset camera</button>
+                </div>
+                <div class="mode-tabs" id="gizmo-modes">
+                    <button data-gizmo="move" data-i18n-title="gizmo.moveTitle">✥ <span data-i18n="gizmo.move">Move</span></button>
+                    <button data-gizmo="rotate" data-i18n-title="gizmo.rotateTitle">⟳ <span data-i18n="gizmo.rotate">Rotate</span></button>
+                    <button data-gizmo="scale" data-i18n-title="gizmo.scaleTitle">⤢ <span data-i18n="gizmo.scale">Scale</span></button>
+                </div>
+                <div class="toolbar-spacer"></div>
+                <div class="toolbar-group">
+                    <label data-i18n-title="opt.toonTitle"><input type="checkbox" id="opt-toon"> <span data-i18n="opt.toon">toon shader</span></label>
+                </div>
+            </div>
+            <div id="view-wrap">
+                <canvas id="view-canvas"></canvas>
+                <div id="view-info" class="float-chip"></div>
+                <div id="view-hints" class="float-chip"></div>
+            </div>
+        </section>
+
+        <!-- ПРАВАЯ ПАНЕЛЬ: вкладки Global Settings (Constants.js) и Objects (Objects.js) -->
+        <aside id="inspector-pane">
+            <div id="pane-tabs" class="mode-tabs">
+                <button data-tab="settings" data-i18n="tab.settings">Global Settings</button>
+                <button data-tab="objects" data-i18n="tab.objects">Objects</button>
+            </div>
+
+            <section class="pane-panel" data-tab="settings">
+                <div id="inspector-header">
+                    <div id="inspector-actions">
+                        <button id="btn-save" disabled>Save to Constants.js</button>
+                        <button id="btn-revert" disabled data-i18n="insp.revert" data-i18n-title="insp.revertTitle">↺ Revert</button>
+                    </div>
+                    <input id="inspector-search" type="search" data-i18n-placeholder="insp.search" placeholder="search: toon, shadow, FOV, CAMERA…">
+                </div>
+                <div id="inspector-groups"></div>
+                <div id="inspector-footer">
+                    <span data-i18n="insp.footer">Edits apply instantly. The file is written only by Save (Ctrl+S). Backups:</span>
+                    <code>_utils/.backups/</code>
+                </div>
+            </section>
+
+            <section class="pane-panel" data-tab="objects" hidden>
+                <div id="objects-header">
+                    <button id="btn-import" data-i18n-title="obj.importTitle">Import FBX…</button>
+                    <div id="objects-actions">
+                        <button id="btn-objects-save" disabled data-i18n="obj.save">Save to Objects.js</button>
+                        <button id="btn-objects-revert" disabled data-i18n="obj.revert" data-i18n-title="obj.revertTitle">↺ Revert</button>
+                    </div>
+                </div>
+                <div id="objects-list"></div>
+                <div id="object-props"></div>
+                <div id="objects-footer" data-i18n="obj.footer">Gizmo arrows move the selected object. Click an object in the view to select it.</div>
+            </section>
+        </aside>
+    </main>
+
+    <div id="toasts"></div>
+    <div id="boot-error"></div>
+
+    <!-- Порядок значим: язык, схема и загрузчик -> модули набора с корня проекта -> UI редактора -->
+    <script src="./i18n.js"></script>
+    <script src="./schema.js"></script>
+    <script src="./loader.js"></script>
+    <script src="/libs/simplex-noise.js"></script>
+    <script src="/libs/babylon.js"></script>
+    <script src="/Objects.js"></script>
+    <script src="/World3D.js"></script>
+    <script src="/Terrain3D.js"></script>
+    <script src="/CameraControl.js"></script>
+    <script src="/Model3D.js"></script>
+    <script src="/Location3D.js"></script>
+    <script src="./history.js"></script>
+    <script src="./inspector.js"></script>
+    <script src="./objects-panel.js"></script>
+    <script src="./lab.js"></script>
+    <script src="./main.js"></script>
+</body>
+</html>

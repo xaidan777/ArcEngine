@@ -1,0 +1,388 @@
+/* editor.css — тёмная тема редактора ArcEngine */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --bg: #14171c;
+    --panel: #1b2027;
+    --panel-2: #20262f;
+    --line: #2b323d;
+    --text: #d7dde5;
+    --muted: #7b8794;
+    --accent: #3dc9b0;
+    --dirty: #ffa14e;
+    --danger: #ff3b30;
+}
+
+html, body { height: 100%; }
+
+body {
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* --- Верхняя панель --- */
+
+#topbar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 8px 14px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+}
+
+#brand { font-weight: 800; letter-spacing: 2px; font-size: 14px; }
+#brand span { color: var(--accent); font-weight: 500; letter-spacing: 0; margin-left: 6px; }
+
+#server-status { margin-left: auto; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+#server-dot { width: 9px; height: 9px; border-radius: 50%; background: #555; }
+#server-dot.ok { background: #45d06c; box-shadow: 0 0 6px #45d06c88; }
+#server-dot.bad { background: var(--danger); box-shadow: 0 0 6px #ff3b3088; }
+
+/* Переключатель языка — справа вверху */
+#lang-switch button { padding: 3px 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
+
+/* --- Основная раскладка: вид локации слева, инспектор справа --- */
+
+main { flex: 1 1 auto; display: flex; min-height: 0; }
+
+#view-pane {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border-right: 1px solid var(--line);
+}
+
+#view-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 7px 12px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+    flex: 0 0 auto;
+}
+
+.mode-tabs { display: flex; background: var(--bg); border: 1px solid var(--line); border-radius: 7px; overflow: hidden; }
+.mode-tabs button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.mode-tabs button.active { background: var(--accent); color: #08211c; font-weight: 600; }
+
+.toolbar-group { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.toolbar-group label { display: flex; align-items: center; gap: 5px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.toolbar-group input[type="checkbox"] { accent-color: var(--accent); }
+.toolbar-group button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+.toolbar-spacer { flex: 1 1 0; }
+
+#view-wrap { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; background: #171b21; }
+#view-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; touch-action: none; }
+
+.float-chip {
+    position: absolute;
+    z-index: 4;
+    background: rgba(16, 19, 24, 0.8);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 11.5px;
+    color: var(--muted);
+    pointer-events: none;
+    white-space: nowrap;
+    max-width: calc(100% - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#view-info { left: 12px; top: 12px; }
+#view-hints { left: 12px; bottom: 12px; }
+
+/* --- Инспектор --- */
+
+#inspector-pane {
+    flex: 0 0 400px;
+    min-width: 0;         /* ширина — ровно 400: поля не распирают панель */
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    min-height: 0;
+}
+
+/* Вкладки: Global Settings | Objects */
+#pane-tabs { margin: 10px 14px 0; flex: 0 0 auto; }
+#pane-tabs button { flex: 1 1 0; font-weight: 600; }
+#pane-tabs button.dirty::after { content: ' ●'; font-size: 9px; color: var(--dirty); }
+#pane-tabs button.active.dirty::after { color: #08211c; }
+
+.pane-panel { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+.pane-panel[hidden] { display: none; }
+
+#inspector-header,
+#objects-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    flex: 0 0 auto;
+}
+
+#inspector-actions,
+#objects-actions { display: flex; gap: 8px; }
+
+#btn-save,
+#btn-objects-save {
+    flex: 1 1 auto;
+    background: var(--accent);
+    color: #08211c;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+}
+#btn-save:disabled,
+#btn-objects-save:disabled { background: var(--panel-2); color: var(--muted); cursor: default; font-weight: 500; }
+
+#btn-revert,
+#btn-objects-revert,
+#btn-import,
+.object-actions button {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+#btn-revert:disabled,
+#btn-objects-revert:disabled,
+#btn-import:disabled { color: var(--muted); cursor: default; opacity: 0.6; }
+#btn-import { font-weight: 600; border-color: var(--accent); }
+#btn-import:hover:not(:disabled) { background: #1d3a35; }
+
+/* --- Вкладка Objects --- */
+
+#objects-list { flex: 0 1 auto; max-height: 38%; overflow-y: auto; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.object-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 14px; cursor: pointer; user-select: none; }
+.object-row:hover { background: var(--panel-2); }
+.object-row.selected { background: #1d3a35; box-shadow: inset 3px 0 0 var(--accent); }
+.object-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.object-file { font-family: Consolas, monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.object-row.broken .object-file { color: var(--danger); }
+
+#object-props { flex: 1 1 auto; overflow-y: auto; padding: 8px 14px 16px; }
+.objects-empty { color: var(--muted); padding: 10px 14px; font-size: 12.5px; }
+#object-props .objects-empty { padding: 4px 0; }
+
+.field-controls input[type="text"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 4px 6px;
+    font-size: 12.5px;
+}
+.field-controls input[type="text"]:focus,
+.field-controls input[type="number"]:focus { border-color: var(--accent); outline: none; }
+.object-model { font-family: Consolas, monospace; font-size: 11.5px; color: var(--muted); word-break: break-all; }
+.axis-label { font-size: 11px; font-weight: 700; color: var(--muted); }
+#object-props .field-controls input[type="number"] { flex: 1 1 0; min-width: 0; width: 0; }
+
+.props-section {
+    margin-top: 10px;
+    padding: 9px 0 2px;
+    border-top: 1px solid var(--line);
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--accent);
+}
+
+.object-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.object-actions button { padding: 6px 10px; font-size: 12.5px; }
+.object-actions button.danger { border-color: #6b2a26; color: #ff8a80; }
+.object-actions button.danger:hover { background: #2a1412; }
+
+#objects-footer {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+}
+
+#inspector-search {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 7px 10px;
+    font-size: 13px;
+    outline: none;
+}
+#inspector-search:focus { border-color: var(--accent); }
+
+#inspector-groups { flex: 1 1 auto; overflow-y: auto; padding: 6px 0 20px; }
+
+.group { border-bottom: 1px solid var(--line); }
+
+.group-title {
+    padding: 9px 14px 7px;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--accent);
+    cursor: pointer;
+    user-select: none;
+}
+.group-title:hover { color: var(--text); }
+.group.collapsed .group-body { display: none; }
+.group.collapsed .group-title { color: var(--muted); }
+
+.group-body { padding: 0 14px 10px; }
+
+.field { padding: 5px 0 7px; }
+
+.field-head { display: flex; align-items: baseline; gap: 8px; }
+.field-head label { font-size: 12.5px; flex: 0 1 auto; }
+.field.dirty .field-head label { color: var(--dirty); }
+.field.dirty .field-head label::after { content: ' ●'; font-size: 9px; }
+
+.field-name {
+    margin-left: auto;
+    font-family: Consolas, monospace;
+    font-size: 10px;
+    color: var(--muted);
+    opacity: 0.75;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 165px;
+}
+
+.field-reset {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 13px;
+    padding: 0 2px;
+    visibility: hidden;
+}
+.field.dirty .field-reset { visibility: visible; }
+.field-reset:hover { color: var(--dirty); }
+
+.field-controls { display: flex; align-items: center; gap: 10px; margin-top: 3px; }
+.field-controls input[type="range"] { flex: 1 1 auto; accent-color: var(--accent); min-width: 0; }
+.field.dirty .field-controls input[type="range"] { accent-color: var(--dirty); }
+
+.field-controls input[type="number"],
+.field-controls input.hex,
+.field-controls select {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 4px 6px;
+    font-size: 12.5px;
+}
+.field-controls input[type="number"] { flex: 0 0 76px; font-family: Consolas, monospace; }
+.field-controls input.hex { flex: 0 0 86px; font-family: Consolas, monospace; }
+.field-controls select { flex: 1 1 auto; min-width: 0; }
+.field-controls select:focus { border-color: var(--accent); outline: none; }
+
+.field-controls input[type="color"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 26px;
+    padding: 0 2px;
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+}
+
+.field.dirty .field-controls input[type="number"],
+.field.dirty .field-controls input[type="color"],
+.field.dirty .field-controls input.hex,
+.field.dirty .field-controls select { border-color: var(--dirty); }
+
+#inspector-footer {
+    flex: 0 0 auto;
+    padding: 8px 14px;
+    border-top: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 11px;
+}
+#inspector-footer code { color: var(--text); font-size: 10.5px; }
+
+/* --- Тосты и ошибки --- */
+
+#toasts {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 50;
+    max-width: 440px;
+}
+
+.toast {
+    background: #10231f;
+    border: 1px solid var(--accent);
+    color: var(--text);
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    transition: opacity 0.4s, transform 0.4s;
+}
+.toast.error { background: #2a1412; border-color: var(--danger); }
+.toast.gone { opacity: 0; transform: translateY(8px); }
+
+#boot-error {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    color: var(--danger);
+    padding: 60px;
+    font-size: 15px;
+    white-space: pre-wrap;
+    z-index: 100;
+}
+#boot-error.visible { display: block; }
+
+/* Узкое окно: инспектор уходит вниз */
+@media (max-width: 900px) {
+    main { flex-direction: column; }
+    #view-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--line); }
+    #inspector-pane { flex: 1 1 45%; }
+}
