@@ -1,0 +1,25 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "game",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tools/dev-server.mjs",
+        "--port=9378",
+        "--no-open"
+      ],
+      "port": 9378
+    },
+    {
+      "name": "editor",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "_utils/editor/server.mjs",
+        "--port=9377",
+        "--no-open"
+      ],
+      "port": 9377
+    }
+  ]
+}
