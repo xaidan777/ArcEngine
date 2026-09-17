@@ -1,0 +1,6 @@
+# Не заливать на GitHub: личное и то, что собирается само. «/» в начале — только в корне
+# (без него build/ скрыл бы и claude/skills/build/).
+/.claude/
+/_utils/.backups/
+/build/
+/dist/

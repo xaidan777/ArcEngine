@@ -1,0 +1,268 @@
+// i18n.js — язык интерфейса редактора (EN по умолчанию, RU). Переключатель —
+// справа вверху (#lang-switch), выбор хранится в localStorage.
+//
+// Статичный текст разметки: data-i18n (textContent), data-i18n-title,
+// data-i18n-placeholder — ключи из STRINGS. Динамичный — I18N.t(key, params)
+// с подстановкой {имя}. Тексты схемы инспектора — объекты { en, ru }: I18N.pick().
+// Смена языка — событие window 'lang-changed': инспектор и вид перерисовывают своё.
+
+/** @satisfies {Record<string, any>} */
+const I18N = {
+    KEY: 'arcengine.editor.lang',
+    LANGS: ['en', 'ru'],
+    lang: 'en',
+
+    STRINGS: {
+        en: {
+            'title': 'ArcEngine — editor',
+            'brand': 'editor',
+            'lang.title': 'Interface language',
+            'server.checking': 'checking server…',
+            'server.ok': 'editor server',
+            'server.old': 'OUTDATED server (api {api} < {need}) — restart editor.bat',
+            'server.oldToast': 'The editor server runs old code. Restart _utils/editor.bat.',
+            'server.none': 'no API — saving unavailable (run _utils/editor.bat)',
+            'cam.free': 'Free camera',
+            'cam.freeTitle': 'Editor navigation: LMB/RMB orbit, middle button or Shift+LMB pan, wheel zooms to the cursor',
+            'cam.game': 'Game camera',
+            'cam.gameTitle': "The game's own camera: same CAMERA_* constants, limits and controls as in the running game",
+            'cam.home': '↺ Reset camera',
+            'cam.homeTitle': 'Camera back to its start position from the constants (R)',
+            'cam.hintFree': 'Free camera: LMB/RMB orbit · click selects an object · middle or Shift+LMB pan · wheel zoom · WASD · R reset',
+            'cam.hintGame': 'Game camera: click selects an object · wheel zoom · middle button and WASD pan · RMB rotate (CAMERA_ORBIT) · R reset',
+            'opt.toon': 'toon shader',
+            'opt.toonTitle': 'WORLD3D_TOON: light bands and silhouette outline, or regular smooth shading',
+            'tab.settings': 'Global Settings',
+            'tab.objects': 'Objects',
+            'gizmo.move': 'Move',
+            'gizmo.rotate': 'Rotate',
+            'gizmo.scale': 'Scale',
+            'gizmo.moveTitle': 'Gizmo: move along the arrows, or across the ground by the green square (1)',
+            'gizmo.rotateTitle': 'Gizmo: rotate around the X, Y, Z axes by the rings (2)',
+            'gizmo.scaleTitle': 'Gizmo: scale along an axis by its handle, uniformly by the center (3)',
+            'obj.import': 'Import FBX…',
+            'obj.importing': 'Choosing a file…',
+            'obj.importTitle': 'Pick a binary .fbx — the dialog opens in assets/models. A file from outside the project is copied there',
+            'obj.dialogTitle': 'Import FBX model',
+            'obj.save': 'Save to Objects.js',
+            'obj.revert': '↺ Revert',
+            'obj.revertTitle': 'Restore the saved layout',
+            'obj.empty': 'No objects. Import an FBX model — it appears at the center of the view.',
+            'obj.noSelection': 'Select an object in the list or click it in the view.',
+            'obj.missing': 'model not loaded',
+            'obj.name': 'Name',
+            'obj.model': 'Model',
+            'obj.kind': 'Kind',
+            'obj.kindProp': 'environment (prop)',
+            'obj.kindActor': 'main object (actor)',
+            'obj.kindHint': 'Environment and main objects have their own highlight, edge and outline levels',
+            'obj.position': 'Position (px)',
+            'obj.positionHint': 'X and Y — on the map, H — height above the ground',
+            'obj.rot': 'Rotation (°)',
+            'obj.rotHint': 'Y — heading on the map (0 — along +x, 90 — down), X and Z — tilt',
+            'obj.scale': 'Scale',
+            'obj.scaleHint': '1 — model size from the file: 1 cm = 1 px',
+            'obj.anim': 'Animation',
+            'obj.animPart': 'Rotating part',
+            'obj.animPartHint': 'An object inside the model (FBX): it spins around its origin set in Blender',
+            'obj.animNone': '— none —',
+            'obj.animAxis': 'Axis',
+            'obj.animAxisHint': 'Local axis of the part, as in Blender; minus — the opposite end',
+            'obj.animSpeed': 'Speed (rpm)',
+            'obj.animSpeedHint': 'Revolutions per minute; 0 — stopped',
+            'obj.animDir': 'Direction',
+            'obj.animDirHint': 'As seen from the end of the axis',
+            'obj.animCw': 'clockwise',
+            'obj.animCcw': 'counterclockwise',
+            'obj.focus': 'Focus (F)',
+            'obj.duplicate': 'Duplicate (Ctrl+D)',
+            'obj.delete': 'Delete (Del)',
+            'obj.footer': 'Gizmo: 1 move · 2 rotate · 3 scale. Click an object to select it, Esc to deselect. Ctrl+Z undo, Ctrl+Shift+Z redo.',
+            'insp.save': 'Save to Constants.js',
+            'insp.saveN': 'Save to Constants.js ({n})',
+            'insp.revert': '↺ Revert',
+            'insp.revertTitle': 'Restore all loaded values',
+            'insp.search': 'search: toon, shadow, FOV, CAMERA…',
+            'insp.footer': 'Edits apply instantly, Ctrl+Z undoes. The file is written only by Save (Ctrl+S). Backups:',
+            'insp.reset': 'Restore the loaded value',
+            'insp.offList': '(not in list)',
+            'toast.reverted': 'All values restored to the loaded ones',
+            'toast.noSave': 'Saving unavailable: the page was not opened via editor.bat',
+            'toast.saved': 'Saved {n} value(s) → Constants.js (backup: {backup})',
+            'toast.partial': 'Saved {n}, rejected {m}: {list}',
+            'toast.saveError': 'Save failed: {msg}',
+            'toast.no3d': '3D failed to start: no /libs/babylon.js or WebGL',
+            'toast.modelFailed': 'Model failed to load: {url} ({msg})',
+            'toast.objSaved': 'Saved {n} object(s) → Objects.js (backup: {backup})',
+            'toast.objSaveError': 'Objects were not saved: {msg}',
+            'toast.objReverted': 'Object layout restored to the saved one',
+            'toast.imported': 'Model added: {path}',
+            'toast.importCopied': 'The file was copied into the project and added: {path}',
+            'toast.importError': 'Import failed: {msg}',
+            'err.not_found': 'constant not found in Constants.js',
+            'err.not_literal': 'the value in the file is not a number literal (a formula?) — unsafe to patch',
+            'err.bad_value': 'the new value is not a number',
+            'err.bad_name': 'invalid name',
+            'err.bad_objects': 'the object list is not an array',
+            'err.bad_model': 'model path must be assets/….fbx (ASCII, no spaces)',
+            'err.not_fbx': 'not an .fbx file',
+            'err.not_binary': 'ASCII FBX is not supported — export a binary FBX',
+            'err.too_large': 'the file is too large',
+            'err.dialog_failed': 'the file dialog failed to open',
+            'err.unsupported': 'no system file dialog on this OS',
+            'info': '{fps} fps · zoom {zoom} · azimuth {az}° · pitch {pitch}° · target {x}, {y}',
+            'info.terrain': ' · terrain {tris}K tris, cell {cell} px',
+            'boot.failed': 'The editor failed to start:',
+            'boot.hint': 'Run it via _utils/editor.bat (needs Node) instead of opening the file.',
+            'boot.noConstants': 'could not load /Constants.js: HTTP {status}',
+            'boot.badConstants': 'Constants.js ran, but WORLD3D_TOON is not visible — did the file format change?',
+        },
+        ru: {
+            'title': 'ArcEngine — редактор',
+            'brand': 'редактор',
+            'lang.title': 'Язык интерфейса',
+            'server.checking': 'проверка сервера…',
+            'server.ok': 'сервер редактора',
+            'server.old': 'СТАРЫЙ сервер (api {api} < {need}) — перезапусти editor.bat',
+            'server.oldToast': 'Сервер редактора запущен со старым кодом. Перезапусти _utils/editor.bat.',
+            'server.none': 'нет API — сохранение недоступно (запусти _utils/editor.bat)',
+            'cam.free': 'Свободная камера',
+            'cam.freeTitle': 'Навигация редактора: ЛКМ/ПКМ — орбита, средняя или Shift+ЛКМ — панорама, колесо — зум к курсору',
+            'cam.game': 'Игровая камера',
+            'cam.gameTitle': 'Камера игры: те же константы CAMERA_*, пределы и управление, что при запуске игры',
+            'cam.home': '↺ Старт камеры',
+            'cam.homeTitle': 'Камера в стартовое положение из констант (R)',
+            'cam.hintFree': 'Свободная камера: ЛКМ/ПКМ — орбита · клик — выбор объекта · средняя или Shift+ЛКМ — панорама · колесо — зум · WASD · R — старт',
+            'cam.hintGame': 'Игровая камера: клик — выбор объекта · колесо — зум · средняя кнопка и WASD — панорама · ПКМ — вращение (CAMERA_ORBIT) · R — старт',
+            'opt.toon': 'toon-шейдер',
+            'opt.toonTitle': 'WORLD3D_TOON: ступени света и обводка силуэта или обычное плавное затенение',
+            'tab.settings': 'Глобальные настройки',
+            'tab.objects': 'Объекты',
+            'gizmo.move': 'Перемещение',
+            'gizmo.rotate': 'Поворот',
+            'gizmo.scale': 'Масштаб',
+            'gizmo.moveTitle': 'Гизмо: сдвиг по стрелкам или по земле за зелёный квадрат (1)',
+            'gizmo.rotateTitle': 'Гизмо: поворот вокруг осей X, Y, Z за кольца (2)',
+            'gizmo.scaleTitle': 'Гизмо: масштаб по оси — за её ручку, равномерно — за центр (3)',
+            'obj.import': 'Импорт FBX…',
+            'obj.importing': 'Выбор файла…',
+            'obj.importTitle': 'Выбрать бинарный .fbx — диалог откроется в assets/models. Файл не из проекта копируется туда',
+            'obj.dialogTitle': 'Импорт модели FBX',
+            'obj.save': 'Сохранить в Objects.js',
+            'obj.revert': '↺ Откатить',
+            'obj.revertTitle': 'Вернуть сохранённую раскладку',
+            'obj.empty': 'Объектов нет. Импортируйте модель FBX — она появится в центре вида.',
+            'obj.noSelection': 'Выберите объект в списке или кликните по нему в виде.',
+            'obj.missing': 'модель не загрузилась',
+            'obj.name': 'Имя',
+            'obj.model': 'Модель',
+            'obj.kind': 'Вид',
+            'obj.kindProp': 'окружение (prop)',
+            'obj.kindActor': 'главный объект (actor)',
+            'obj.kindHint': 'У окружения и главных объектов свои уровни блика, контура и обводки',
+            'obj.position': 'Позиция (px)',
+            'obj.positionHint': 'X и Y — по карте, H — высота над землёй',
+            'obj.rot': 'Поворот (°)',
+            'obj.rotHint': 'Y — курс по карте (0 — вдоль +x, 90 — вниз), X и Z — наклон',
+            'obj.scale': 'Масштаб',
+            'obj.scaleHint': '1 — размер модели из файла: 1 см = 1 px',
+            'obj.anim': 'Анимация',
+            'obj.animPart': 'Вращается часть',
+            'obj.animPartHint': 'Объект внутри модели (FBX): крутится вокруг своего origin из Blender',
+            'obj.animNone': '— нет —',
+            'obj.animAxis': 'Ось',
+            'obj.animAxisHint': 'Локальная ось части, как в Blender; минус — обратный конец',
+            'obj.animSpeed': 'Скорость (об/мин)',
+            'obj.animSpeedHint': 'Оборотов в минуту; 0 — стоит',
+            'obj.animDir': 'Направление',
+            'obj.animDirHint': 'Если смотреть с конца оси',
+            'obj.animCw': 'по часовой',
+            'obj.animCcw': 'против часовой',
+            'obj.focus': 'Показать (F)',
+            'obj.duplicate': 'Дублировать (Ctrl+D)',
+            'obj.delete': 'Удалить (Del)',
+            'obj.footer': 'Гизмо: 1 — сдвиг · 2 — поворот · 3 — масштаб. Клик по объекту — выбор, Esc — снять выбор. Ctrl+Z — отменить, Ctrl+Shift+Z — повторить.',
+            'insp.save': 'Сохранить в Constants.js',
+            'insp.saveN': 'Сохранить в Constants.js ({n})',
+            'insp.revert': '↺ Откатить',
+            'insp.revertTitle': 'Вернуть все загруженные значения',
+            'insp.search': 'поиск: toon, тени, FOV, CAMERA…',
+            'insp.footer': 'Правки видны сразу, Ctrl+Z — отменить. В файл — только по кнопке (Ctrl+S). Бэкапы:',
+            'insp.reset': 'Вернуть загруженное значение',
+            'insp.offList': '(вне списка)',
+            'toast.reverted': 'Все значения возвращены к загруженным',
+            'toast.noSave': 'Сохранение недоступно: страница открыта не через editor.bat',
+            'toast.saved': 'Сохранено {n} знач. → Constants.js (бэкап: {backup})',
+            'toast.partial': 'Записано {n}, отклонено {m}: {list}',
+            'toast.saveError': 'Ошибка сохранения: {msg}',
+            'toast.no3d': '3D не поднялся: нет /libs/babylon.js или WebGL',
+            'toast.modelFailed': 'Модель не загрузилась: {url} ({msg})',
+            'toast.objSaved': 'Сохранено объектов: {n} → Objects.js (бэкап: {backup})',
+            'toast.objSaveError': 'Объекты не сохранены: {msg}',
+            'toast.objReverted': 'Раскладка объектов возвращена к сохранённой',
+            'toast.imported': 'Модель добавлена: {path}',
+            'toast.importCopied': 'Файл скопирован в проект и добавлен: {path}',
+            'toast.importError': 'Импорт не удался: {msg}',
+            'err.not_found': 'константа не найдена в Constants.js',
+            'err.not_literal': 'значение в файле — не числовой литерал (формула?), патчить опасно',
+            'err.bad_value': 'новое значение не число',
+            'err.bad_name': 'недопустимое имя',
+            'err.bad_objects': 'список объектов — не массив',
+            'err.bad_model': 'путь модели — assets/….fbx (латиница, без пробелов)',
+            'err.not_fbx': 'файл не .fbx',
+            'err.not_binary': 'текстовый (ASCII) FBX не читается — экспортируйте бинарный',
+            'err.too_large': 'файл слишком большой',
+            'err.dialog_failed': 'диалог выбора файла не открылся',
+            'err.unsupported': 'на этой ОС нет системного диалога выбора файла',
+            'info': '{fps} к/с · зум {zoom} · азимут {az}° · наклон {pitch}° · цель {x}, {y}',
+            'info.terrain': ' · террейн {tris}K треуг., клетка {cell} px',
+            'boot.failed': 'Редактор не запустился:',
+            'boot.hint': 'Запускать через _utils/editor.bat (нужен Node), а не открытием файла.',
+            'boot.noConstants': 'не удалось загрузить /Constants.js: HTTP {status}',
+            'boot.badConstants': 'Constants.js исполнен, но WORLD3D_TOON не виден — формат файла изменился?',
+        },
+    },
+
+    // Язык из localStorage (EN, если нет или хранилище закрыто) + разметка + кнопки переключателя.
+    init() {
+        let saved = null;
+        try { saved = localStorage.getItem(this.KEY); } catch (e) { /* хранилище закрыто */ }
+        this.lang = this.LANGS.includes(saved) ? saved : 'en';
+        for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#lang-switch [data-lang]'))) {
+            btn.addEventListener('click', () => this.set(btn.dataset.lang));
+        }
+        this.applyDom();
+    },
+
+    set(lang) {
+        if (!this.LANGS.includes(lang) || lang === this.lang) return;
+        this.lang = lang;
+        try { localStorage.setItem(this.KEY, lang); } catch (e) { /* выбор проживёт до F5 */ }
+        this.applyDom();
+        window.dispatchEvent(new CustomEvent('lang-changed', { detail: { lang } }));
+    },
+
+    // Строка интерфейса; нет перевода — английская, нет и её — сам ключ.
+    t(key, params) {
+        const s = this.STRINGS[this.lang][key] || this.STRINGS.en[key] || key;
+        return params ? s.replace(/\{(\w+)\}/g, (m, k) => (k in params ? String(params[k]) : m)) : s;
+    },
+
+    // Текст схемы: строка или { en, ru }.
+    pick(text) {
+        if (text == null) return '';
+        if (typeof text === 'string') return text;
+        return text[this.lang] || text.en || '';
+    },
+
+    applyDom() {
+        document.documentElement.lang = this.lang;
+        document.title = this.t('title');
+        for (const el of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-i18n]'))) el.textContent = this.t(el.dataset.i18n);
+        for (const el of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('[data-i18n-title]'))) el.title = this.t(el.dataset.i18nTitle);
+        for (const el of /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('[data-i18n-placeholder]'))) el.placeholder = this.t(el.dataset.i18nPlaceholder);
+        for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#lang-switch [data-lang]'))) {
+            btn.classList.toggle('active', btn.dataset.lang === this.lang);
+        }
+    },
+};

@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": [
+    "*.js",
+    "../../Constants.js", "../../Objects.js", "../../World3D.js", "../../Terrain3D.js",
+    "../../CameraControl.js", "../../Model3D.js", "../../Location3D.js",
+    "../../globals.d.ts", "../../libs/*.d.ts"
+  ]
+}
