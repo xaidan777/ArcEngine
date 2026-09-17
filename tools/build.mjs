@@ -3,8 +3,8 @@
 // ----------------------------------------------------------------------------
 //  node tools/build.mjs [флаги]
 //
-//    --version=0.2.0   версия билда (по умолчанию — GAME_VERSION из Constants.js);
-//                      прописывается в Constants.js билда и в ?v= у <script>
+//    --version=0.2.0   версия билда (по умолчанию — GAME_VERSION из js/Constants.js);
+//                      прописывается в js/Constants.js билда и в ?v= у <script>
 //    --out=dist        куда положить архив                     (по умолчанию dist)
 //    --no-zip          только собрать папку build/, не архивировать
 //    --keep-unused     не выбрасывать ассеты, на которые нет ссылок
@@ -69,7 +69,7 @@ async function main() {
   say(C.dim + '  ' + '='.repeat(58) + C.r + '\n');
 
   // --- версия --------------------------------------------------------------
-  const constantsSrc = await fsp.readFile(path.join(ROOT, 'Constants.js'), 'utf8');
+  const constantsSrc = await fsp.readFile(path.join(ROOT, 'js', 'Constants.js'), 'utf8');
   const vMatch = /const\s+GAME_VERSION\s*=\s*['"]([^'"]+)['"]/.exec(constantsSrc);
   if (!vMatch) fail('в Constants.js не найден GAME_VERSION');
   const currentVersion = vMatch ? vMatch[1] : '0.0.0';
@@ -114,13 +114,13 @@ async function main() {
     catch { fail('нет файла кода: ' + f); }
   }
 
-  // 1e. порядок подключения: Constants.js обязан идти первым —
+  // 1e. порядок подключения: js/Constants.js обязан идти первым —
   //     остальные модули читают его глобалы уже на этапе загрузки.
   const indexSrc = await fsp.readFile(path.join(ROOT, 'index.html'), 'utf8');
   const srcOrder = [...indexSrc.matchAll(/<script\s+src=["']([^"']+)["']/g)].map(m => m[1]);
   const localOrder = srcOrder.filter(s => !/^https?:/.test(s) && !s.startsWith('libs/'));
-  if (localOrder[0] !== 'Constants.js') {
-    fail('первым локальным скриптом должен идти Constants.js, а идёт ' + localOrder[0]);
+  if (localOrder[0] !== 'js/Constants.js') {
+    fail('первым локальным скриптом должен идти js/Constants.js, а идёт ' + localOrder[0]);
   } else {
     ok('порядок подключения скриптов корректный');
   }
@@ -217,7 +217,7 @@ async function main() {
     if (rel === 'index.html') {
       data = Buffer.from(stampIndexHtml(data.toString('utf8'), VERSION), 'utf8');
     }
-    if (rel === 'Constants.js' && VERSION !== currentVersion) {
+    if (rel === 'js/Constants.js' && VERSION !== currentVersion) {
       data = Buffer.from(
         data.toString('utf8').replace(
           /const\s+GAME_VERSION\s*=\s*['"][^'"]+['"]/,

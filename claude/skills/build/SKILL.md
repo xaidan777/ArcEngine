@@ -16,10 +16,9 @@ build.bat --version=0.2.0    # проставить версию в билд
 build.bat --no-zip           # только папка build/
 build.bat --keep-unused      # не выбрасывать ассеты без ссылок
 build.bat --force            # собрать несмотря на провалы проверок
-upload.bat "что изменилось"  # на GitHub: git add -A, commit, push (только по просьбе пользователя)
 ```
 
-Git — только для заливки: что не едет — `.gitignore`; `.gitattributes` (`* -text`) — байт в байт,
+Git: что не едет в репозиторий — `.gitignore`; `.gitattributes` (`* -text`) — файлы байт в байт,
 без замены концов строк.
 
 ## dev-сервер (`tools/dev-server.mjs`)
@@ -37,7 +36,7 @@ Git — только для заливки: что не едет — `.gitignore
 |---|---|
 | ссылки на ассеты резолвятся | 404 в рантайме |
 | `node --check` каждого скрипта | синтаксическую ошибку больше ловить нечем |
-| `index.html` есть, `Constants.js` — первый локальный скрипт | точка входа в корне; глобалы констант читаются при загрузке |
+| `index.html` есть, `js/Constants.js` — первый локальный скрипт | точка входа в корне; глобалы констант читаются при загрузке |
 | внешних скриптов и URL нет | ноль зависимостей: всё лежит в архиве |
 | имена файлов — ASCII без пробелов | распаковка и URL на хостинге |
 | регистр путей совпадает с диском (через `readdir`) | разработка на Windows, раздача с Linux |
@@ -56,7 +55,7 @@ TypeScript 7 (`npx --yes -p typescript@7.0.2 tsc`, версия — в `tools/ch
 
 | Конфиг | Файлы |
 |---|---|
-| `tsconfig.json` | `*.js` корня, `globals.d.ts`, `libs/*.d.ts` |
+| `tsconfig.json` | `js/*.js`, `globals.d.ts`, `libs/*.d.ts` |
 | `_utils/editor/tsconfig.json` | `_utils/editor/*.js` + модули набора без `main.js` (у редактора свой) |
 
 Режим: `strict` без `noImplicitAny`, `strictNullChecks`, `useUnknownInCatchVariables` — ловит
@@ -97,7 +96,7 @@ TypeScript 7 (`npx --yes -p typescript@7.0.2 tsc`, версия — в `tools/ch
 
 ## Чеклист
 
-1. Новый скрипт — строка в `CODE_FILES`; новый ассет — литерал `'assets/…'` в коде.
+1. Новый скрипт — файл в `js/`, `<script>` в `index.html` и строка в `CODE_FILES`; новый ассет — литерал `'assets/…'` в коде.
 2. `node tools/check.mjs` проходит; новая логика без 3D — тест рядом с похожими.
 3. `build.bat` проходит без `--force`.
 4. Игра стартует на dev-сервере — консоль без ошибок.

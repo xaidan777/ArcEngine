@@ -80,12 +80,12 @@ export function patchScalar(src, name, value) {
   return { src: src.slice(0, m.index) + m[1] + num + m[3] + src.slice(m.index + m[0].length) };
 }
 
-// changes: [{ name: 'CAMERA_FOV_DEG', value: 52 }] -> патч <root>/Constants.js.
+// changes: [{ name: 'CAMERA_FOV_DEG', value: 52 }] -> патч <root>/js/Constants.js.
 export async function saveConstants(root, changes) {
   if (!Array.isArray(changes) || changes.length === 0) {
     return { ok: false, error: 'empty change list' };
   }
-  const file = path.join(root, 'Constants.js');
+  const file = path.join(root, 'js', 'Constants.js');
   // BOM (если есть) снимаем на время патча и возвращаем при записи.
   const raw = await fsp.readFile(file, 'utf8');
   const hadBom = raw.charCodeAt(0) === 0xFEFF;
@@ -183,11 +183,11 @@ export function formatObjects(objects) {
   return { ok: true, src: OBJECTS_HEADER + 'const LOCATION_OBJECTS = [\n' + lines.join('') + '];\n', count: lines.length };
 }
 
-// Список объектов -> <root>/Objects.js целиком (негодный список файл не трогает).
+// Список объектов -> <root>/js/Objects.js целиком (негодный список файл не трогает).
 export async function saveObjects(root, objects) {
   const r = formatObjects(objects);
   if (!r.ok) return r;
-  const file = path.join(root, 'Objects.js');
+  const file = path.join(root, 'js', 'Objects.js');
   const backup = fs.existsSync(file) ? await backupFile(root, file, 'Objects') : null;
   await fsp.writeFile(file, r.src, 'utf8');
   return { ok: true, count: r.count, backup };

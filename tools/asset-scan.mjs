@@ -22,14 +22,14 @@ export const EXTRA_REFS = [];
 // index.html = новая строка здесь, иначе файл не попадёт в архив.
 export const CODE_FILES = [
   'index.html',
-  'Constants.js', 'Objects.js', 'World3D.js', 'Terrain3D.js', 'CameraControl.js', 'Model3D.js', 'Location3D.js', 'main.js',
+  'js/Constants.js', 'js/Objects.js', 'js/World3D.js', 'js/Terrain3D.js', 'js/CameraControl.js', 'js/Model3D.js', 'js/Location3D.js', 'js/main.js',
   'libs/simplex-noise.js', 'libs/babylon.js',
 ];
 
 // Что заведомо не едет в сборку.
 export const BUILD_EXCLUDE = [
   'tools', 'build', 'dist', '.git', '.claude', 'claude', '_utils', 'tests',
-  'CLAUDE.md', 'run.bat', 'build.bat', 'check.bat', 'upload.bat', 'README.md', 'tsconfig.json', 'globals.d.ts',
+  'CLAUDE.md', 'run.bat', 'build.bat', 'check.bat', 'upload.bat', 'editor.bat', 'README.md', 'tsconfig.json', 'globals.d.ts',
 ];
 
 const SCAN_EXT = new Set(['.js', '.html', '.css']);

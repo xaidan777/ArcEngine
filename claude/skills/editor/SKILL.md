@@ -6,8 +6,8 @@ description: Веб-редактор набора (_utils/editor) — вид л�
 # Редактор (`_utils/editor`)
 
 ```
-_utils/editor.bat              # порт 8090 (или следующий свободный), откроет браузер
-_utils/editor.bat 9100 --no-open
+editor.bat                     # в корне набора: порт 8090 (или следующий свободный), откроет браузер
+editor.bat 9100 --no-open
 ```
 
 Адрес: `http://localhost:8090/_utils/editor/`. Нужен только Node. Редактор — не часть
@@ -19,9 +19,9 @@ _utils/editor.bat 9100 --no-open
 |---|---|
 | `server.mjs` | статика от КОРНЯ проекта (no-store) + `GET /api/status`, `POST /api/save-constants`, `/api/save-objects`, `/api/pick-model`, `/api/import-model`. `EDITOR_API_VERSION` |
 | `save.mjs` | запись без HTTP: `patchScalar`, `saveConstants(root, changes)`, `formatObjects`, `saveObjects(root, objects)`, бэкапы, `ERRORS`/`failure`, `isModelPath`; покрыт `tests/editor-save.test.mjs` |
-| `index.html` | шапка с переключателем языка `#lang-switch`, тулбар вида, канвас `#view-canvas`, правая панель с вкладками `#pane-tabs` (`.pane-panel[data-tab]`: settings, objects); порядок скриптов: `i18n.js`, `schema.js`, `loader.js`, модули набора с корня (`/Objects.js`, `/World3D.js` … `/Model3D.js`, `/Location3D.js`), `inspector.js`, `objects-panel.js`, `lab.js`, `main.js` |
+| `index.html` | шапка с переключателем языка `#lang-switch`, тулбар вида, канвас `#view-canvas`, правая панель с вкладками `#pane-tabs` (`.pane-panel[data-tab]`: settings, objects); порядок скриптов: `i18n.js`, `schema.js`, `loader.js`, модули набора (`/js/Objects.js`, `/js/World3D.js` … `/js/Model3D.js`, `/js/Location3D.js`), `inspector.js`, `objects-panel.js`, `lab.js`, `main.js` |
 | `i18n.js` | `I18N`: язык (EN по умолчанию, выбор в `localStorage` `arcengine.editor.lang`), словари `STRINGS.en/ru`, `t(key, params)`, `pick({ en, ru })`, разметка по `data-i18n*`, событие `lang-changed` |
-| `loader.js` | тянет `/Constants.js`, меняет `^const` на `var`, исполняет косвенным `eval` — константы становятся перезаписываемыми свойствами `window` |
+| `loader.js` | тянет `/js/Constants.js`, меняет `^const` на `var`, исполняет косвенным `eval` — константы становятся перезаписываемыми свойствами `window` |
 | `schema.js` | `KIT_SCHEMA` — группы и поля инспектора, тексты `{ en, ru }`; `EDITOR_API_VERSION` клиента |
 | `history.js` | `EditHistory`: отмена/повтор (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y) — записи `{ key, undo, redo }`, одинаковый `key` быстрее 800 мс склеивается, `batch(fn)` — один шаг; в текстовых и числовых полях Ctrl+Z — браузерный |
 | `inspector.js` | вкладка Global Settings: поля из схемы, группы свёрнуты при запуске, dirty-подсветка, ↺, поиск на обоих языках, «Сохранить» (Ctrl+S); `Toast` |

@@ -13,7 +13,7 @@ main.js: World3D.init(canvas) -> new Location3D() -> new CameraController(view)
          runRenderLoop: location.update(dt) -> camera.update(dt) -> World3D.renderFrame()
 ```
 
-## Файлы
+## Файлы (`js/`)
 
 | Файл | Что |
 |---|---|
@@ -191,11 +191,12 @@ toon), ставит корень в карту теней, рёбра — в к�
 1. Новая константа: числовой литерал в `Constants.js` + чтение через `typeof` с
    дефолтом (`World3D.cfg()` / `CameraController.cfg()`) + строка в `_utils/editor/schema.js`
    (подписи `{ en, ru }`, скилл `editor`).
-2. Новый `<script>`: место в `index.html` (после `Constants.js`, до `main.js`) и строка
-   в `CODE_FILES` (`tools/asset-scan.mjs`); редактору — тот же скрипт в его `index.html`.
+2. Новый скрипт: файл в `js/`, `<script src="js/…">` в `index.html` (после `Constants.js`,
+   до `main.js`) и строка в `CODE_FILES` (`tools/asset-scan.mjs`); редактору — тот же скрипт
+   в его `index.html` (`/js/…`).
 3. Новый объект мира — через `World3D.addObject`; проекции экран↔мир — через `View3D`.
 4. Не трогать: `useRightHandedSystem`, CSS px в `createPickingRay`, порядок света,
    `shadowMinZ/MaxZ`, проверку нормалей террейна.
 5. `node tools/check.mjs` проходит (типы и тесты, скилл `build`); новое поле на объекте
    Babylon — в `globals.d.ts`.
-6. Проверить в браузере игру (`run.bat`) и редактор (`_utils/editor.bat`): консоль без ошибок.
+6. Проверить в браузере игру (`run.bat`) и редактор (`editor.bat`): консоль без ошибок.

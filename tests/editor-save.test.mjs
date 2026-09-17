@@ -67,23 +67,23 @@ test('patchScalar: отказы — формула, нет имени, не чи
 
 test('saveConstants: BOM, бэкап, частичный отказ, неверное имя', async () => {
   const original = '\uFEFFconst A = 1;\nconst B = 0x102030;\nconst F = A * 2;\n';
-  const root = tempRoot({ 'Constants.js': original });
+  const root = tempRoot({ 'js/Constants.js': original });
   const r = await saveConstants(root, [
     { name: 'A', value: 3 }, { name: 'B', value: 0xabcdef }, { name: 'F', value: 1 }, { name: 'A.B', value: 1 },
   ]);
   assert.equal(r.ok, false);
   assert.equal(r.patched, 2);
   assert.deepEqual(r.results.map(x => x.code || 'ok'), ['ok', 'ok', 'not_literal', 'bad_name']);
-  assert.equal(read(root, 'Constants.js'), '\uFEFFconst A = 3;\nconst B = 0xabcdef;\nconst F = A * 2;\n');
+  assert.equal(read(root, 'js/Constants.js'), '\uFEFFconst A = 3;\nconst B = 0xabcdef;\nconst F = A * 2;\n');
   assert.equal(r.backup, '_utils/.backups/' + backups(root, 'Constants')[0]);
   assert.equal(read(root, r.backup), original);
 });
 
 test('saveConstants: ничего не подошло — файл и бэкапы не трогаются', async () => {
-  const root = tempRoot({ 'Constants.js': 'const A = 1;\n' });
+  const root = tempRoot({ 'js/Constants.js': 'const A = 1;\n' });
   const r = await saveConstants(root, [{ name: 'NOPE', value: 1 }]);
   assert.equal(r.patched, 0);
-  assert.equal(read(root, 'Constants.js'), 'const A = 1;\n');
+  assert.equal(read(root, 'js/Constants.js'), 'const A = 1;\n');
   assert.deepEqual(backups(root, 'Constants'), []);
   assert.equal((await saveConstants(root, [])).ok, false);
 });
@@ -91,7 +91,7 @@ test('saveConstants: ничего не подошло — файл и бэкап
 test('бэкапов хранится 20 последних', async () => {
   const old = {};
   for (let i = 10; i < 35; i++) old[`_utils/.backups/Constants-2000-01-01-00-00-${i}.js`] = 'old';
-  const root = tempRoot({ 'Constants.js': 'const A = 1;\n', ...old });
+  const root = tempRoot({ 'js/Constants.js': 'const A = 1;\n', ...old });
   const r = await saveConstants(root, [{ name: 'A', value: 2 }]);
   const left = backups(root, 'Constants');
   assert.equal(left.length, 20);
@@ -100,7 +100,7 @@ test('бэкапов хранится 20 последних', async () => {
 });
 
 test('каждое число настоящего Constants.js редактор может перезаписать без потерь', () => {
-  const src = fs.readFileSync(path.join(ROOT, 'Constants.js'), 'utf8').replace(/^\uFEFF/, '');
+  const src = fs.readFileSync(path.join(ROOT, 'js', 'Constants.js'), 'utf8').replace(/^\uFEFF/, '');
   const names = [...src.matchAll(/^const\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(-?\d+(?:\.\d+)?|0[xX][0-9a-fA-F]+)\s*;/gm)].map(m => m[1]);
   assert.ok(names.length > 50, 'констант найдено: ' + names.length);
   const before = evalConsts(src, names);
@@ -160,15 +160,15 @@ test('Objects.js: негодные записи отклоняются с ном
 });
 
 test('saveObjects: файл с бэкапом, негодный список файл не трогает, сканер видит модели', async () => {
-  const root = tempRoot({ 'Objects.js': 'const LOCATION_OBJECTS = [];\n', 'assets/models/mill.fbx': 'fbx' });
+  const root = tempRoot({ 'js/Objects.js': 'const LOCATION_OBJECTS = [];\n', 'assets/models/mill.fbx': 'fbx' });
   const r = await saveObjects(root, [MILL]);
   assert.equal(r.ok, true);
   assert.equal(read(root, r.backup), 'const LOCATION_OBJECTS = [];\n');
-  const written = read(root, 'Objects.js');
+  const written = read(root, 'js/Objects.js');
   assert.equal(evalObjects(written).length, 1);
 
   assert.equal((await saveObjects(root, [{ ...MILL, model: 'C:/mill.fbx' }])).code, 'bad_model');
-  assert.equal(read(root, 'Objects.js'), written);
+  assert.equal(read(root, 'js/Objects.js'), written);
 
   const scan = await collectRefs(root);
   assert.deepEqual(scan.refs, ['assets/models/mill.fbx'], 'шапка файла не даёт ложных ссылок');

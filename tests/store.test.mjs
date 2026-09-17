@@ -17,7 +17,7 @@ const quietConsole = { ...console, warn() {} };
 
 test('get/set/remove через localStorage', () => {
   const storage = memoryStorage();
-  const Store = loadScripts(['Constants.js'], { localStorage: storage }).get('Store');
+  const Store = loadScripts(['js/Constants.js'], { localStorage: storage }).get('Store');
   assert.equal(Store.get('k'), null);
   assert.equal(Store.set('k', 5), true);
   assert.equal(Store.get('k'), '5');
@@ -27,7 +27,7 @@ test('get/set/remove через localStorage', () => {
 
 test('getJSON: объект, отсутствие, битое и не-объектное значение', () => {
   const storage = memoryStorage();
-  const Store = loadScripts(['Constants.js'], { localStorage: storage, console: quietConsole }).get('Store');
+  const Store = loadScripts(['js/Constants.js'], { localStorage: storage, console: quietConsole }).get('Store');
   const fallback = { level: 1 };
   assert.equal(Store.getJSON('save', fallback), fallback);
 
@@ -48,7 +48,7 @@ test('закрытое хранилище (SecurityError в sandbox-iframe) не
     get() { throw new DOMException('The operation is insecure.', 'SecurityError'); },
     enumerable: true,
   });
-  const Store = loadScripts(['Constants.js'], globals).get('Store');
+  const Store = loadScripts(['js/Constants.js'], globals).get('Store');
   assert.equal(Store.get('k'), null);
   assert.equal(Store.set('k', 1), false);
   assert.doesNotThrow(() => Store.remove('k'));

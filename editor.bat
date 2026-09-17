@@ -9,7 +9,7 @@ rem    editor.bat 9100         -> custom port
 rem    editor.bat 9100 --no-open  -> do not open a browser
 rem ==========================================================================
 setlocal
-cd /d "%~dp0.."
+cd /d "%~dp0"
 
 where node >nul 2>nul
 if errorlevel 1 (

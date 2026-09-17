@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { loadScripts, stub } from './browser-scripts.mjs';
 
-const SCRIPTS = ['Constants.js', 'libs/simplex-noise.js', 'Terrain3D.js'];
+const SCRIPTS = ['js/Constants.js', 'libs/simplex-noise.js', 'js/Terrain3D.js'];
 const EPS = 1e-3;   // поле высот — Float32Array
 
 function makeTerrain(noise = {}, cfg = {}, globals = {}) {

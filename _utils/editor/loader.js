@@ -17,7 +17,7 @@
 /** @satisfies {Record<string, any>} */
 const EditorLoader = {
     async load() {
-        const resp = await fetch('/Constants.js', { cache: 'no-store' });
+        const resp = await fetch('/js/Constants.js', { cache: 'no-store' });
         if (!resp.ok) throw new Error(I18N.t('boot.noConstants', { status: resp.status }));
         let src = await resp.text();
         src = src.replace(/^\uFEFF/, '');
