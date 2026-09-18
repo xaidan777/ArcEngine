@@ -1,28 +1,28 @@
 // ============================================================================
-//  ArcEngine — сборщик билда
+//  ArcEngine — builder of the build
 // ----------------------------------------------------------------------------
-//  node tools/build.mjs [флаги]
+//  node tools/build.mjs [flags]
 //
-//    --version=0.2.0   версия билда (по умолчанию — GAME_VERSION из js/Constants.js);
-//                      прописывается в js/Constants.js билда и в ?v= у <script>
-//    --out=dist        куда положить архив                     (по умолчанию dist)
-//    --no-zip          только собрать папку build/, не архивировать
-//    --keep-unused     не выбрасывать ассеты, на которые нет ссылок
-//    --force           собрать несмотря на ошибки проверки
-//    --quiet           без подробного лога
+//    --version=0.2.0   build version (default — GAME_VERSION from js/Constants.js);
+//                      written into the build's js/Constants.js and into ?v= of <script>
+//    --out=dist        where to put the archive                (default dist)
+//    --no-zip          only assemble the build/ folder, do not archive
+//    --keep-unused     do not drop assets that have no references
+//    --force           build despite check errors
+//    --quiet           no detailed log
 //
-//  Что делает:
-//    1. проверяет проект (ассеты, синтаксис JS, внешние запросы, точка входа);
-//    2. кладёт в build/ ТОЛЬКО то, что игре нужно в рантайме;
-//    3. проставляет версию: ?v= в <script src> и @font-face, GAME_VERSION;
-//    4. пакует в dist/<ARCHIVE_NAME>-<version>.zip (index.html строго в корне архива);
-//    5. печатает отчёт: размеры, топ файлов, что выкинуто, что проверено.
+//  What it does:
+//    1. checks the project (assets, JS syntax, external requests, entry point);
+//    2. puts into build/ ONLY what the game needs at runtime;
+//    3. stamps the version: ?v= in <script src> and @font-face, GAME_VERSION;
+//    4. packs into dist/<ARCHIVE_NAME>-<version>.zip (index.html strictly at the archive root);
+//    5. prints a report: sizes, top files, what was dropped, what was checked.
 //
-//  ПОЧЕМУ ?v= проставляется здесь, а не в рантайме:
-//    в index.html была строчка, дописывающая '?v='+GAME_VERSION к src уже
-//    выполненных <script>. Это no-op: менять src после выполнения поздно,
-//    браузер продолжает отдавать закэшированный скрипт. Кэш-бастинг скриптов
-//    можно сделать только на этапе сборки — здесь.
+//  WHY ?v= is stamped here and not at runtime:
+//    index.html used to have a line appending '?v='+GAME_VERSION to the src of
+//    already executed <script>s. That is a no-op: changing src after execution is
+//    too late, the browser keeps serving the cached script. Cache busting of scripts
+//    can only be done at build time — here.
 // ============================================================================
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -36,11 +36,11 @@ const execFileP = promisify(execFile);
 const ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..');
 const ARCHIVE_NAME = 'arcengine';   // dist/<ARCHIVE_NAME>-<version>.zip
 
-// Имена файлов в архиве: только ASCII без пробелов — кириллица и пробелы
-// в путях ломают распаковку и URL на хостинге.
+// File names in the archive: ASCII only, no spaces — Cyrillic and spaces
+// in paths break unpacking and URLs on the hosting.
 const SAFE_NAME = /^[A-Za-z0-9._\-/]+$/;
 
-// --- Разбор флагов ----------------------------------------------------------
+// --- Flag parsing -----------------------------------------------------------
 const argv = process.argv.slice(2);
 const flag = n => argv.includes('--' + n);
 const opt  = (n, d) => {
@@ -68,7 +68,7 @@ async function main() {
   say('\n' + C.cyn + C.b + '  ArcEngine' + C.r + ' ' + C.dim + '— сборка' + C.r);
   say(C.dim + '  ' + '='.repeat(58) + C.r + '\n');
 
-  // --- версия --------------------------------------------------------------
+  // --- version -------------------------------------------------------------
   const constantsSrc = await fsp.readFile(path.join(ROOT, 'js', 'Constants.js'), 'utf8');
   const vMatch = /const\s+GAME_VERSION\s*=\s*['"]([^'"]+)['"]/.exec(constantsSrc);
   if (!vMatch) fail('в Constants.js не найден GAME_VERSION');
@@ -77,24 +77,24 @@ async function main() {
   say('  версия: ' + C.b + VERSION + C.r +
       (VERSION !== currentVersion ? C.dim + ' (в исходниках ' + currentVersion + ')' + C.r : '') + '\n');
 
-  // === 1. ПРОВЕРКИ =========================================================
+  // === 1. CHECKS ===========================================================
   say(C.b + '  [1/4] проверка проекта' + C.r);
   const scan = await collectRefs(ROOT);
 
-  // 1a. недостающие ассеты — 404 в рантайме
+  // 1a. missing assets — 404 at runtime
   if (scan.missing.length) {
     fail('нет ' + scan.missing.length + ' ассет(ов): ' + scan.missing.join(', '));
   } else {
     ok('все ' + scan.refs.length + ' ассетов на месте');
   }
 
-  // 1b. точка входа
+  // 1b. entry point
   try {
     await fsp.access(path.join(ROOT, 'index.html'));
     ok('index.html есть — попадёт в корень архива');
   } catch { fail('нет index.html — у архива не будет точки входа'); }
 
-  // 1c. синтаксис каждого скрипта игры (libs/ не наши — не проверяем)
+  // 1c. syntax of every game script (libs/ is not ours — not checked)
   const gameScripts = CODE_FILES.filter(f => f.endsWith('.js') && !f.startsWith('libs/'));
   let syntaxBad = 0;
   for (const f of gameScripts) {
@@ -108,14 +108,14 @@ async function main() {
   }
   if (!syntaxBad) ok('синтаксис ' + gameScripts.length + ' скриптов в порядке');
 
-  // 1d. все ли файлы кода на месте
+  // 1d. whether all code files are in place
   for (const f of CODE_FILES) {
     try { await fsp.access(path.join(ROOT, f)); }
     catch { fail('нет файла кода: ' + f); }
   }
 
-  // 1e. порядок подключения: js/Constants.js обязан идти первым —
-  //     остальные модули читают его глобалы уже на этапе загрузки.
+  // 1e. include order: js/Constants.js must come first —
+  //     the other modules read its globals already at load time.
   const indexSrc = await fsp.readFile(path.join(ROOT, 'index.html'), 'utf8');
   const srcOrder = [...indexSrc.matchAll(/<script\s+src=["']([^"']+)["']/g)].map(m => m[1]);
   const localOrder = srcOrder.filter(s => !/^https?:/.test(s) && !s.startsWith('libs/'));
@@ -125,11 +125,11 @@ async function main() {
     ok('порядок подключения скриптов корректный');
   }
 
-  // 1f. внешние скрипты: ноль зависимостей — всё лежит в архиве
+  // 1f. external scripts: zero dependencies — everything is in the archive
   const externals = srcOrder.filter(s => /^https?:\/\//.test(s));
   if (externals.length) fail('внешние скрипты: ' + externals.join(', '));
 
-  // 1g. имена файлов: только ASCII без пробелов
+  // 1g. file names: ASCII only, no spaces
   const badNames = [...CODE_FILES, ...scan.refs].filter(n => !SAFE_NAME.test(n));
   if (badNames.length) {
     fail('недопустимые имена (пробелы/кириллица/юникод): ' + badNames.join(', '));
@@ -137,9 +137,9 @@ async function main() {
     ok('имена файлов безопасны для распаковки');
   }
 
-  // 1h. РЕГИСТР путей. Разработка идёт на Windows (регистр не важен),
-  //     а распакованный билд отдаётся с Linux — 'Assets/Car.png' там 404.
-  //     fs.existsSync такое не ловит, поэтому сверяем с реальным readdir.
+  // 1h. CASE of paths. Development happens on Windows (case does not matter),
+  //     while the unpacked build is served from Linux — 'Assets/Car.png' is a 404 there.
+  //     fs.existsSync does not catch this, so we compare against a real readdir.
   const caseBad = [];
   for (const rel of scan.refs) {
     const parts = rel.split('/');
@@ -161,8 +161,8 @@ async function main() {
     ok('регистр всех путей совпадает с диском');
   }
 
-  // 1i. абсолютные пути и посторонние внешние URL во ВСЁМ отгружаемом коде.
-  //     Игру могут отдавать из вложенного пути — всё должно быть относительным.
+  // 1i. absolute paths and stray external URLs in ALL shipped code.
+  //     The game may be served from a nested path — everything must be relative.
   const shipped = CODE_FILES.filter(f => /\.(js|html|css)$/.test(f) && !f.startsWith('libs/'));
   const absHits = [], extHits = [];
   for (const f of shipped) {
@@ -183,7 +183,7 @@ async function main() {
   if (extHits.length) fail('обращения к внешним хостам: ' + extHits.join(', '));
   else ok('внешних запросов нет');
 
-  // 1j. мёртвый вес
+  // 1j. dead weight
   if (scan.unused.length) {
     let dead = 0;
     for (const f of scan.unused) dead += (await fsp.stat(path.join(ROOT, f))).size;
@@ -200,7 +200,7 @@ async function main() {
   }
   if (problems.length) warn('--force: собираю несмотря на ' + problems.length + ' проблем(ы)');
 
-  // === 2. СБОРКА build/ ====================================================
+  // === 2. ASSEMBLING build/ ================================================
   say('\n' + C.b + '  [2/4] копирование в build/' + C.r);
   await fsp.rm(BUILD_DIR, { recursive: true, force: true });
   await fsp.mkdir(BUILD_DIR, { recursive: true });
@@ -213,7 +213,7 @@ async function main() {
     let data;
     try { data = await fsp.readFile(src); } catch { continue; }
 
-    // --- трансформации ----------------------------------------------------
+    // --- transformations --------------------------------------------------
     if (rel === 'index.html') {
       data = Buffer.from(stampIndexHtml(data.toString('utf8'), VERSION), 'utf8');
     }
@@ -241,7 +241,7 @@ async function main() {
   if (NO_ZIP) {
     say('  ' + C.dim + 'пропущена (--no-zip)' + C.r);
   } else {
-    // index.html первым — сразу видно, что точка входа в корне архива
+    // index.html first — makes it obvious that the entry point is at the archive root
     manifest.sort((a, b) =>
       a.name === 'index.html' ? -1 : b.name === 'index.html' ? 1 : a.name.localeCompare(b.name));
     const zip = await makeZip(manifest);
@@ -253,7 +253,7 @@ async function main() {
     ok('index.html лежит в корне архива');
   }
 
-  // === 4. ОТЧЁТ ============================================================
+  // === 4. REPORT ===========================================================
   say('\n' + C.b + '  [4/4] отчёт' + C.r);
 
   const byDir = new Map();
@@ -281,14 +281,14 @@ async function main() {
   process.exit(problems.length ? 2 : 0);
 }
 
-// --- Проставление версии в index.html ---------------------------------------
+// --- Stamping the version into index.html -----------------------------------
 function stampIndexHtml(html, version) {
-  // 1) ?v= локальным скриптам
+  // 1) ?v= for local scripts
   html = html.replace(/(<script\s+src=")([^"]+)(")/g, (m, a, src, b) => {
     if (/^https?:\/\//.test(src)) return m;
     return a + src.split('?')[0] + '?v=' + version + b;
   });
-  // 2) ?v= шрифту в @font-face
+  // 2) ?v= for the font in @font-face
   html = html.replace(/url\('(assets\/[^']+)'\)/g,
     (m, p) => "url('" + p.split('?')[0] + '?v=' + version + "')");
   return html;

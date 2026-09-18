@@ -1,4 +1,4 @@
-// Store (Constants.js): обёртка localStorage, которая не падает, когда хранилище закрыто.
+// Store (Constants.js): a localStorage wrapper that does not crash when the storage is closed.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { loadScripts } from './browser-scripts.mjs';

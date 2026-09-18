@@ -1,19 +1,19 @@
-// Terrain3D.js — земля локации: поле высот из шума, одна сетка на прямоугольник
-// [0..W]×[0..H] и грубое кольцо земли за краем (на низком угле камеры за краем
-// иначе зияло бы небо).
+// Terrain3D.js — the location's ground: a height field from noise, one grid over the rectangle
+// [0..W]×[0..H] and a coarse ground ring beyond the edge (otherwise, at a low camera angle,
+// the sky would gape beyond the edge).
 //
-// Высота — TERRAIN_BASE + шум (SimplexNoise(TERRAIN_NOISE_SEED), две октавы,
-// амплитуда TERRAIN_NOISE_AMP, размер холма TERRAIN_NOISE_SCALE). heightAt()
-// читает ТЕ ЖЕ треугольники, что рисует меш: объекты стоят ровно на
-// поверхности. Не заменяй на билинейную интерполяцию — на склонах объекты
-// начнут тонуть или висеть.
+// Height — TERRAIN_BASE + noise (SimplexNoise(TERRAIN_NOISE_SEED), two octaves,
+// amplitude TERRAIN_NOISE_AMP, hill size TERRAIN_NOISE_SCALE). heightAt()
+// reads THE SAME triangles the mesh draws: objects stand exactly on the
+// surface. Do not replace it with bilinear interpolation — on slopes objects
+// would start to sink or float.
 //
-// Материал — тайл текстуры (setGroundImage), повтор каждые GROUND_TILE_SIZE px.
-// UV у сетки и кольца одни — (x/W, y/H), поэтому тайл продолжается за край без
-// шва. Кольцо красится WORLD3D_OUTER_TINT (меньше 1 — граница локации видна).
+// Material — a texture tile (setGroundImage), repeated every GROUND_TILE_SIZE px. The grid and
+// the ring share the same UVs — (x/W, y/H), so the tile continues beyond the edge without a
+// seam. The ring is tinted by WORLD3D_OUTER_TINT (less than 1 — the location boundary is visible).
 //
-// ТЕРРЕЙН — КАРТИНКА. Логика игры высоту у 3D не спрашивает: клетка сетки
-// зависит от устройства (мобильные — крупнее), и расчёт разошёлся бы между ними.
+// THE TERRAIN IS A PICTURE. Game logic does not ask 3D for height: the grid cell depends
+// on the device (mobile — larger), and the computation would diverge between them.
 
 class Terrain3D {
     // cfg: { worldW, worldH, groundImage?, cell?, noise?: { amp, scale, seed, base } }
@@ -31,7 +31,7 @@ class Terrain3D {
         this.noiseBase = nz.base != null ? nz.base : (typeof TERRAIN_BASE !== U ? TERRAIN_BASE : 0);
         this.noiseSeed = nz.seed != null ? nz.seed : (typeof TERRAIN_NOISE_SEED !== U ? TERRAIN_NOISE_SEED : 5);
         this._noise = (typeof SimplexNoise !== U) ? new SimplexNoise(String(this.noiseSeed)) : null;
-        // Ширину кольца читает предел наклона камеры: край кольца не должен попасть в кадр.
+        // The camera pitch limit reads the ring width: the ring edge must not get into the frame.
         this.outerRing = Terrain3D.OUTER_RING;
         this.meshes = [];
         this.texture = null;
@@ -42,10 +42,10 @@ class Terrain3D {
         if (cfg.groundImage) this.setGroundImage(cfg.groundImage);
     }
 
-    // --- Материал ------------------------------------------------------------------
+    // --- Material ------------------------------------------------------------------
 
-    // Два материала на одну текстуру: сетка локации и кольцо за краем (у кольца
-    // своя яркость). Пока текстуры нет — ровный зелёный.
+    // Two materials on one texture: the location grid and the ring beyond the edge (the ring
+    // has its own brightness). Until there is a texture — flat green.
     _buildMaterials() {
         const mat = new BABYLON.StandardMaterial('terrainMat', this.scene);
         mat.metadata = { toonGroup: 'ground' };
@@ -59,8 +59,8 @@ class Terrain3D {
         this.outerMaterial = outer;
     }
 
-    // Тайл текстуры земли (Image или Canvas). DynamicTexture с invertY = false:
-    // V идёт вниз по карте, как y.
+    // Ground texture tile (Image or Canvas). DynamicTexture with invertY = false:
+    // V goes down the map, like y.
     setGroundImage(img) {
         if (!img || !(img.width > 0)) return;
         const c = document.createElement('canvas');
@@ -76,8 +76,8 @@ class Terrain3D {
         const old = this.texture;
         this.texture = tex;
         this.applyTileSize();
-        // С текстурой цвет материала — множитель: у сетки белый, у кольца — яркость
-        // WORLD3D_OUTER_TINT (metadata.outer читает applyMaterialConstants).
+        // With a texture the material color is a multiplier: white for the grid, for the ring —
+        // brightness WORLD3D_OUTER_TINT (metadata.outer is read by applyMaterialConstants).
         this.material.diffuseTexture = tex;
         this.material.diffuseColor = new BABYLON.Color3(1, 1, 1);
         this.outerMaterial.diffuseTexture = tex;
@@ -86,8 +86,8 @@ class Terrain3D {
         if (old) { try { old.dispose(); } catch (e) { /* ok */ } }
     }
 
-    // Повтор тайла — масштабом текстуры: u' = (x/W)·(W/tile) = x/tile.
-    // GROUND_TILE_SIZE сменился (редактор) — только это.
+    // Tile repeat — via the texture scale: u' = (x/W)·(W/tile) = x/tile.
+    // GROUND_TILE_SIZE changed (editor) — only this.
     applyTileSize() {
         if (!this.texture) return;
         const tile = Math.max(16, (typeof GROUND_TILE_SIZE !== 'undefined') ? GROUND_TILE_SIZE : 512);
@@ -95,7 +95,7 @@ class Terrain3D {
         this.texture.vScale = this.worldH / tile;
     }
 
-    // --- Поле высот ------------------------------------------------------------------
+    // --- Height field ----------------------------------------------------------------
 
     terrainNoise(x, y) {
         if (!this._noise || !(this.noiseAmp > 0)) return this.noiseBase;
@@ -105,8 +105,8 @@ class Terrain3D {
         return this.noiseBase + n * this.noiseAmp;
     }
 
-    // Высоты в узлах сетки [0..W]×[0..H] с шагом cell. Последняя клетка может
-    // выйти за край (UV там > 1 — тайл просто продолжается).
+    // Heights at the nodes of the grid [0..W]×[0..H] with step cell. The last cell may
+    // extend beyond the edge (UV there > 1 — the tile simply continues).
     _buildField() {
         const cs = this.cell;
         this.nx = Math.ceil(this.worldW / cs) + 1;
@@ -123,14 +123,14 @@ class Terrain3D {
             }
         }
         this.hgrid = H;
-        // Диапазон высот — для луча указателя (View3D.pointerToGround) и предела камеры.
+        // Height range — for the pointer ray (View3D.pointerToGround) and the camera limit.
         this.hMin = lo;
         this.hMax = hi;
     }
 
-    // Высота поверхности под точкой — ровно та, что рисуется: клетка разбита
-    // диагональю (i,j)-(i+1,j+1) на треугольники (00,10,11) и (00,11,01), как в
-    // меше. За краем сетки — шум, как у кольца.
+    // Surface height under a point — exactly the one that is drawn: the cell is split by
+    // the diagonal (i,j)-(i+1,j+1) into triangles (00,10,11) and (00,11,01), as in the
+    // mesh. Beyond the grid edge — noise, as for the ring.
     heightAt(x, y) {
         const cs = this.cell, n = this.nx;
         const fx = x / cs, fy = y / cs;
@@ -144,8 +144,8 @@ class Terrain3D {
         return h00 + (h01 - h00) * ty + (h11 - h01) * tx;
     }
 
-    // Наклон поверхности вдоль курса (рад): продольный и поперечный уклон по
-    // четырём точкам базы объекта — для тангажа и крена корпуса.
+    // Surface tilt along the heading (rad): longitudinal and lateral slope from the
+    // four points of the object's base — for the body's pitch and roll.
     tiltAt(x, y, headingRad, halfLen, halfWid) {
         const cx = Math.cos(headingRad), sy = Math.sin(headingRad);
         const hf = this.heightAt(x + cx * halfLen, y + sy * halfLen);
@@ -153,15 +153,15 @@ class Terrain3D {
         const hl = this.heightAt(x - sy * halfWid, y + cx * halfWid);
         const hr = this.heightAt(x + sy * halfWid, y - cx * halfWid);
         return {
-            pitch: Math.atan2(hf - hb, halfLen * 2),   // нос выше кормы -> положительный
-            roll: Math.atan2(hl - hr, halfWid * 2)     // левый борт выше -> положительный
+            pitch: Math.atan2(hf - hb, halfLen * 2),   // nose higher than stern -> positive
+            roll: Math.atan2(hl - hr, halfWid * 2)     // left side higher -> positive
         };
     }
 
-    // --- Сетки --------------------------------------------------------------------
+    // --- Grids --------------------------------------------------------------------
 
-    // Индексы регулярной сетки nx×ny: треугольники (a,b,d)(a,d,c) по диагонали
-    // a-d; swap — обратный обход.
+    // Indices of a regular nx×ny grid: triangles (a,b,d)(a,d,c) along the diagonal
+    // a-d; swap — reversed winding.
     static gridIndices(nx, ny, swap) {
         const idx = new Uint32Array((nx - 1) * (ny - 1) * 6);
         let p = 0;
@@ -175,10 +175,10 @@ class Terrain3D {
         return idx;
     }
 
-    // Сетка локации. ОРИЕНТАЦИЯ: земле нужна нормаль +Y. ComputeNormals берёт
-    // нормаль грани (p1−p2)×(p3−p2) — по ней выбирается обход, а страховка
-    // после ComputeNormals переворачивает его, если движок посчитал иначе. Не
-    // «чинить» порядок вручную: правосторонняя сцена уже стоила итерации.
+    // Location grid. ORIENTATION: the ground needs a +Y normal. ComputeNormals takes the
+    // face normal (p1−p2)×(p3−p2) — the winding is chosen by it, and a safeguard
+    // after ComputeNormals flips it if the engine computed otherwise. Do not
+    // "fix" the order by hand: the right-handed scene already cost an iteration.
     _buildGeometry() {
         const nx = this.nx, ny = this.ny, cs = this.cell, NV = nx * ny, H = this.hgrid;
         const W = this.worldW, HH = this.worldH;
@@ -190,7 +190,7 @@ class Terrain3D {
                 uvs[k * 2] = x / W; uvs[k * 2 + 1] = y / HH;
             }
         }
-        // Нормаль первого треугольника (a, b, d): (a − b) × (d − b), компонента Y.
+        // Normal of the first triangle (a, b, d): (a − b) × (d − b), Y component.
         const b = 3, d = (nx + 1) * 3;
         const ax = pos[0] - pos[b], az = pos[2] - pos[b + 2];
         const qx = pos[d] - pos[b], qz = pos[d + 2] - pos[b + 2];
@@ -203,7 +203,7 @@ class Terrain3D {
             idx = Terrain3D.gridIndices(nx, ny, swap);
             BABYLON.VertexData.ComputeNormals(pos, idx, normals);
         }
-        this._swap = swap;   // тот же обход — у кольца
+        this._swap = swap;   // same winding — for the ring
 
         const mesh = new BABYLON.Mesh('terrain', this.scene);
         const vd = new BABYLON.VertexData();
@@ -221,9 +221,9 @@ class Terrain3D {
         this.meshes.push(mesh);
     }
 
-    // Кольцо земли вокруг локации: чистый шум, клетка RING_CELL. Дыра в нём —
-    // сетка локации; клетки кольца у её края остаются и лежат на 1 px НИЖЕ (под
-    // сеткой, не дальше полутора клеток) — T-стык грубой и мелкой сеток не светит небом.
+    // Ground ring around the location: pure noise, cell RING_CELL. The hole in it is the location
+    // grid; the ring cells at its edge stay and lie 1 px LOWER (under the grid, no further than one
+    // and a half cells) — the T-junction of the coarse and fine grids doesn't let the sky show.
     _buildOuterRing() {
         const extent = this.outerRing, cell = Terrain3D.RING_CELL;
         const W = this.worldW, H = this.worldH;
@@ -237,7 +237,7 @@ class Terrain3D {
                 uvs[k * 2] = x / W; uvs[k * 2 + 1] = y / H;
             }
         }
-        // Клетки — только вне сетки локации (с запасом в клетку у её края).
+        // Cells — only outside the location grid (with a one-cell margin at its edge).
         const X1 = (this.nx - 1) * this.cell, Y1 = (this.ny - 1) * this.cell;
         const inside = (x, y) => x > 0 && x < X1 && y > 0 && y < Y1;
         const indices = [];
@@ -278,6 +278,6 @@ class Terrain3D {
     }
 }
 
-// Ширина кольца земли за краем локации (px) и его клетка.
+// Width of the ground ring beyond the location edge (px) and its cell.
 Terrain3D.OUTER_RING = 2400;
 Terrain3D.RING_CELL = 64;

@@ -1,12 +1,12 @@
 // ============================================================================
-//  ArcEngine — запись файлов игры редактором: патч Constants.js, Objects.js
-//  целиком, бэкапы. Без HTTP: server.mjs зовёт эти функции, tests/ — тоже.
+//  ArcEngine — the editor writing game files: Constants.js patch, the whole
+//  Objects.js, backups. No HTTP: server.mjs calls these functions, and so does tests/.
 // ----------------------------------------------------------------------------
-//  Патч Constants.js нарочно тупой и безопасный:
-//   - меняются ТОЛЬКО строки вида `const ИМЯ = <число>;` (формулу не трогаем —
-//     отказ); цвет 0xRRGGBB остаётся hex-литералом;
-//   - перед каждой записью — бэкап в _utils/.backups/ (хранится 20 последних).
-//  Objects.js пишется ЦЕЛИКОМ из проверенного списка (бэкап — туда же).
+//  The Constants.js patch is deliberately dumb and safe:
+//   - ONLY lines of the form `const NAME = <number>;` are changed (a formula is left
+//     alone — rejection); a 0xRRGGBB color stays a hex literal;
+//   - before every write — a backup in _utils/.backups/ (the last 20 are kept).
+//  Objects.js is written WHOLE from a validated list (the backup goes there too).
 // ============================================================================
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
@@ -17,17 +17,20 @@ const NUMBER = /^-?\d+(?:\.\d+)?$/;
 const HEX = /^0[xX][0-9a-fA-F]+$/;
 const BACKUP_KEEP = 20;
 
-// Отказы: code переводит клиент (err.<code> в i18n.js), error — для лога и
-// клиентов без перевода.
+// Rejections: code is translated by the client (err.<code> in i18n.js), error — for the log and
+// clients without a translation.
 export const ERRORS = {
   not_found: 'constant not found in Constants.js',
   not_literal: 'the value in the file is not a number literal (a formula?) — unsafe to patch',
   bad_value: 'the new value is not a number',
   bad_name: 'invalid name',
   bad_objects: 'the object list is not an array',
-  bad_model: 'model path must be assets/….fbx (ASCII, no spaces)',
-  not_fbx: 'not an .fbx file',
+  bad_model: 'model path must be assets/….fbx or .glb (ASCII, no spaces)',
+  not_model: 'not an .fbx or .glb file',
   not_binary: 'ASCII FBX is not supported — export a binary FBX',
+  not_glb: 'not a binary glTF — export .glb',
+  bad_ui: 'the UI layout is not an array',
+  bad_element: 'invalid UI element',
   too_large: 'the file is too large',
   dialog_failed: 'the file dialog failed to open',
   unsupported: 'no system file dialog on this OS',
@@ -35,13 +38,13 @@ export const ERRORS = {
 export const failure = (code, extra) => Object.assign({ ok: false, code, error: ERRORS[code] }, extra);
 const rejected = (name, code) => ({ name, ok: false, code, error: ERRORS[code] });
 
-// Путь модели: .fbx внутри assets/, ASCII без пробелов и без . / .. в сегментах.
-const MODEL_PATH = /^assets\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.fbx$/i;
+// Model path: an .fbx or .glb inside assets/, ASCII with no spaces and no . / .. in the segments.
+const MODEL_PATH = /^assets\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:fbx|glb)$/i;
 export const isModelPath = p => MODEL_PATH.test(p) && !p.split('/').some(s => s === '.' || s === '..');
 
-// --- Бэкапы ------------------------------------------------------------------
+// --- Backups -----------------------------------------------------------------
 
-// Копия файла в <root>/_utils/.backups/<prefix>-<время>.js; хранятся 20 последних на префикс.
+// A copy of the file in <root>/_utils/.backups/<prefix>-<time>.js; the last 20 per prefix are kept.
 async function backupFile(root, file, prefix) {
   const dir = path.join(root, '_utils', '.backups');
   await fsp.mkdir(dir, { recursive: true });
@@ -57,21 +60,21 @@ async function backupFile(root, file, prefix) {
 
 // --- Constants.js --------------------------------------------------------------
 
-// Числа пишем без экспонент и мусорных хвостов float (0.65000000000004 -> 0.65).
+// Numbers are written without exponents and junk float tails (0.65000000000004 -> 0.65).
 function fmtNumber(v) {
   const n = Number(v);
   if (!isFinite(n)) return null;
   return Number.isInteger(n) ? String(n) : String(parseFloat(n.toFixed(6)));
 }
 
-// `const ИМЯ = <число>;` -> новое число: { src } или { code }. Формулы и не-числа не трогаем.
+// `const NAME = <number>;` -> the new number: { src } or { code }. Formulas and non-numbers are left alone.
 export function patchScalar(src, name, value) {
   const re = new RegExp('^(const\\s+' + name + '\\s*=\\s*)([^;\\n]+?)(\\s*;)', 'm');
   const m = re.exec(src);
   if (!m) return { code: 'not_found' };
   const was = m[2].trim();
   if (!NUMBER.test(was) && !HEX.test(was)) return { code: 'not_literal' };
-  // Формат литерала сохраняем: цвет ушёл 0x1e6c80 — вернётся 0x1e6c80.
+  // The literal format is kept: a color went out as 0x1e6c80 — it comes back as 0x1e6c80.
   const num = HEX.test(was)
     ? ((Number(value) >= 0 && Number.isFinite(Number(value)))
         ? '0x' + (Number(value) >>> 0).toString(16).padStart(6, '0') : null)
@@ -80,13 +83,13 @@ export function patchScalar(src, name, value) {
   return { src: src.slice(0, m.index) + m[1] + num + m[3] + src.slice(m.index + m[0].length) };
 }
 
-// changes: [{ name: 'CAMERA_FOV_DEG', value: 52 }] -> патч <root>/js/Constants.js.
+// changes: [{ name: 'CAMERA_FOV_DEG', value: 52 }] -> a patch of <root>/js/Constants.js.
 export async function saveConstants(root, changes) {
   if (!Array.isArray(changes) || changes.length === 0) {
     return { ok: false, error: 'empty change list' };
   }
   const file = path.join(root, 'js', 'Constants.js');
-  // BOM (если есть) снимаем на время патча и возвращаем при записи.
+  // The BOM (if any) is stripped for the duration of the patch and put back on write.
   const raw = await fsp.readFile(file, 'utf8');
   const hadBom = raw.charCodeAt(0) === 0xFEFF;
   let src = hadBom ? raw.slice(1) : raw;
@@ -119,27 +122,29 @@ export async function saveConstants(root, changes) {
 
 // --- Objects.js ------------------------------------------------------------------
 
-// Путь модели в шапке — без кавычек: сканер сборщика считает ссылкой любой литерал
-// в кавычках, даже в комментарии.
-export const OBJECTS_HEADER = `// Objects.js — объекты локации: модели, расставленные в редакторе (вкладка Objects).
-// Файл целиком перезаписывает редактор (POST /api/save-objects) — формат держать.
-// Путь модели — строковый литерал от assets/: сборщик берёт в архив только ассеты с такими ссылками.
-//   model — .fbx (Model3D.js); kind — 'prop' (окружение) | 'actor' (главный объект кадра);
-//   x, y — px карты; h — px над землёй; rot — [x, y, z] градусы: y — курс (0 — вдоль +x,
-//   90 — вниз по карте), x и z — наклон; scale — [x, y, z] к размеру модели (1 см в файле = 1 px);
-//   anim — вращение части модели (необязательно): part — объект внутри FBX (крутится вокруг
-//   своего origin из Blender), axis — его ось 'x' | 'y' | 'z' (с минусом — обратный конец),
-//   speed — об/мин, dir — 'cw' | 'ccw': по/против часовой, если смотреть с конца оси.
+// The model path in the header — without quotes: the builder's asset scanner treats any
+// quoted literal as a reference, even in a comment.
+export const OBJECTS_HEADER = `// Objects.js — location objects: models placed in the editor (Objects tab).
+// The editor rewrites the whole file (POST /api/save-objects) — keep the format.
+// Model path — a string literal starting from assets/: the builder archives only assets referenced this way.
+//   model — .fbx (Model3D.js) or .glb (Gltf3D.js: skeleton, clips, textures);
+//   kind — 'prop' (environment) | 'actor' (main object of the frame);
+//   x, y — map px; h — px above the ground; rot — [x, y, z] degrees: y — heading (0 — along +x,
+//   90 — down the map), x and z — tilt; scale — [x, y, z] relative to model size (1 cm in the file = 1 px);
+//   anim — spin of a model part (optional): part — an object inside the FBX (spins around
+//   its origin from Blender), axis — its axis 'x' | 'y' | 'z' (with a minus — the opposite end),
+//   speed — rpm, dir — 'cw' | 'ccw': clockwise/counterclockwise as seen from the end of the axis;
+//   clip — looped animation clip of a .glb model (optional): 'idle', 'run'…
 `;
 
-// Число с фиксированной точностью без хвостов float; не число — null.
+// A number with fixed precision and no float tails; not a number — null.
 function fmtFixed(v, digits) {
   const n = Number(v);
   return Number.isFinite(n) ? String(parseFloat(n.toFixed(digits))) : null;
 }
 
-// Тройка [x, y, z] с точностью digits; число — старая запись (rot — курс, scale —
-// равномерный) разворачивается по asNumber. Не числа или non-positive (positive) — null.
+// A triple [x, y, z] with digits precision; a number — an old record (rot — heading, scale —
+// uniform) is expanded by asNumber. Non-numbers or non-positive (positive) — null.
 function fmtTriple(v, digits, asNumber, positive) {
   const t = Array.isArray(v) ? v : (v == null ? null : asNumber(v));
   if (!t || t.length !== 3) return null;
@@ -148,12 +153,12 @@ function fmtTriple(v, digits, asNumber, positive) {
   return '[' + out.join(', ') + ']';
 }
 
-// Имя объекта или части модели — в одинарных кавычках файла: без кавычек, обратной косой
-// черты и управляющих символов, до 64 знаков.
+// The name of an object or a model part — inside the file's single quotes: no quotes, backslashes
+// or control characters, up to 64 characters.
 const cleanName = v => String(v == null ? '' : v).replace(/[\x00-\x1f\\'"`]/g, '').trim().slice(0, 64);
 const ANIM_AXES = ['x', '-x', 'y', '-y', 'z', '-z'];
 
-// anim: { part, axis, speed, dir } -> хвост записи `, anim: { … }`; нет анимации — '', негодная — null.
+// anim: { part, axis, speed, dir } -> the record tail `, anim: { … }`; no animation — '', invalid — null.
 function fmtAnim(a) {
   if (a == null) return '';
   const part = cleanName(a.part), speed = fmtFixed(a.speed, 1);
@@ -161,8 +166,14 @@ function fmtAnim(a) {
   return `, anim: { part: '${part}', axis: '${a.axis}', speed: ${speed}, dir: '${a.dir === 'ccw' ? 'ccw' : 'cw'}' }`;
 }
 
-// objects: [{ name, model, kind, x, y, h, rot: [x, y, z], scale: [x, y, z], anim? }] ->
-// { ok, src, count } или отказ (index — номер негодной записи).
+// clip: a clip name -> the record tail `, clip: '…'`; none — ''.
+function fmtClip(v) {
+  const clip = cleanName(v);
+  return clip ? `, clip: '${clip}'` : '';
+}
+
+// objects: [{ name, model, kind, x, y, h, rot: [x, y, z], scale: [x, y, z], anim?, clip? }] ->
+// { ok, src, count } or a rejection (index — the number of the invalid record).
 export function formatObjects(objects) {
   if (!Array.isArray(objects)) return failure('bad_objects');
   const lines = [];
@@ -178,17 +189,90 @@ export function formatObjects(objects) {
     };
     if (Object.values(n).includes(null)) return failure('bad_value', { index: i });
     const kind = o.kind === 'actor' ? 'actor' : 'prop';
-    lines.push(`    { name: '${cleanName(o.name)}', model: '${model}', kind: '${kind}', x: ${n.x}, y: ${n.y}, h: ${n.h}, rot: ${n.rot}, scale: ${n.scale}${n.anim} },\n`);
+    lines.push(`    { name: '${cleanName(o.name)}', model: '${model}', kind: '${kind}', x: ${n.x}, y: ${n.y}, h: ${n.h}, rot: ${n.rot}, scale: ${n.scale}${n.anim}${fmtClip(o.clip)} },\n`);
   }
   return { ok: true, src: OBJECTS_HEADER + 'const LOCATION_OBJECTS = [\n' + lines.join('') + '];\n', count: lines.length };
 }
 
-// Список объектов -> <root>/js/Objects.js целиком (негодный список файл не трогает).
+// Object list -> the whole <root>/js/Objects.js (an invalid list leaves the file untouched).
 export async function saveObjects(root, objects) {
   const r = formatObjects(objects);
   if (!r.ok) return r;
   const file = path.join(root, 'js', 'Objects.js');
   const backup = fs.existsSync(file) ? await backupFile(root, file, 'Objects') : null;
+  await fsp.writeFile(file, r.src, 'utf8');
+  return { ok: true, count: r.count, backup };
+}
+
+// --- UILayout.js -----------------------------------------------------------------
+
+export const UI_HEADER = `// UILayout.js — the game's UI layout: every HUD element, placed and styled in the editor (UI tab).
+// The editor rewrites the whole file (POST /api/save-ui) — keep the format. Drawn by js/UI.js;
+// game code takes an element by id: UI.get('score').setText('10') — and never positions HUD itself.
+//   kind — 'text' | 'panel' | 'bar' | 'button'; anchor — one of 9 screen points ('top-left' …
+//   'bottom-right'): x, y go from it to the same point of the element (inward from an edge,
+//   signed from the center); w, h — px; numbers are px of a screen UI_REF_HEIGHT tall;
+//   colors — '#rrggbb', '' — none; visible: 0 — hidden until the game calls show().
+//   Records go in drawing order: later — on top.
+`;
+
+const UI_ANCHORS = ['top-left', 'top-center', 'top-right', 'middle-left', 'middle-center', 'middle-right',
+  'bottom-left', 'bottom-center', 'bottom-right'];
+const UI_ID = /^[A-Za-z_][A-Za-z0-9_-]{0,47}$/;
+const UI_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+// Fields of a record by kind, in file order — the same set as UI.DEFAULTS in js/UI.js
+// (tests/ui.test.mjs compares them). type: px — a number, size — a number ≥ 0, unit — 0..1,
+// color — '#rrggbb' or '', text — a string, flag — 0 | 1.
+const UI_TYPES = {
+  x: 'px', y: 'px', w: 'size', h: 'size', radius: 'size', fontSize: 'size', value: 'unit', alpha: 'unit',
+  color: 'color', fill: 'color', border: 'color', shadow: 'color', text: 'text', visible: 'flag',
+};
+export const UI_FIELDS = {
+  text: ['x', 'y', 'text', 'fontSize', 'color', 'shadow', 'alpha', 'visible'],
+  panel: ['x', 'y', 'w', 'h', 'fill', 'border', 'radius', 'alpha', 'visible'],
+  bar: ['x', 'y', 'w', 'h', 'value', 'color', 'fill', 'border', 'radius', 'alpha', 'visible'],
+  button: ['x', 'y', 'w', 'h', 'text', 'fontSize', 'color', 'fill', 'border', 'radius', 'alpha', 'visible'],
+};
+
+// A field value -> its literal in the file; invalid — null.
+function fmtUIField(type, v) {
+  if (type === 'text') return JSON.stringify(String(v == null ? '' : v).replace(/[\x00-\x09\x0b-\x1f]/g, '').slice(0, 200));
+  if (type === 'color') return v === '' || v == null ? "''" : (UI_COLOR.test(v) ? `'${String(v).toLowerCase()}'` : null);
+  if (type === 'flag') return v === 0 || v === false ? '0' : '1';
+  const n = fmtFixed(v, type === 'unit' ? 2 : 1);
+  if (n === null) return null;
+  if (type === 'size' && Number(n) < 0) return null;
+  if (type === 'unit' && (Number(n) < 0 || Number(n) > 1)) return null;
+  return n;
+}
+
+// elements: [{ id, kind, anchor, … }] -> { ok, src, count } or a rejection (index — the number
+// of the invalid record). Ids are unique: game code finds an element by its id.
+export function formatUI(elements) {
+  if (!Array.isArray(elements)) return failure('bad_ui');
+  const lines = [], ids = new Set();
+  for (let i = 0; i < elements.length; i++) {
+    const e = elements[i] || {}, fields = UI_FIELDS[e.kind];
+    if (!fields || !UI_ID.test(String(e.id)) || ids.has(e.id) || !UI_ANCHORS.includes(e.anchor)) return failure('bad_element', { index: i });
+    ids.add(e.id);
+    const parts = [`id: '${e.id}'`, `kind: '${e.kind}'`, `anchor: '${e.anchor}'`];
+    for (const f of fields) {
+      const lit = fmtUIField(UI_TYPES[f], e[f]);
+      if (lit === null) return failure('bad_element', { index: i, field: f });
+      parts.push(`${f}: ${lit}`);
+    }
+    lines.push(`    { ${parts.join(', ')} },\n`);
+  }
+  return { ok: true, src: UI_HEADER + 'const UI_LAYOUT = [\n' + lines.join('') + '];\n', count: lines.length };
+}
+
+// Element list -> the whole <root>/js/UILayout.js (an invalid list leaves the file untouched).
+export async function saveUI(root, elements) {
+  const r = formatUI(elements);
+  if (!r.ok) return r;
+  const file = path.join(root, 'js', 'UILayout.js');
+  const backup = fs.existsSync(file) ? await backupFile(root, file, 'UILayout') : null;
   await fsp.writeFile(file, r.src, 'utf8');
   return { ok: true, count: r.count, backup };
 }

@@ -1,4 +1,5 @@
-// Сканер ассетов (tools/asset-scan.mjs): ссылки 'assets/…' в коде -> что в архив, чего нет, что лишнее.
+// Asset scanner (tools/asset-scan.mjs): 'assets/…' references in code -> what goes into the
+// archive, what is missing, what is extra.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -10,7 +11,7 @@ import { ROOT } from './browser-scripts.mjs';
 const temps = [];
 after(() => { for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true }); });
 
-// Мини-проект во временной папке: { 'путь': 'содержимое' }.
+// Mini project in a temp folder: { 'path': 'content' }.
 function project(files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'arcengine-scan-'));
   temps.push(root);
@@ -35,7 +36,7 @@ test('литералы в .js/.html/.css: найденные, пропавшие
   assert.deepEqual(scan.refs, ['assets/bg.png', 'assets/font.ttf', 'assets/models/mill.fbx', 'assets/tex.png']);
   assert.deepEqual(scan.missing, ['assets/bg.png', 'assets/font.ttf']);
   assert.deepEqual(scan.dirs, ['assets/sounds']);
-  // Файлы внутри папки, на которую ссылается код, собираются из кусков — сканер их не знает.
+  // Files inside a folder the code refers to are assembled from pieces — unknown to the scanner.
   assert.deepEqual(scan.unused, ['assets/sounds/hit.mp3', 'assets/unused.png']);
 });
 

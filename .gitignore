@@ -1,5 +1,5 @@
-# Не заливать на GitHub: личное и то, что собирается само. «/» в начале — только в корне
-# (без него build/ скрыл бы и claude/skills/build/).
+# Do not upload to GitHub: personal stuff and what gets built by itself. A leading "/" — root only
+# (without it build/ would also hide claude/skills/build/).
 /.claude/
 /upload.bat
 /_utils/.backups/

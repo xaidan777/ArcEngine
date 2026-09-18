@@ -1,46 +1,46 @@
-// World3D.js — 3D-движок набора: Babylon на канвасе, вид сцены (View3D: камера,
-// свет, тени, проекции экран <-> мир), константы рендера (cfg), toon-шейдер
-// (ArcToonPlugin), контур рёбер и обводка силуэта, регистрация объектов мира.
+// World3D.js — the kit's 3D engine: Babylon on a canvas, the scene view (View3D: camera,
+// light, shadows, screen <-> world projections), render constants (cfg), toon shader
+// (ArcToonPlugin), ink edges and silhouette outline, world object registration.
 //
-// Координаты: карта (x вправо, y вниз, px) -> Babylon (X = x, Z = y,
-// Y = высота). Сцена ПРАВОСТОРОННЯЯ (useRightHandedSystem): при виде сверху с
-// севером (−y) вверху восток (+x) справа; в левосторонней тот же мир выходил
-// зеркальным. Курс heading (рад, atan2(vy, vx)) -> rotation.y = -heading.
-// «Вправо на экране» при азимуте камеры az — (−sin az, cos az).
+// Coordinates: map (x right, y down, px) -> Babylon (X = x, Z = y,
+// Y = height). The scene is RIGHT-HANDED (useRightHandedSystem): viewed from above with
+// north (−y) up, east (+x) is on the right; in a left-handed scene the same world came
+// out mirrored. Heading (rad, atan2(vy, vx)) -> rotation.y = -heading.
+// "Right on screen" at camera azimuth az is (−sin az, cos az).
 //
-// Кадр рисует владелец цикла: World3D.renderFrame() из своего
-// requestAnimationFrame (main.js игры, lab.js редактора), после camera.update().
+// The frame is drawn by the loop owner: World3D.renderFrame() from its own
+// requestAnimationFrame (the game's main.js, the editor's lab.js), after camera.update().
 //
-// Свет один на весь мир: азимут WORLD3D_SUN_AZIMUTH_DEG задаёт, КУДА падает
-// тень, высота солнца — WORLD3D_SUN_ELEVATION_DEG. Тени настоящие
-// (ShadowGenerator, ортокадр солнца ездит за камерой).
+// One light for the whole world: the azimuth WORLD3D_SUN_AZIMUTH_DEG sets WHERE the
+// shadow falls, the sun elevation is WORLD3D_SUN_ELEVATION_DEG. Shadows are real
+// (ShadowGenerator, the sun's ortho frustum follows the camera).
 //
-// ТЕНИ — ОДИН ЦВЕТ НА ВСЁ. Babylon даёт только видимость солнца (darkness
-// генератора = 0); красит тень плагин ArcToonPlugin (define ARCSHADOW): свет
-// поверхности в тени = свет без тени × mix(1, WORLD3D_SHADOW_COLOR,
-// WORLD3D_SHADOW_STRENGTH). Свет без тени восстанавливается из суммы (солнце
-// — ПОСЛЕДНИЙ свет сцены: hemi создаётся первым, `shadow` шейдера после
-// цикла света — его; направление и цвет солнца — uniform'ы плагина из
+// SHADOWS — ONE COLOR FOR EVERYTHING. Babylon only provides the sun visibility (generator
+// darkness = 0); the shadow is colored by the ArcToonPlugin plugin (define ARCSHADOW):
+// surface light in shadow = unshadowed light × mix(1, WORLD3D_SHADOW_COLOR,
+// WORLD3D_SHADOW_STRENGTH). The unshadowed light is reconstructed from the sum (the sun
+// is the LAST light of the scene: hemi is created first, the shader's `shadow` after
+// the light loop is the sun's; the sun direction and color are plugin uniforms from
 // scene.metadata.arcSun).
 //
-// КОНСТАНТЫ РЕНДЕРА читает одно место — World3D.cfg() (в игре это лексические
-// const, отсюда typeof-проверки). applyRenderConstants(view) применяет их к
-// живой сцене без пересборки: свет, небо, туман и тени (View3D.applyLighting),
-// материалы по группам (metadata.toonGroup: 'ground' | 'prop' | 'actor'),
-// toon (uniform'ы — сразу, вкл/выкл — пересборка шейдеров), контур и обводка.
+// RENDER CONSTANTS are read in one place — World3D.cfg() (in the game they are lexical
+// const, hence the typeof checks). applyRenderConstants(view) applies them to the
+// live scene without a rebuild: light, sky, fog and shadows (View3D.applyLighting),
+// materials by group (metadata.toonGroup: 'ground' | 'prop' | 'actor'),
+// toon (uniforms — immediately, on/off — a shader rebuild), ink edges and outline.
 //
-// ОБЪЕКТЫ МИРА регистрирует addObject(view, mesh, kind): группа материалов,
-// тень, контур рёбер и обводка. kind: 'actor' — главные объекты кадра
-// (персонажи, машины), 'prop' — окружение (кубы, стены, деревья).
+// WORLD OBJECTS are registered by addObject(view, mesh, kind): material group,
+// shadow, ink edges and outline. kind: 'actor' — the main objects of the frame
+// (characters, cars), 'prop' — environment (cubes, walls, trees).
 //
-// Toon-шейдер — ArcToonPlugin (BABYLON.MaterialPluginBase, регистрируется на
-// ВСЕ StandardMaterial при World3D.init): после суммирования света всех
-// источников яркость diffuseBase квантуется в WORLD3D_TOON_BANDS ступеней
-// между WORLD3D_TOON_LOW и 1, блик — порогом, по краю силуэта — ободок.
-// Точка врезки — строка `aggShadow=aggShadow/numLights;` шейдера
-// default.fragment (регулярка в getCustomCode; если строки нет — код не
-// врезается и шейдер не ломается, просто нет ступеней). Unlit-материалы
-// (disableLighting) плагин не трогает.
+// The toon shader is ArcToonPlugin (BABYLON.MaterialPluginBase, registered on
+// ALL StandardMaterial at World3D.init): after the light of all sources is summed,
+// the diffuseBase brightness is quantized into WORLD3D_TOON_BANDS bands between
+// WORLD3D_TOON_LOW and 1, the specular highlight — by a threshold, along the silhouette
+// edge — a rim light. The injection point is the line `aggShadow=aggShadow/numLights;`
+// of the default.fragment shader (a regex in getCustomCode; if the line is missing, the
+// code is not injected and the shader does not break, there are just no bands). Unlit
+// materials (disableLighting) are left untouched by the plugin.
 
 /** @satisfies {Record<string, any>} */
 const World3D = {
@@ -49,26 +49,26 @@ const World3D = {
     /** @type {HTMLCanvasElement | null} */
     canvas: null,
     /** @type {View3D | null} */
-    view: null,             // активный View3D (его рисует renderFrame)
+    view: null,             // the active View3D (drawn by renderFrame)
     /** @type {BABYLON.Color4 | null} */
     _bg: null,
     /** @type {typeof ArcToon} */
-    toon: null,             // состояние toon-плагина — ArcToon ниже, после ArcToonPlugin
+    toon: null,             // toon plugin state — ArcToon below, after ArcToonPlugin
 
-    // Слои рендера (renderingGroupId Babylon), буфер глубины ОБЩИЙ (см. View3D):
-    //   WORLD   — земля и всё, что на ней стоит;
-    //   OVERLAY — метки поверх мира (выделение, пути): их материалам ставят
-    //             depthFunction = ALWAYS и disableDepthWrite — рельеф их не режет,
-    //             а глубина мира остаётся целой;
-    //   ACTOR   — объекты, которые идут последними: краска OVERLAY не ложится на
-    //             них сверху, но за стенами они прячутся честно.
+    // Render layers (Babylon renderingGroupId), the depth buffer is SHARED (see View3D):
+    //   WORLD   — the ground and everything standing on it;
+    //   OVERLAY — marks on top of the world (selection, paths): their materials get
+    //             depthFunction = ALWAYS and disableDepthWrite — the terrain does not cut
+    //             them, and the world depth stays intact;
+    //   ACTOR   — objects that go last: OVERLAY paint does not land on top of
+    //             them, but they hide behind walls honestly.
     LAYER: { WORLD: 0, OVERLAY: 1, ACTOR: 2 },
 
     available() {
         return typeof BABYLON !== 'undefined' && !!this.engine;
     },
 
-    // Поднимает движок на канвасе (один на страницу). false — нет Babylon или WebGL.
+    // Brings up the engine on the canvas (one per page). false — no Babylon or WebGL.
     init(canvas) {
         if (typeof BABYLON === 'undefined') {
             console.warn('World3D: libs/babylon.js не загружен — 3D-мир недоступен.');
@@ -79,7 +79,7 @@ const World3D = {
         try {
             this.engine = new BABYLON.Engine(canvas, true, {
                 preserveDrawingBuffer: false,
-                stencil: true,     // нужен HighlightLayer обводки силуэта (needStencil)
+                stencil: true,     // needed by the silhouette outline HighlightLayer (needStencil)
                 antialias: true,
                 adaptToDeviceRatio: false,
                 powerPreference: 'high-performance',
@@ -90,14 +90,14 @@ const World3D = {
             this.engine = null;
             return false;
         }
-        // Чёткость на HiDPI: рендерим в физические пиксели (на мобильных —
-        // не дороже 1.5x, иначе заливка съедает кадр).
+        // Sharpness on HiDPI: render in physical pixels (on mobile —
+        // no more than 1.5x, otherwise fill rate eats the frame).
         const dpr = window.devicePixelRatio || 1;
         const cap = IS_MOBILE ? 1.5 : 2;
         this.engine.setHardwareScalingLevel(1 / Math.min(dpr, cap));
         this._bg = new BABYLON.Color4(0.133, 0.133, 0.133, 1);
-        // Toon-плагин вешается на материалы при их СОЗДАНИИ — регистрировать
-        // до первой сцены.
+        // The toon plugin attaches to materials at their CREATION — register it
+        // before the first scene.
         this.toon.register();
         this.resize();
         return true;
@@ -125,11 +125,11 @@ const World3D = {
         return new View3D(this, opts || {});
     },
 
-    // --- Константы рендера ----------------------------------------------------
+    // --- Render constants -----------------------------------------------------
 
-    // Все константы рендера с дефолтами (Constants.js может быть старше кода).
-    // В игре константы — лексические const: их нельзя прочитать по имени через
-    // window, только typeof по идентификатору.
+    // All render constants with defaults (Constants.js may be older than the code).
+    // In the game the constants are lexical const: they cannot be read by name via
+    // window, only by typeof on the identifier.
     cfg() {
         const U = 'undefined';
         return {
@@ -175,8 +175,8 @@ const World3D = {
         };
     },
 
-    // Живое применение констант рендера к сцене вида (редактор): свет, тени,
-    // небо, материалы по группам, toon, контуры. Ничего не пересобирает.
+    // Live application of render constants to the view's scene (editor): light, shadows,
+    // sky, materials by group, toon, ink edges and outlines. Rebuilds nothing.
     applyRenderConstants(view) {
         if (!view || !view.scene) return;
         const c = this.cfg();
@@ -188,8 +188,8 @@ const World3D = {
         view.scene.resetCachedMaterial();
     },
 
-    // Блик материала по группе (metadata.toonGroup): земля, окружение, главные
-    // объекты. Кольцо земли за краем (metadata.outer) — ещё и яркость WORLD3D_OUTER_TINT.
+    // Material specular highlight by group (metadata.toonGroup): ground, environment, main objects.
+    // The ground ring beyond the edge (metadata.outer) — also the WORLD3D_OUTER_TINT brightness.
     applyMaterialConstants(m, c) {
         const g = m && m.metadata && m.metadata.toonGroup;
         if (!g || !(m instanceof BABYLON.StandardMaterial)) return;
@@ -206,13 +206,14 @@ const World3D = {
         }
     },
 
-    // --- Объекты мира ------------------------------------------------------------
+    // --- World objects -----------------------------------------------------------
 
-    // Регистрация объекта: материалы (и дочерних мешей) — в группу kind (блик из
-    // констант, toon), корень — в карту теней, рёбра — в контур, силуэт — в
-    // обводку. Корень и дети получают СВОЙ metadata: clone() копирует его по
-    // ссылке, и контур/обводка клонов писали бы в общий объект.
-    // kind: 'actor' | 'prop'. opts: { castShadow, receiveShadows, ink, outline } — по умолчанию все true.
+    // Object registration: materials (of child meshes too) — into the kind group (specular
+    // highlight from constants, toon), the root — into the shadow map, edges — into the ink
+    // edges, the silhouette — into the outline. The root and the children get THEIR OWN
+    // metadata: clone() copies it by reference, and the ink edges/outline of clones would
+    // write into a shared object.
+    // kind: 'actor' | 'prop'. opts: { castShadow, receiveShadows, ink, outline } — all true by default.
     addObject(view, mesh, kind, opts) {
         if (!view || !mesh) return mesh;
         const o = opts || {};
@@ -230,15 +231,17 @@ const World3D = {
                 this.applyMaterialConstants(sm, c);
             }
             const solid = m.getTotalVertices && m.getTotalVertices() > 0;
-            if (solid && o.ink !== false) this.inkMesh(m, k, c);
-            // Все части — в ОДИН слой обводки: линия идёт по общему силуэту, а не по детали.
+            // A skinned mesh gets no ink edges: EdgesRenderer builds its lines once, from the
+            // rest pose, and they would stay behind while the bones move the mesh.
+            if (solid && o.ink !== false && !m.skeleton) this.inkMesh(m, k, c);
+            // All parts — into ONE outline layer: the line follows the overall silhouette, not a part.
             if (solid && o.outline !== false) this.outlineAdd(view, m, k, c);
         }
         if (o.castShadow !== false) view.addShadowCaster(mesh, true);
         return mesh;
     },
 
-    // Снять объект: обводка, тени, меш с детьми. Материалы остаются владельцу.
+    // Remove an object: outline, shadows, the mesh with its children. Materials stay with the owner.
     removeObject(view, mesh) {
         if (!mesh) return;
         const parts = [mesh].concat(mesh.getChildMeshes ? mesh.getChildMeshes(false) : []);
@@ -247,11 +250,11 @@ const World3D = {
         mesh.dispose(false, false);
     },
 
-    // --- Контур чернилами (EdgesRenderer) --------------------------------------
+    // --- Ink edges (EdgesRenderer) ---------------------------------------------
 
-    // Рёбра меша, изломанные круче WORLD3D_TOON_INK_ANGLE, рисуются линиями цвета
-    // чернил. group: 'actor' (уровень 1) | 'prop' (уровень 2). Цена: ~5 мс на
-    // меш в 1300 треугольников, один раз.
+    // Mesh edges creased sharper than WORLD3D_TOON_INK_ANGLE are drawn as lines in the ink
+    // color. group: 'actor' (level 1) | 'prop' (level 2). Cost: ~5 ms per
+    // mesh of 1300 triangles, once.
     inkMesh(mesh, group, c) {
         if (!mesh || !mesh.enableEdgesRendering) return;
         c = c || this.cfg();
@@ -265,8 +268,8 @@ const World3D = {
         }
         const eps = Math.cos(Math.max(1, Math.min(89, c.inkAngle)) * Math.PI / 180);
         if (!mesh.edgesRenderer || md.inkEps !== eps) {
-            // checkVerticesInsteadOfIndices: у lowpoly с плоским затенением
-            // треугольники разъединены, смежность ищется по координатам вершин.
+            // checkVerticesInsteadOfIndices: in flat-shaded lowpoly the
+            // triangles are disconnected, adjacency is found by vertex coordinates.
             mesh.enableEdgesRendering(eps, true);
             md.inkEps = eps;
         }
@@ -283,62 +286,62 @@ const World3D = {
         }
     },
 
-    // --- Обводка силуэта: постэффект по маске -----------------------------------
+    // --- Silhouette outline: mask-based post effect ------------------------------
     //
-    // «Stroke как в фотошопе»: объекты рисуются в отдельную МАСКУ (RTT), она
-    // расширяется и накладывается на кадр цветом чернил. Линия идёт по ВНЕШНЕЙ
-    // границе силуэта и ОДНА на объект целиком. Толщина — в экранных пикселях,
-    // от расстояния до камеры не зависит. Своего шейдера нет: штатный
-    // BABYLON.HighlightLayer с isStroke (#define STROKE в glowMapMerge даёт
-    // жёсткую кромку вместо свечения). Уровни — WORLD3D_TOON_OUTLINE. Обводка —
-    // часть toon-вида: при WORLD3D_TOON = 0 (галочка «toon shader» редактора)
-    // её нет. Контур рёбер (inkMesh) от WORLD3D_TOON не зависит.
+    // "Stroke like in Photoshop": objects are drawn into a separate MASK (RTT), it is
+    // dilated and laid over the frame in the ink color. The line follows the OUTER
+    // boundary of the silhouette, ONE per whole object. The width is in screen pixels
+    // and does not depend on the distance to the camera. No shader of its own: the stock
+    // BABYLON.HighlightLayer with isStroke (#define STROKE in glowMapMerge gives a
+    // hard edge instead of a glow). Levels — WORLD3D_TOON_OUTLINE. The outline is
+    // part of the toon look: at WORLD3D_TOON = 0 (the editor's "toon shader" checkbox)
+    // there is none. Ink edges (inkMesh) do not depend on WORLD3D_TOON.
     //
-    // У вида объектов ('actor' / 'prop') своя толщина, а у слоя она одна на
-    // всех — поэтому разным видам нужны разные слои.
+    // Each object kind ('actor' / 'prop') has its own width, while a layer has one for
+    // everything — so different kinds need different layers.
     //
-    // Туман сцены линию не касается (она ложится на готовый кадр) — тон по
-    // туману каждому мешу даёт outlineFog раз в кадр.
+    // Scene fog does not touch the line (it is laid over the finished frame) — the fog
+    // tone is given to each mesh by outlineFog once per frame.
     //
-    // ЛОВУШКА: слою нужен буфер трафарета (needStencil() = true) — движок
-    // поднимается с stencil: true, иначе обводка залезает на сам объект.
-    // ЛОВУШКА: обводка рисуется ПОВЕРХ кадра и глубины не знает — объект
-    // перед обведённым её не перекроет. При виде сверху это незаметно.
+    // PITFALL: the layer needs a stencil buffer (needStencil() = true) — the engine
+    // is brought up with stencil: true, otherwise the outline creeps onto the object itself.
+    // PITFALL: the outline is drawn ON TOP of the frame and knows nothing about depth — an
+    // object in front of an outlined one will not occlude it. Viewed from above it is unnoticeable.
 
     outlineKind(kind) { return kind === 'prop' ? 'prop' : 'actor'; },
 
-    // Толщина обводки вида объектов в экранных px (пикселях кадра).
+    // Outline width of an object kind in screen px (frame pixels).
     outlineWidthOf(kind, c) {
         c = c || this.cfg();
         return this.outlineKind(kind) === 'prop' ? c.outlinePropWidth : c.outlineActorWidth;
     },
 
-    // Разрешение слоя: маска — доля кадра, размытие — доля маски. Маску ниже
-    // кадра не опускать: линию тоньше текселя не нарисовать, а тексель
-    // 0.5 × 0.5 — это 4 px кадра. На мобильных дешевле только размытие.
+    // Layer resolution: the mask is a fraction of the frame, the blur is a fraction of the
+    // mask. Do not drop the mask below the frame: a line thinner than a texel cannot be
+    // drawn, and a 0.5 × 0.5 texel is 4 frame px. On mobile only the blur is cheaper.
     outlineRatios() {
         return { main: 1, blur: IS_MOBILE ? 0.5 : 1 };
     },
 
-    // Толщина в px кадра -> ядро размытия слоя.
-    // ЛОВУШКА: blurHorizontalSize у HighlightLayer — в ТЕКСЕЛЯХ текстуры
-    // размытия (кадр × mainTextureRatio × blurTextureSizeRatio), а не в px
-    // кадра. Без пересчёта на мобильных (0.5 × 0.5) та же константа давала
-    // линию вчетверо толще, чем на ПК.
+    // Width in frame px -> the layer's blur kernel.
+    // PITFALL: HighlightLayer's blurHorizontalSize is in TEXELS of the blur
+    // texture (frame × mainTextureRatio × blurTextureSizeRatio), not in frame
+    // px. Without the conversion, on mobile (0.5 × 0.5) the same constant gave
+    // a line four times thicker than on PC.
     outlineKernel(width) {
         const r = this.outlineRatios();
         return width * r.main * r.blur;
     },
 
-    // Слой обводки: СВОЙ на каждую пару «вид объектов × группа рендера меша»
-    // (`view._outlines['actor@2']` и т.п.). Вид задаёт толщину, группа — момент
-    // наложения.
+    // Outline layer: a SEPARATE one for each "object kind × mesh rendering group" pair
+    // (`view._outlines['actor@2']` etc.). The kind sets the width, the group — the moment
+    // of compositing.
     //
-    // ЛОВУШКА (обводка только у части объектов). Слой даёт линию ТОЛЬКО тем
-    // мешам, которые рисуются в его группе рендера. При дефолтном
-    // renderingGroupId = −1 наложение попадало между группами: объекты другой
-    // группы заливались маской целиком, а у части объектов линии не было вовсе.
-    // Поэтому слой заводится на КАЖДУЮ группу, в которой есть обводимый меш.
+    // PITFALL (outline on only some of the objects). A layer gives a line ONLY to the
+    // meshes that are drawn in its rendering group. With the default
+    // renderingGroupId = −1 the compositing landed between groups: objects of another
+    // group were flooded by the mask entirely, and some objects had no line at all.
+    // So a layer is created for EVERY group that has an outlined mesh.
     outlineLayer(view, kind, renderGroup, c) {
         if (!view || !view.scene || typeof BABYLON.HighlightLayer !== 'function') return null;
         c = c || this.cfg();
@@ -361,38 +364,38 @@ const World3D = {
                 blurVerticalSize: kernel,
                 renderingGroupId: g
             });
-            hl.innerGlow = false;     // только наружу — это обводка, не свечение
+            hl.innerGlow = false;     // outward only — this is an outline, not a glow
             hl.outerGlow = true;
-            // ЛОВУШКА (тёмный «призрак» контура в тумане). В режиме STROKE шейдер
-            // слияния (glowMapMerge) уже умножает цвет на альфу, а смешивание слоя
-            // по умолчанию, ALPHA_COMBINE (SRC_ALPHA), умножает второй раз:
-            // цвет·α² + кадр·(1−α). Чёрной линии это не видно, а линия цвета
-            // тумана (outlineFog) получала кромку на четверть темнее фона: объект
-            // вдали растворялся, контур оставался. Нужен ALPHA_PREMULTIPLIED
-            // (ONE, ONE_MINUS_SRC_ALPHA) — но ТОЛЬКО на время склейки. Режим
-            // лежит в приватных опциях тонкого слоя, и их же слой читает, когда
-            // пересоздаёт текстуры при смене размера канваса: с PREMULTIPLIED он
-            // собирал другую цепочку размытия (2 прохода вместо 3), текстура
-            // размытия оставалась пустой, и обводка пропадала совсем (редактор
-            // ArcTrack после смены размера вида). Опцией конструктора нельзя по
-            // той же причине. Поле приватное: при апгрейде Babylon проверить.
+            // PITFALL (dark "ghost" of the outline in fog). In STROKE mode the merge
+            // shader (glowMapMerge) already multiplies the color by alpha, and the layer's
+            // default blending, ALPHA_COMBINE (SRC_ALPHA), multiplies a second time:
+            // color·α² + frame·(1−α). On a black line this is invisible, but a fog-colored
+            // line (outlineFog) got an edge a quarter darker than the background: the object
+            // dissolved in the distance, the outline remained. ALPHA_PREMULTIPLIED
+            // (ONE, ONE_MINUS_SRC_ALPHA) is needed — but ONLY for the duration of the compose.
+            // The mode lives in the thin layer's private options, and the layer reads those
+            // same options when it recreates textures on canvas resize: with PREMULTIPLIED it
+            // built a different blur chain (2 passes instead of 3), the blur
+            // texture stayed empty, and the outline vanished completely (the ArcTrack
+            // editor after a view resize). A constructor option will not do for
+            // the same reason. The field is private: check it when upgrading Babylon.
             const thin = /** @type {any} */ (hl)._thinEffectLayer;
             if (thin && thin._options) {
                 const C = BABYLON.Constants;
                 hl.onBeforeComposeObservable.add(() => { thin._options.alphaBlendingMode = C.ALPHA_PREMULTIPLIED; });
                 hl.onAfterComposeObservable.add(() => { thin._options.alphaBlendingMode = C.ALPHA_COMBINE; });
             }
-            // ЛОВУШКА (тёмная кайма у светлой линии). Маску слой чистит
-            // neutralColor — по умолчанию чёрным (0,0,0,0). Размытие берёт цвет
-            // самого яркого отсчёта, а отсчёт у края маски билинейно смешан с
-            // этим чёрным: при дробном ядре (толщина 1.5 или 0.5 px) и на
-            // мобильных (размытие в половину кадра) линия цвета тумана получала
-            // тёмную кайму. Фон маски — самый тёмный тон мешей слоя с альфой 0
-            // (outlineFog): смешение с ним цвет не темнит, а светлее нельзя —
-            // размытие перекрасило бы им линию ближнего объекта. Объект свой:
-            // по умолчанию все слои делят статический HighlightLayer.NeutralColor.
+            // PITFALL (dark fringe on a light line). The layer clears the mask with
+            // neutralColor — black (0,0,0,0) by default. The blur takes the color of
+            // the brightest sample, and a sample at the mask edge is bilinearly mixed with
+            // that black: with a fractional kernel (width 1.5 or 0.5 px) and on
+            // mobile (blur at half the frame) a fog-colored line got
+            // a dark fringe. The mask background is the darkest tone of the layer's meshes
+            // with alpha 0 (outlineFog): mixing with it does not darken the color, and it
+            // cannot be lighter — the blur would repaint a nearer object's line with it. The
+            // object is its own: by default all layers share the static HighlightLayer.NeutralColor.
             hl.neutralColor = new BABYLON.Color4(0, 0, 0, 0);
-            // meshes: меш -> его цвет линии (Color3, тон по туману правит outlineFog).
+            // meshes: mesh -> its line color (Color3, the fog tone is adjusted by outlineFog).
             rec = store[key] = { hl: hl, group: g, kind: k, meshes: new Map(), ink: null };
         }
         rec.hl.blurHorizontalSize = kernel;
@@ -401,30 +404,30 @@ const World3D = {
         return rec.hl;
     },
 
-    // Поставить меш в обводку. kind: 'actor' (уровень 1) | 'prop' (уровень 2).
-    // Меш запоминает вид — applyOutlines пересобирает набор при правке
-    // констант. Инстансы (thin и обычные) обводятся вместе с исходным мешем.
+    // Put a mesh into the outline. kind: 'actor' (level 1) | 'prop' (level 2).
+    // The mesh remembers its kind — applyOutlines rebuilds the set when constants
+    // are edited. Instances (thin and regular) are outlined together with the source mesh.
     outlineAdd(view, mesh, kind, c) {
         if (!view || !mesh) return;
         c = c || this.cfg();
         const k = this.outlineKind(kind);
         const md = mesh.metadata || (mesh.metadata = {});
         md.outline = k;
-        this.outlineRemove(view, mesh);   // мог висеть в слое другой группы
-        // Toon выключен — обводки нет; снятый меш вернёт applyOutlines, когда toon включат.
+        this.outlineRemove(view, mesh);   // it may have been in another group's layer
+        // Toon is off — no outline; applyOutlines brings the removed mesh back when toon is turned on.
         const want = c.toon > 0 && c.outline >= (k === 'prop' ? 2 : 1) && this.outlineWidthOf(k, c) > 0;
         if (!want) return;
         const g = mesh.renderingGroupId || 0;
         const hl = this.outlineLayer(view, k, g, c);
         if (!hl) return;
-        const tone = this.hexColor3(c.inkColor);   // свой объект у каждого меша: outlineFog правит его на месте
+        const tone = this.hexColor3(c.inkColor);   // each mesh gets its own object: outlineFog edits it in place
         hl.addMesh(mesh, tone);
         const rec = view._outlines[k + '@' + g];
         if (rec) rec.meshes.set(mesh, tone);
     },
 
-    // Снять меш со всех слоёв обводки; опустевший слой сносится (пустая маска
-    // всё равно стоит прохода рендера).
+    // Remove a mesh from all outline layers; an emptied layer is disposed (an empty mask
+    // still costs a render pass).
     outlineRemove(view, mesh) {
         const store = view && view._outlines;
         if (!store || !mesh) return;
@@ -440,7 +443,7 @@ const World3D = {
         }
     },
 
-    // Правка констант: толщина — на живые слои, уровни и цвет — пересбор набора.
+    // Constants edit: the width goes onto live layers, levels and color — a rebuild of the set.
     applyOutlines(view, c) {
         if (!view || !view.scene) return;
         c = c || this.cfg();
@@ -449,21 +452,21 @@ const World3D = {
         }
     },
 
-    // Тон обводки по туману — раз в кадр, до scene.render() (renderFrame).
-    // Линия ложится на готовый кадр, и без тона объект вдали растворялся в
-    // тумане, а чёрный контур вокруг него оставался. Цвет линии меша смешивается
-    // с туманом ТОЙ ЖЕ формулой, что Babylon применяет к поверхности
-    // (fogFragment: mix(fogColor, цвет, f)), на расстоянии от камеры до центра
-    // меша. Своих констант нет: туман — сцены (WORLD3D_FOG_DENSITY,
-    // WORLD3D_SKY_COLOR, переопределения opts вида). Тон один на меш. У меша с
-    // инстансами (thin или обычными — например, лес одним мешем) центр
-    // габарита — середина всей россыпи, и тон по нему врал бы у копий рядом с
-    // камерой: им тон — по расстоянию до точки взгляда камеры.
+    // Outline fog tone — once per frame, before scene.render() (renderFrame).
+    // The line is laid over the finished frame, and without the tone a distant object
+    // dissolved in the fog while the black outline around it remained. The mesh's line color
+    // is mixed with the fog by the SAME formula Babylon applies to the surface
+    // (fogFragment: mix(fogColor, color, f)), at the distance from the camera to the mesh
+    // center. No constants of its own: the fog is the scene's (WORLD3D_FOG_DENSITY,
+    // WORLD3D_SKY_COLOR, the view's opts overrides). One tone per mesh. For a mesh with
+    // instances (thin or regular — e.g. a forest as one mesh) the bounds
+    // center is the middle of the whole scatter, and a tone based on it would be wrong for
+    // copies near the camera: their tone is by the distance to the camera's look-at point.
     outlineFog(view) {
         const store = view && view._outlines;
         if (!store || !view.scene || !view.camera) return;
         const scene = view.scene, fog = scene.fogColor, cam = view.camera;
-        cam.getViewMatrix();   // globalPosition пересчитывается с матрицей вида, а рендер кадра ещё впереди
+        cam.getViewMatrix();   // globalPosition is recomputed with the view matrix, and the frame render is still ahead
         const eye = cam.globalPosition;
         const focus = BABYLON.Vector3.Distance(eye, cam.getTarget());
         for (const key in store) {
@@ -473,21 +476,21 @@ const World3D = {
             for (const [m, tone] of rec.meshes) {
                 let d = focus;
                 if (!m.hasThinInstances && !(m.instances && m.instances.length)) {
-                    m.computeWorldMatrix();   // объект могли сдвинуть после прошлого кадра
+                    m.computeWorldMatrix();   // the object may have been moved since the last frame
                     d = BABYLON.Vector3.Distance(eye, m.getBoundingInfo().boundingSphere.centerWorld);
                 }
                 const f = m.applyFog === false ? 1 : this.fogFactor(scene, d);
                 rec.hl.addMesh(m, tone.set(fog.r + (ink.r - fog.r) * f, fog.g + (ink.g - fog.g) * f, fog.b + (ink.b - fog.b) * f));
-                // Яркость — как у выбора отсчёта в размытии (glowBlurPostProcess).
+                // Luminance — same as the sample selection in the blur (glowBlurPostProcess).
                 const lum = 0.2126 * tone.r + 0.7152 * tone.g + 0.0722 * tone.b;
                 if (lum < darkest) { darkest = lum; rec.hl.neutralColor.set(tone.r, tone.g, tone.b, 0); }
             }
         }
     },
 
-    // Доля цвета поверхности, которую оставляет туман сцены на расстоянии d
-    // (1 — тумана нет, 0 — только туман). Формулы — CalcFogFactor из
-    // fogFragmentDeclaration Babylon.
+    // The fraction of the surface color that the scene fog leaves at distance d
+    // (1 — no fog, 0 — fog only). Formulas — CalcFogFactor from
+    // Babylon's fogFragmentDeclaration.
     fogFactor(scene, d) {
         if (!scene.fogEnabled) return 1;
         const S = BABYLON.Scene, rho = scene.fogDensity;
@@ -498,10 +501,10 @@ const World3D = {
         return Math.max(0, Math.min(1, f));
     },
 
-    // --- Утилиты ---------------------------------------------------------------
+    // --- Utilities -------------------------------------------------------------
 
-    // Вектор «куда светит солнце» (единичный, вниз): азимут по карте (0 — вправо,
-    // 90 — вниз), высота над горизонтом.
+    // The "where the sun shines" vector (unit, downward): azimuth on the map (0 — right,
+    // 90 — down), elevation above the horizon.
     sunDirection(c) {
         c = c || this.cfg();
         const az = c.sunAz * Math.PI / 180;
@@ -517,19 +520,19 @@ const World3D = {
     }
 };
 
-// --- Toon-плагин материалов -----------------------------------------------------
+// --- Toon material plugin -------------------------------------------------------
 
-// Плагин StandardMaterial. Живёт на каждом материале (material.arcToon). Два
-// независимых define:
-//   ARCSHADOW — цветная тень (см. шапку файла): на всех освещённых материалах
-//               сцены, у которой есть scene.metadata.arcSun (ставит
+// StandardMaterial plugin. Lives on every material (material.arcToon). Two
+// independent defines:
+//   ARCSHADOW — colored shadow (see the file header): on all lit materials
+//               of a scene that has scene.metadata.arcSun (set by
 //               View3D.applyLighting);
-//   ARCTOON   — ступени света (World3D.toon.s.on).
-// Значения уходят uniform'ами на каждой привязке (без пересборки шейдера),
-// define — при markAllDefinesAsDirty. Материалы группы 'ground' получают
-// bands = 0 при выключенном WORLD3D_TOON_GROUND и ободок 0 — ветвление в
-// шейдере, не в define, чтобы переключатели редактора не компилировали
-// шейдеры заново. metadata.toon = false выключает ступени на материале.
+//   ARCTOON   — light bands (World3D.toon.s.on).
+// Values go out as uniforms on every bind (no shader rebuild),
+// defines — on markAllDefinesAsDirty. Materials of the 'ground' group get
+// bands = 0 when WORLD3D_TOON_GROUND is off, and rim light 0 — branching in the
+// shader, not in a define, so that the editor's toggles do not recompile
+// shaders. metadata.toon = false turns the bands off on a material.
 class ArcToonPlugin extends BABYLON.MaterialPluginBase {
     constructor(material) {
         super(material, 'ArcToon', 500, { ARCTOON: false, ARCSHADOW: false }, true, true);
@@ -581,10 +584,10 @@ class ArcToonPlugin extends BABYLON.MaterialPluginBase {
     }
 }
 
-// arcToonA = (ступени, мягкость, нижняя ступень, сила блика),
-// arcToonB = (порог блика, сила ободка, ширина ободка, —),
-// arcShadowColor = (цвет тени, сила), arcSunDir = к солнцу, arcSunColor =
-// диффуз солнца × интенсивность (как vLightDiffuse Babylon).
+// arcToonA = (bands, softness, lowest band, specular highlight strength),
+// arcToonB = (specular highlight threshold, rim light strength, rim light width, —),
+// arcShadowColor = (shadow color, strength), arcSunDir = toward the sun, arcSunColor =
+// sun diffuse × intensity (like Babylon's vLightDiffuse).
 ArcToonPlugin.CODE = {
     CUSTOM_FRAGMENT_DEFINITIONS: `
 #ifdef ARCTOON
@@ -601,15 +604,15 @@ float arcToonLevel(float v) {
 }
 #endif
 `,
-    // Доля тени в точке — общая для цветной тени и ободка toon.
+    // Shadow fraction at the point — shared by the colored shadow and the toon rim light.
     CUSTOM_FRAGMENT_MAIN_BEGIN: `
 float arcShadowA = 0.0;
 `,
-    // Сразу после суммирования света всех источников (default.fragment):
-    // diffuseBase и specularBase ещё не умножены на цвет/текстуру. Сначала
-    // цветная тень: видимость солнца — переменная shadow ПОСЛЕДНЕГО света
-    // (солнце; darkness генератора 0), свет без тени восстанавливается
-    // добавкой скрытой доли солнца.
+    // Right after the light of all sources is summed (default.fragment):
+    // diffuseBase and specularBase are not yet multiplied by color/texture. First
+    // the colored shadow: the sun visibility is the shadow variable of the LAST light
+    // (the sun; generator darkness 0), the unshadowed light is reconstructed
+    // by adding back the hidden fraction of the sun.
     '!!aggShadow=aggShadow/numLights;': `$0
 #ifdef ARCSHADOW
 {
@@ -637,7 +640,7 @@ if (arcToonA.x >= 1.5) {
 }
 #endif
 `,
-    // Ободок по краю силуэта — светлее базового цвета, гаснет в тени.
+    // Rim light along the silhouette edge — lighter than the base color, fades out in shadow.
     CUSTOM_FRAGMENT_BEFORE_FOG: `
 #ifdef ARCTOON
 if (arcToonB.y > 0.0) {
@@ -655,8 +658,8 @@ const ArcToon = {
     s: { on: true, bands: 3, soft: 0.06, low: 0.35, ground: true, spec: 1, specSize: 0.12, rim: 0.25, rimWidth: 0.35 },
     registered: false,
 
-    // Раз на страницу: фабрика вешает плагин на каждый новый StandardMaterial
-    // (событие создания материала). Только GLSL (WebGL) — как и весь мир.
+    // Once per page: the factory attaches the plugin to every new StandardMaterial
+    // (material creation event). GLSL (WebGL) only — like the whole world.
     register() {
         if (this.registered || typeof BABYLON === 'undefined' || !BABYLON.MaterialPluginBase ||
             typeof BABYLON.RegisterMaterialPlugin !== 'function') return;
@@ -684,8 +687,8 @@ const ArcToon = {
         };
     },
 
-    // Новые константы: значения — uniform'ами на следующей привязке; вкл/выкл
-    // — пересборка шейдеров всех материалов с плагином во всех движках страницы.
+    // New constants: values — as uniforms on the next bind; on/off
+    // — a shader rebuild of all materials with the plugin in all engines of the page.
     apply(c) {
         const wasOn = this.s.on;
         this.load(c || World3D.cfg());
@@ -700,9 +703,9 @@ const ArcToon = {
 };
 World3D.toon = ArcToon;
 
-// Один 3D-вид: своя Babylon-сцена, камера, свет и тени.
+// One 3D view: its own Babylon scene, camera, light and shadows.
 class View3D {
-    // opts: { sky?, groundTint?, shadowColor?, fogDensity?, shadowRadius? } — переопределения констант
+    // opts: { sky?, groundTint?, shadowColor?, fogDensity?, shadowRadius? } — constant overrides
     constructor(world, opts) {
         this.world = world;
         this.opts = opts;
@@ -711,27 +714,27 @@ class View3D {
 
         const scene = new BABYLON.Scene(this.engine);
         this.scene = scene;
-        // Правосторонняя система: X = x, Z = y карты (y вниз) при виде сверху
-        // даёт восток СПРАВА; в левосторонней тот же мир выходил зеркальным.
+        // Right-handed system: X = x, Z = y of the map (y down) viewed from above
+        // puts east on the RIGHT; in a left-handed one the same world came out mirrored.
         scene.useRightHandedSystem = true;
         scene.detachControl();
         scene.skipPointerMovePicking = true;
         scene.skipFrustumClipping = false;
         scene.autoClear = true;
         scene.autoClearDepthAndStencil = true;
-        // Слои OVERLAY и ACTOR глубину НЕ сбрасывают (World3D.LAYER): метки поверх
-        // мира пускает тест ALWAYS их материала, а ACTOR по-прежнему проверяется о
-        // глубину мира. Сброс глубины вместо ALWAYS уже пробовали — объекты ACTOR
-        // начинали просвечивать сквозь стены.
+        // The OVERLAY and ACTOR layers do NOT clear depth (World3D.LAYER): marks on top of
+        // the world are let through by their material's ALWAYS test, while ACTOR is still
+        // tested against the world depth. Clearing depth instead of ALWAYS has already been
+        // tried — ACTOR objects started showing through walls.
         scene.setRenderingAutoClearDepthStencil(World3D.LAYER.OVERLAY, false);
         scene.setRenderingAutoClearDepthStencil(World3D.LAYER.ACTOR, false);
         scene.ambientColor = new BABYLON.Color3(0.35, 0.35, 0.38);
-        // Туман прячет край земли на низком угле камеры.
+        // Fog hides the ground edge at a low camera angle.
         scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
 
         const c = World3D.cfg();
 
-        // --- Камера: TargetCamera без встроенных инпутов, ведёт CameraController ---
+        // --- Camera: TargetCamera without built-in inputs, driven by CameraController ---
         this.camera = new BABYLON.TargetCamera('cam', new BABYLON.Vector3(0, 600, 0), scene);
         this.camera.fov = ((typeof CAMERA_FOV_DEG !== 'undefined') ? CAMERA_FOV_DEG : 52) * Math.PI / 180;
         this.camera.minZ = 6;
@@ -739,15 +742,15 @@ class View3D {
         this.camera.setTarget(new BABYLON.Vector3(1, 0, 1));
         scene.activeCamera = this.camera;
 
-        // --- Свет: небо (полусфера) + солнце; значения — applyLighting ---
+        // --- Light: sky (hemisphere) + sun; values — applyLighting ---
         this.hemi = new BABYLON.HemisphericLight('hemi', new BABYLON.Vector3(0, 1, 0), scene);
         this.hemi.specular = new BABYLON.Color3(0, 0, 0);
 
         this.sun = new BABYLON.DirectionalLight('sun', World3D.sunDirection(c), scene);
         this.sun.specular = new BABYLON.Color3(0.25, 0.25, 0.25);
         this.sun.autoUpdateExtends = false;
-        // Глубина карты теней — от позиции солнца (LIGHT_DIST от цели):
-        // узкий диапазон = точность, широкий (1..6000) тени терял.
+        // Shadow map depth — from the sun position (LIGHT_DIST from the target):
+        // a narrow range = precision, a wide one (1..6000) lost shadows.
         this.sun.shadowMinZ = View3D.LIGHT_DIST - 1200;
         this.sun.shadowMaxZ = View3D.LIGHT_DIST + 1200;
         this._shadowRadius = opts.shadowRadius || (IS_MOBILE ? Math.min(520, c.shadowRadius) : c.shadowRadius);
@@ -759,16 +762,16 @@ class View3D {
         this.applyLighting(c);
         this.updateLightFrustum(0, 0, 0);
 
-        this._syncFns = [];   // функции, дёргаемые перед каждым кадром 3D
+        this._syncFns = [];   // functions called before every 3D frame
         this.active = true;
         world.view = this;
     }
 
-    // Свет, небо, туман и тени из констант рендера (opts вида их переопределяют).
-    // Сюда же — данные плагина цветной тени (scene.metadata.arcSun, arcShadow):
-    // плотность и цвет тени считает шейдер, darkness Babylon — 0.
-    // Свет подобран так, чтобы ровная земля выходила ≈1.0 (краска текстуры без
-    // изменений), склоны и тени темнели; суммы больше ~1.2 клампятся в белый.
+    // Light, sky, fog and shadows from the render constants (the view's opts override them).
+    // Also here — the colored shadow plugin data (scene.metadata.arcSun, arcShadow):
+    // shadow density and color are computed by the shader, Babylon's darkness is 0.
+    // The light is tuned so that flat ground comes out ≈1.0 (texture paint
+    // unchanged), slopes and shadows darken; sums above ~1.2 clamp to white.
     applyLighting(c) {
         c = c || World3D.cfg();
         const o = this.opts || {};
@@ -797,10 +800,10 @@ class View3D {
         };
 
         const sg = this.shadow;
-        sg.setDarkness(0);   // цвет и силу тени даёт плагин (ARCSHADOW), Babylon — только видимость
+        sg.setDarkness(0);   // shadow color and strength come from the plugin (ARCSHADOW), Babylon — visibility only
         sg.bias = c.shadowBias;
-        // Край тени: 0 — жёсткий (одна выборка карты), иначе PCF (WebGL2) или
-        // Пуассон (WebGL1); на мобильных — не выше низкого качества.
+        // Shadow edge: 0 — hard (one map sample), otherwise PCF (WebGL2) or
+        // Poisson (WebGL1); on mobile — no higher than low quality.
         let soft = Math.max(0, Math.min(3, Math.round(c.shadowSoft)));
         if (IS_MOBILE && soft > 1) soft = 1;
         const webgl2 = this.engine.webGLVersion >= 2;
@@ -815,21 +818,21 @@ class View3D {
             sg.usePercentageCloserFiltering = false;
             sg.usePoissonSampling = soft > 0;
         }
-        // Смещение по нормали — в ТЕКСЕЛЯХ карты: «акне» (полосы и «пила» на гранях
-        // под острым углом к солнцу) растёт с текселем, а кадр теней ужимается и
-        // растёт (fitShadowFrustum). Фильтр края сравнивает глубину и на соседних
-        // текселях — к константе прибавляется его радиус (PCF 1/3/5 выборок —
-        // 0.5/1.5/2.5 текселя, Пуассон — 1), иначе при мягком крае «пила»
-        // возвращается. В мировые px переводит updateLightFrustum.
+        // Normal bias is in map TEXELS: "shadow acne" (stripes and a "sawtooth" on faces
+        // at an acute angle to the sun) grows with the texel, and the shadow frustum shrinks
+        // and grows (fitShadowFrustum). The edge filter compares depth on neighboring
+        // texels too — its radius is added to the constant (PCF 1/3/5 samples —
+        // 0.5/1.5/2.5 texels, Poisson — 1), otherwise with a soft edge the "sawtooth"
+        // comes back. updateLightFrustum converts it to world px.
         const filter = soft === 0 ? 0 : (webgl2 ? [0, 0.5, 1.5, 2.5][soft] : 1);
         this._normalBiasTexels = Math.max(0, c.shadowNormalBias) + filter;
-        // Позиция солнца зависит от направления — ортокадр пересчитать.
+        // The sun position depends on the direction — recompute the ortho frustum.
         if (this._lightAt) this.updateLightFrustum(this._lightAt.x, this._lightAt.y, this._lightAt.h, this._lightAt.r);
     }
 
-    // Ортокадр солнца ездит за точкой интереса (обычно цель камеры): тени
-    // чёткие там, куда смотрит игрок, а не размазаны на весь мир.
-    // radius — переопределение полуразмера кадра.
+    // The sun's ortho frustum follows the point of interest (usually the camera target):
+    // shadows are crisp where the player is looking, not smeared over the whole world.
+    // radius — override of the frustum half-size.
     updateLightFrustum(x, y2d, h, radius) {
         const R = radius || this._shadowRadius;
         const d = this.sun.direction;
@@ -840,24 +843,24 @@ class View3D {
         this.sun.orthoRight = R;
         this.sun.orthoTop = R;
         this.sun.orthoBottom = -R;
-        // Тексель карты в мировых px: Babylon расширяет кадр на shadowOrthoScale с каждой стороны.
+        // Map texel in world px: Babylon expands the frustum by shadowOrthoScale on each side.
         const texel = 2 * R * (1 + 2 * this.sun.shadowOrthoScale) / this._mapSize;
         this.shadow.normalBias = (this._normalBiasTexels || 0) * texel;
     }
 
-    // Ортокадр солнца по КАСТЕРАМ в пределах maxR от точки интереса: чем кадр
-    // меньше, тем больше текселей карты на мировой px и чётче тень (кадр 720 px
-    // при карте 1024 давал 0.7 текселя на px — тень расплывалась в пятно).
-    //   • центр — середина ГАБАРИТОВ кастеров (bounding box в мире), попавших в
-    //     maxR (остальные дальше края экрана, их тень не видна). По позициям
-    //     кадр резал тень большой модели: у здания позиция — одна точка;
-    //   • к полуразмеру — высота кастеров над точкой интереса, как её видит
-    //     солнце (× cos высоты солнца: на столько верх объекта уходит в кадре
-    //     солнца), но не меньше PAD;
-    //   • радиус квантуется шагом 32 px, центр — по сетке текселей: иначе
-    //     кромка тени «ползёт» по текселям при каждом сдвиге камеры;
-    //   • кастер с thin instances стоит в начале координат и габарит бы врал —
-    //     с ним кадр берётся по maxR.
+    // The sun's ortho frustum fitted to the SHADOW CASTERS within maxR of the point of interest:
+    // the smaller the frustum, the more map texels per world px and the crisper the shadow (a
+    // 720 px frustum with a 1024 map gave 0.7 texels per px — the shadow blurred into a blob).
+    //   • center — the middle of the BOUNDS of the shadow casters (world bounding box) that
+    //     fall within maxR (the rest are beyond the screen edge, their shadow is not visible).
+    //     By positions the frustum cut off a big model's shadow: a building's position is one point;
+    //   • added to the half-size — the height of the shadow casters above the point of
+    //     interest as the sun sees it (× cos of the sun elevation: that is how far the top of
+    //     an object shifts in the sun's frustum), but no less than PAD;
+    //   • the radius is quantized in 32 px steps, the center — to the texel grid: otherwise
+    //     the shadow edge "crawls" across texels on every camera shift;
+    //   • a shadow caster with thin instances sits at the origin and its bounds would lie —
+    //     with it the frustum is taken by maxR.
     fitShadowFrustum(x, y2d, h, maxR) {
         const R0 = Math.min(maxR || this._shadowRadius, this._shadowRadius);
         const list = this.shadow ? this.shadow.getShadowMap().renderList : null;
@@ -878,14 +881,14 @@ class View3D {
             n++;
         }
         if (wide || !n) { this.updateLightFrustum(x, y2d, h, R0); return; }
-        const PAD = 64;   // запас: кромка мягкой тени и углы габарита в кадре солнца
+        const PAD = 64;   // margin: the soft shadow edge and the corners of the bounds in the sun's frustum
         const dy = this.sun.direction.y;
         const rise = Math.max(top - h, h - bottom) * Math.sqrt(Math.max(0, 1 - dy * dy));
         let R = Math.max(View3D.SHADOW_MIN_RADIUS, Math.max(x1 - x0, y1 - y0) / 2 + Math.max(PAD, rise));
         R = Math.min(R0, Math.ceil(R / 32) * 32);
-        // Гистерезис: пока прежний радиус годится и не шире нужного больше чем на
-        // шаг, держим его — иначе на границе шага R щёлкал бы между двумя
-        // значениями через кадр, и кромка тени дрожала бы текселем.
+        // Hysteresis: while the previous radius still fits and is not wider than needed by more
+        // than a step, keep it — otherwise at a step boundary R would flip between two
+        // values every other frame, and the shadow edge would jitter by a texel.
         const prev = this._fitR;
         if (prev != null && prev <= R0 && prev >= R && prev - R <= 32) R = prev;
         this._fitR = R;
@@ -912,10 +915,10 @@ class View3D {
         }
     }
 
-    // --- Экран <-> мир ------------------------------------------------------
+    // --- Screen <-> world ---------------------------------------------------
 
-    // Камеру подвинули, кадр ещё не рисовался — матрицы для проекций обновить
-    // сейчас (зум к курсору, панорама «за указателем»).
+    // The camera was moved, the frame has not been drawn yet — update the projection
+    // matrices now (zoom to cursor, "follow the pointer" pan).
     refreshMatrices() {
         const cam = this.camera;
         this.scene.setTransformMatrix(cam.getViewMatrix(true), cam.getProjectionMatrix(true));
@@ -926,20 +929,20 @@ class View3D {
         return this.engine.getRenderWidth() / cw;
     }
 
-    // Точка экрана (CSS px канваса) -> точка карты ({x, y}) под курсором.
-    // С terrain — пересечение луча с РЕЛЬЕФОМ, без него — плоскость Y = h.
-    // null — луч смотрит в небо.
+    // Screen point (canvas CSS px) -> map point ({x, y}) under the cursor.
+    // With terrain — the ray intersection with the TERRAIN, without it — the plane Y = h.
+    // null — the ray looks into the sky.
     pointerToGround(px, py, h, terrain) {
-        // createPickingRay ждёт CSS-пиксели канваса: масштаб рендера
-        // (hardwareScalingLevel) он учитывает САМ. Умножение на _renderScale()
-        // уводило точку от курсора тем дальше, чем дальше от левого верхнего угла.
+        // createPickingRay expects canvas CSS pixels: it accounts for the render scale
+        // (hardwareScalingLevel) ITSELF. Multiplying by _renderScale() moved the point
+        // away from the cursor the more, the farther it was from the top-left corner.
         const ray = this.scene.createPickingRay(px, py, BABYLON.Matrix.Identity(), this.camera, false);
         const o = ray.origin, d = ray.direction;
         if (Math.abs(d.y) < 1e-6) return null;
         const planeT = (yy) => (yy - o.y) / d.y;
         if (terrain && terrain.hgrid && Number.isFinite(terrain.hMin)) {
-            // Марш по лучу от уровня выше максимума рельефа до уровня ниже
-            // минимума; первый шаг под поверхностью уточняется бисекцией.
+            // March along the ray from a level above the terrain maximum to a level below
+            // the minimum; the first step under the surface is refined by bisection.
             let t0 = planeT(terrain.hMax + 1), t1 = planeT(terrain.hMin - 1);
             if (t1 > 0) {
                 if (t0 < 0) t0 = 0;
@@ -969,9 +972,9 @@ class View3D {
         return { x: o.x + d.x * t, y: o.z + d.z * t };
     }
 
-    // Точка карты (x, y и высота) -> экранные CSS-пиксели канваса.
-    // visible — точка внутри вьюпорта и перед камерой. Vector3.Project отдаёт
-    // РЕНДЕР-пиксели — отсюда деление на _renderScale().
+    // Map point (x, y and height) -> screen CSS pixels of the canvas.
+    // visible — the point is inside the viewport and in front of the camera. Vector3.Project
+    // returns RENDER pixels — hence the division by _renderScale().
     projectToScreen(x, y2d, h) {
         const k = this._renderScale();
         const w = this.engine.getRenderWidth(), hh = this.engine.getRenderHeight();
@@ -988,17 +991,17 @@ class View3D {
         };
     }
 
-    // Всё, что создано в сцене (меши, материалы, слои обводки), умирает вместе с ней.
+    // Everything created in the scene (meshes, materials, outline layers) dies with it.
     dispose() {
         this.active = false;
         if (this.world.view === this) this.world.view = null;
         this._syncFns = [];
-        try { this.scene.dispose(); } catch (e) { /* уже снесена */ }
+        try { this.scene.dispose(); } catch (e) { /* already disposed */ }
         this.scene = null;
     }
 }
 
-// Расстояние от цели камеры до «солнца» (центр ортокадра теней), px.
+// Distance from the camera target to the "sun" (center of the shadow ortho frustum), px.
 View3D.LIGHT_DIST = 2200;
-// Минимальный полуразмер ортокадра теней: один объект со своей тенью.
+// Minimum half-size of the shadow ortho frustum: one object with its shadow.
 View3D.SHADOW_MIN_RADIUS = 140;

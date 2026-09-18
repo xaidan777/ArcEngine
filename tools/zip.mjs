@@ -1,18 +1,18 @@
 // ============================================================================
-//  Минимальный ZIP-писатель на deflate. Без зависимостей (node:zlib).
+//  Minimal deflate-based ZIP writer. No dependencies (node:zlib).
 // ----------------------------------------------------------------------------
-//  Обычный ZIP с index.html в корне. Пишем формат вручную, чтобы не тащить
-//  archiver/jszip: у проекта принцип «ноль зависимостей».
+//  A plain ZIP with index.html at the root. The format is written by hand so as
+//  not to pull in archiver/jszip: the project's principle is "zero dependencies".
 //
-//  Пишем ZIP64-совместимо НЕ пишем — архив игры заведомо меньше 4 ГБ и
-//  файлов меньше 65535, обычной записи хватает.
+//  ZIP64-compatible output is NOT written — the game archive is certainly smaller
+//  than 4 GB and has fewer than 65535 files, plain records are enough.
 // ============================================================================
 import zlib from 'node:zlib';
 import { promisify } from 'node:util';
 
 const deflateRaw = promisify(zlib.deflateRaw);
 
-// CRC-32 (таблица считается один раз)
+// CRC-32 (the table is computed once)
 const CRC_TABLE = (() => {
   const t = new Int32Array(256);
   for (let i = 0; i < 256; i++) {
@@ -29,8 +29,8 @@ function crc32(buf) {
   return (c ^ -1) >>> 0;
 }
 
-// MS-DOS date/time. Время берём из аргумента — сборка должна быть
-// воспроизводимой, а не зависеть от момента запуска.
+// MS-DOS date/time. The time is taken from the argument — the build must be
+// reproducible, not depend on the moment it is run.
 function dosDateTime(date) {
   const y = Math.max(1980, date.getFullYear());
   return {
@@ -40,8 +40,8 @@ function dosDateTime(date) {
 }
 
 /**
- * @param {{name:string, data:Buffer}[]} entries — name с прямыми слэшами, относительный путь
- * @param {Date} mtime — одна метка на весь архив
+ * @param {{name:string, data:Buffer}[]} entries — name with forward slashes, a relative path
+ * @param {Date} mtime — one timestamp for the whole archive
  * @returns {Promise<Buffer>}
  */
 export async function makeZip(entries, mtime = new Date(2025, 0, 1, 0, 0, 0)) {
@@ -53,13 +53,13 @@ export async function makeZip(entries, mtime = new Date(2025, 0, 1, 0, 0, 0)) {
   for (const e of entries) {
     const nameBuf = Buffer.from(e.name, 'utf8');
     const crc = crc32(e.data);
-    // level 9: архив заливается один раз, скорость сборки не важна
+    // level 9: the archive is uploaded once, build speed does not matter
     let comp = await deflateRaw(e.data, { level: 9 });
     let method = 8;
-    // если deflate раздул файл (уже сжатые png/jpg/mp3) — кладём как есть
+    // if deflate inflated the file (already compressed png/jpg/mp3) — store it as is
     if (comp.length >= e.data.length) { comp = e.data; method = 0; }
 
-    // UTF-8 flag (bit 11) — имена файлов латиницей, но пусть будет корректно
+    // UTF-8 flag (bit 11) — file names are Latin, but let it be correct
     const flags = 0x0800;
 
     const local = Buffer.alloc(30 + nameBuf.length);

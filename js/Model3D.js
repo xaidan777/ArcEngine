@@ -1,44 +1,49 @@
-// Model3D.js — модели: бинарный FBX (7.x: Blender, Maya, Unity) -> меши Babylon.
-// Объекты локации (Objects.js) ставит Location3D: load(url) -> build() ->
-// World3D.addObject. Модели лежат в assets/models/.
+// Model3D.js — models: binary FBX (7.x: Blender, Maya, Unity) -> Babylon meshes.
+// Location objects (Objects.js) are placed by Location3D: load(url, scene) -> build() ->
+// World3D.addObject. Models live in assets/models/. A .glb / .gltf (skeleton, animation
+// clips, textures) goes through the same three calls into Gltf3D.js; clips(root) — its clips.
 //
-// Берётся: узлы Model с геометрией — трансформ (Lcl Translation/Rotation/Scaling,
-// Pre/PostRotation, пивоты, Geometric*, родители), полигоны веером в
-// треугольники, нормали, цвет материала (DiffuseColor), центр и оси узла (по
-// ним Location3D вращает часть — def.anim). Не берётся: текстуры, UV, вершинные
-// цвета, кости, анимация, ASCII-FBX.
+// FBX, this file's own parser.
+// Taken: Model nodes with geometry — transform (Lcl Translation/Rotation/Scaling,
+// Pre/PostRotation, pivots, Geometric*, parents), polygons fanned into
+// triangles, normals, material color (DiffuseColor), node center and axes (Location3D
+// spins a part by them — def.anim). Not taken: textures, UVs, vertex
+// colors, bones, animation, ASCII FBX.
 //
-// ЕДИНИЦЫ: сантиметры (UnitScaleFactor файла учтён) = px мира: модель из Blender
-// ростом 2 м — 200 px при scale 1. Начало координат модели — начало файла.
-// ОСИ: FBX по умолчанию правосторонний с Y вверх — как сцена набора; другие оси
-// файла (GlobalSettings: UpAxis, FrontAxis, CoordAxis) приводятся к этим.
-// ОБХОД: лицевая грань FBX — против часовой, а у мешей Babylon (MeshBuilder,
-// Terrain3D) нормаль по обходу смотрит в обратную сторону — треугольники
-// пишутся задом наперёд, иначе backFaceCulling срежет лицевые грани.
-// ЦВЕТ: DiffuseColor в файле линейный (так пишет Blender), StandardMaterial
-// ждёт гамма-пространство — без toGammaSpace краски темнее, чем в Blender.
-// Матрицы Babylon — под вектор-строку: A.multiply(B) — сначала A, потом B.
+// UNITS: centimeters (the file's UnitScaleFactor is applied) = world px: a model from Blender
+// 2 m tall — 200 px at scale 1. The model's origin is the file's origin.
+// AXES: FBX is right-handed with Y up by default — like the kit's scene; other file
+// axes (GlobalSettings: UpAxis, FrontAxis, CoordAxis) are converted to these.
+// WINDING: an FBX front face is counterclockwise, while for Babylon meshes (MeshBuilder,
+// Terrain3D) the normal by winding points the opposite way — triangles are
+// written in reverse, otherwise backFaceCulling would cull the front faces.
+// COLOR: DiffuseColor in the file is linear (that is how Blender writes it), StandardMaterial
+// expects gamma space — without toGammaSpace the colors are darker than in Blender.
+// Babylon matrices are for a row vector: A.multiply(B) — first A, then B.
 
 /** @satisfies {Record<string, any>} */
 const Model3D = {
-    _cache: new Map(),   // url -> Promise разбора: файл качается и разбирается раз на страницу
+    _cache: new Map(),   // url -> parse Promise: the file is downloaded and parsed once per page
 
-    // url -> Promise<модель> (см. parse).
-    load(url) {
+    // url -> Promise<model> (see parse). A .glb / .gltf goes to Gltf3D (skeleton, clips,
+    // textures) and needs the scene: its meshes are created by the Babylon loader.
+    load(url, scene) {
+        if (Gltf3D.is(url)) return Gltf3D.load(url, scene);
         let p = this._cache.get(url);
         if (!p) {
             p = fetch(url)
                 .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); })
                 .then((buf) => this.parse(buf));
             this._cache.set(url, p);
-            p.catch(() => this._cache.delete(url));   // ошибку не кэшируем: файл могут положить позже
+            p.catch(() => this._cache.delete(url));   // errors are not cached: the file may be added later
         }
         return p;
     },
 
-    // Модель -> меш-корень без геометрии, части — его дети; у каждого вызова свои
-    // меши и материалы. opts: { name }.
+    // Model -> root mesh without geometry, parts are its children; each call gets its own
+    // meshes and materials. opts: { name }.
     build(model, scene, opts) {
+        if (model.gltf) return Gltf3D.build(model, scene, opts);
         const o = opts || {};
         const root = new BABYLON.Mesh(o.name || 'model', scene);
         const mats = [];
@@ -74,8 +79,14 @@ const Model3D = {
         return root;
     },
 
-    // Снять построенную модель со сцены вместе с её материалами
-    // (World3D.removeObject материалы оставляет владельцу).
+    // Animation clips of a built model: Clips3D (play('run'), names()) for a glTF with
+    // animations, null for FBX.
+    clips(root) {
+        return Gltf3D.clips(root);
+    },
+
+    // Remove a built model from the scene together with its materials
+    // (World3D.removeObject leaves materials to the owner).
     dispose(view, root) {
         const mats = new Set();
         for (const m of [root].concat(root.getChildMeshes(false))) {
@@ -89,14 +100,14 @@ const Model3D = {
 
     // ArrayBuffer -> { materials: [{ name, color: [r, g, b] }], parts: [{ name,
     // positions, normals | null, groups: [{ material, start, count }], pivot: [x, y, z],
-    // axes: { x, y, z } }], min, max }. Координаты — мир файла в осях сцены; вершины
-    // части идут группами по материалу; pivot и axes — начало и единичные локальные
-    // оси узла (origin и оси объекта в Blender).
+    // axes: { x, y, z } }], min, max }. Coordinates — the file's world in scene axes; a part's
+    // vertices go in groups by material; pivot and axes — the origin and unit local
+    // axes of the node (the object's origin and axes in Blender).
     async parse(buffer) {
         const tree = await this._readTree(buffer);
         const objects = new Map(), parents = new Map(), children = new Map();
         for (const n of (this._child(tree, 'Objects') || { nodes: [] }).nodes) objects.set(n.props[0], n);
-        // Связи «объект -> родитель» в порядке файла: по нему нумеруются материалы модели.
+        // "object -> parent" links in file order: the model's materials are numbered by it.
         for (const c of (this._child(tree, 'Connections') || { nodes: [] }).nodes) {
             if (c.name !== 'C' || c.props[0] !== 'OO') continue;
             const from = c.props[1], to = c.props[2];
@@ -120,7 +131,7 @@ const Model3D = {
             return m;
         };
 
-        // Оси файла -> оси сцены, единицы файла -> см (UnitScaleFactor — сантиметров в единице).
+        // File axes -> scene axes, file units -> cm (UnitScaleFactor — centimeters per unit).
         const gs = this._props70(this._child(tree, 'GlobalSettings'));
         const unit = gs.UnitScaleFactor && gs.UnitScaleFactor[0] > 0 ? gs.UnitScaleFactor[0] : 1;
         const axes = this._axisMatrix(gs).multiply(BABYLON.Matrix.Scaling(unit, unit, unit));
@@ -146,7 +157,7 @@ const Model3D = {
             const part = this._triangulate(geo, world, mats, model);
             if (part) {
                 part.name = nameOf(node);
-                // Узел без Geometric*: они сдвигают только геометрию, центр объекта остаётся.
+                // Node without Geometric*: they shift only the geometry, the object's center stays.
                 const frame = worldOf(id).multiply(axes), V = BABYLON.Vector3;
                 part.pivot = V.TransformCoordinates(V.Zero(), frame).asArray();
                 part.axes = { x: [1, 0, 0], y: [0, 1, 0], z: [0, 0, 1] };
@@ -158,7 +169,7 @@ const Model3D = {
         return model;
     },
 
-    // Полигоны Geometry -> треугольники в мире файла, группами по материалу; габарит — в model.
+    // Geometry polygons -> triangles in the file's world, grouped by material; bounds — into model.
     _triangulate(geo, world, mats, model) {
         const V = this._value(geo, 'Vertices'), P = this._value(geo, 'PolygonVertexIndex');
         if (!V || !P) return null;
@@ -167,11 +178,11 @@ const Model3D = {
         const matIds = this._value(ml, 'Materials');
         const byPoly = matIds && this._value(ml, 'MappingInformationType') === 'ByPolygon';
         const normalMatrix = world.clone().invert().transpose();
-        const mirror = world.determinant() < 0;   // зеркальный трансформ сам разворачивает обход
-        const groups = new Map();                  // материал -> { pos: [], nrm: [] }
+        const mirror = world.determinant() < 0;   // a mirror transform flips the winding itself
+        const groups = new Map();                  // material -> { pos: [], nrm: [] }
         const a = new BABYLON.Vector3(), lo = model.min, hi = model.max;
 
-        // Угол полигона: pv — номер в PolygonVertexIndex (последний угол записан как ~индекс).
+        // Polygon corner: pv — number in PolygonVertexIndex (the last corner is stored as ~index).
         const corner = (g, pv, poly) => {
             const v = P[pv] < 0 ? ~P[pv] : P[pv];
             BABYLON.Vector3.TransformCoordinatesFromFloatsToRef(V[3 * v], V[3 * v + 1], V[3 * v + 2], world, a);
@@ -193,7 +204,7 @@ const Model3D = {
             let g = groups.get(key);
             if (!g) groups.set(key, (g = { pos: [], nrm: [] }));
             for (let k = start + 1; k < i; k++) {
-                // Веер (start, k, k+1) задом наперёд — обход Babylon (шапка файла).
+                // Fan (start, k, k+1) in reverse — Babylon winding (file header).
                 corner(g, start, poly);
                 corner(g, mirror ? k : k + 1, poly);
                 corner(g, mirror ? k + 1 : k, poly);
@@ -216,8 +227,8 @@ const Model3D = {
         return { positions, normals, groups: list };
     },
 
-    // Слой геометрии (нормали): данные и индекс данных для угла полигона —
-    // pv: номер угла в PolygonVertexIndex, v: вершина, poly: полигон.
+    // Geometry layer (normals): the data and the data index for a polygon corner —
+    // pv: corner number in PolygonVertexIndex, v: vertex, poly: polygon.
     _layer(el, dataName, indexName) {
         const data = this._value(el, dataName);
         if (!data) return null;
@@ -232,9 +243,9 @@ const Model3D = {
         };
     },
 
-    // Локальный трансформ узла. У FBX (вектор-столбец):
+    // Local transform of a node. In FBX (column vector):
     //   T · Roff · Rp · Rpre · R · Rpost⁻¹ · Rp⁻¹ · Soff · Sp · S · Sp⁻¹
-    // у Babylon (вектор-строка) — тот же ряд справа налево.
+    // in Babylon (row vector) — the same sequence right to left.
     _localMatrix(p) {
         const M = BABYLON.Matrix, Z = [0, 0, 0];
         const T = (t, k) => M.Translation(t[0] * k, t[1] * k, t[2] * k);
@@ -245,7 +256,7 @@ const Model3D = {
             .multiply(T(sp, 1))
             .multiply(T(p.ScalingOffset || Z, 1))
             .multiply(T(rp, -1))
-            .multiply(this._euler(p.PostRotation || Z, 'XYZ').transpose())   // обратная к повороту — транспонированная
+            .multiply(this._euler(p.PostRotation || Z, 'XYZ').transpose())   // the inverse of a rotation is its transpose
             .multiply(this._euler(p['Lcl Rotation'] || Z, order))
             .multiply(this._euler(p.PreRotation || Z, 'XYZ'))
             .multiply(T(rp, 1))
@@ -253,7 +264,7 @@ const Model3D = {
             .multiply(T(p['Lcl Translation'] || Z, 1));
     },
 
-    // Сдвиг геометрии относительно своего узла (детям не наследуется): Gt · Gr · Gs.
+    // Geometry offset relative to its own node (not inherited by children): Gt · Gr · Gs.
     _geometricMatrix(p) {
         const M = BABYLON.Matrix, s = p.GeometricScaling || [1, 1, 1], t = p.GeometricTranslation || [0, 0, 0];
         return M.Scaling(s[0], s[1], s[2])
@@ -261,7 +272,7 @@ const Model3D = {
             .multiply(M.Translation(t[0], t[1], t[2]));
     },
 
-    // Углы в градусах -> поворот; order — оси в порядке применения (XYZ: сначала X).
+    // Angles in degrees -> rotation; order — axes in order of application (XYZ: X first).
     _euler(deg, order) {
         const M = BABYLON.Matrix, r = Math.PI / 180;
         let m = M.Identity();
@@ -271,7 +282,7 @@ const Model3D = {
         return m;
     },
 
-    // Оси файла -> оси сцены: CoordAxis -> X, UpAxis -> Y, FrontAxis -> Z, со знаками.
+    // File axes -> scene axes: CoordAxis -> X, UpAxis -> Y, FrontAxis -> Z, with signs.
     _axisMatrix(gs) {
         const get = (name, def) => (gs[name] ? gs[name][0] : def);
         const c = get('CoordAxis', 0), u = get('UpAxis', 1), f = get('FrontAxis', 2);
@@ -284,7 +295,7 @@ const Model3D = {
         return BABYLON.Matrix.FromArray(m);
     },
 
-    // Properties70 узла -> { имя: [значения] } (запись P: имя, тип, два флага, значения).
+    // Node's Properties70 -> { name: [values] } (P record: name, type, two flags, values).
     _props70(node) {
         const out = {}, p70 = this._child(node, 'Properties70');
         if (p70) for (const p of p70.nodes) out[p.props[0]] = p.props.slice(4);
@@ -300,21 +311,21 @@ const Model3D = {
         return n ? n.props[0] : undefined;
     },
 
-    // Бинарный FBX -> дерево узлов { name, props, nodes }. int64 — строкой (это
-    // id объектов), массивы — типизированные: сжатые (zlib) распаковывает
-    // DecompressionStream, все разом после обхода.
+    // Binary FBX -> node tree { name, props, nodes }. int64 — as a string (these are
+    // object ids), arrays — typed: compressed ones (zlib) are unpacked by
+    // DecompressionStream, all at once after the traversal.
     async _readTree(buffer) {
         const bytes = new Uint8Array(buffer), dv = new DataView(buffer), text = new TextDecoder();
         const str = (at, n) => text.decode(bytes.subarray(at, at + n));
         if (bytes.length < 27 || str(0, 18) !== 'Kaydara FBX Binary') throw new Error('not a binary FBX (ASCII FBX is not supported)');
-        const W = dv.getUint32(23, true) >= 7500 ? 8 : 4;   // с версии 7.5 поля записи 64-битные
+        const W = dv.getUint32(23, true) >= 7500 ? 8 : 4;   // since v7.5 record fields are 64-bit
         const num = (at) => (W === 8 ? Number(dv.getBigUint64(at, true)) : dv.getUint32(at, true));
         const ARRAYS = { f: Float32Array, d: Float64Array, i: Int32Array, l: BigInt64Array, b: Uint8Array };
         const pending = [];
 
         const readNode = (at) => {
             const end = num(at), count = num(at + W), nameLen = bytes[at + 3 * W];
-            if (end === 0) return null;   // нулевая запись — конец списка
+            if (end === 0) return null;   // null record — end of list
             const node = { name: str(at + 3 * W + 1, nameLen), props: [], nodes: [], end };
             let p = at + 3 * W + 1 + nameLen;
             for (let i = 0; i < count; i++) {
@@ -358,7 +369,7 @@ const Model3D = {
             at = node.end;
         }
         await Promise.all(pending.map(async (a) => {
-            // Своя копия байтов: типизированному массиву нужно выравнивание буфера.
+            // Own copy of the bytes: a typed array needs buffer alignment.
             const raw = a.zip
                 ? new Uint8Array(await new Response(new Blob([a.data]).stream().pipeThrough(new DecompressionStream('deflate'))).arrayBuffer())
                 : a.data.slice();

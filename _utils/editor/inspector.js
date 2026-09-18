@@ -1,29 +1,29 @@
-// inspector.js — правая панель: поля из KIT_SCHEMA, правка window-глобалов live
-// (сцена применяет их по событию constants-changed — см. main.js), подсветка
-// «грязных» значений и сохранение их в Constants.js через API сервера.
+// inspector.js — the right pane: fields from KIT_SCHEMA, live editing of window globals
+// (the scene applies them on the constants-changed event — see main.js), highlighting
+// of dirty values and saving them to Constants.js through the server API.
 //
-// Группы при запуске свёрнуты. Раскрытые вручную запоминаются на сессию
-// (open): смена языка перестраивает панель, не сворачивая их; поиск раскрывает
-// найденное временно, пустой запрос возвращает ручное состояние.
+// Groups are collapsed at startup. Those expanded by hand are remembered for the session
+// (open): a language change rebuilds the pane without collapsing them; search expands
+// the matches temporarily, an empty query restores the manual state.
 
 /** @satisfies {Record<string, any>} */
 const Inspector = {
     schema: [],
     /** @type {Record<string, number>} */
-    originals: {},        // name -> значение на момент загрузки (или последнего сохранения)
+    originals: {},        // name -> the value as of load (or the last save)
     /** @type {Record<string, any>} */
-    fieldByName: {},      // name -> описание поля
+    fieldByName: {},      // name -> field description
     /** @type {Record<string, any>} */
     fieldEls: {},         // name -> { row, slider|select|color, num|text, field }
-    open: new Set(),      // id групп, раскрытых вручную
-    query: '',            // текущий поисковый запрос
-    saveAvailable: false, // /api/status ответил — сервер редактора, не чужой
+    open: new Set(),      // ids of the groups expanded by hand
+    query: '',            // the current search query
+    saveAvailable: false, // /api/status answered — the editor server, not a foreign one
     server: { state: 'checking', api: 0 },
 
     get(name) { return /** @type {any} */ (window)[name]; },
     set(name, value) { /** @type {any} */ (window)[name] = value; },
 
-    // --- Инициализация --------------------------------------------------------
+    // --- Initialization -------------------------------------------------------
 
     init() {
         this.schema = KIT_SCHEMA;
@@ -57,8 +57,8 @@ const Inspector = {
             const j = await r.json();
             if (!j || j.editor !== 'arcengine') throw new Error('foreign server');
             this.saveAvailable = true;
-            // Клиентские файлы подхватываются по F5, серверные — только
-            // перезапуском процесса: устаревший сервер молча пишет старым форматом.
+            // Client files are picked up on F5, server ones — only by
+            // restarting the process: an outdated server silently writes in the old format.
             this.server.api = Number(j.api) || 0;
             this.server.state = this.server.api < EDITOR_API_VERSION ? 'old' : 'ok';
             if (this.server.state === 'old') Toast.show(I18N.t('server.oldToast'), true);
@@ -81,7 +81,7 @@ const Inspector = {
             : I18N.t('server.checking');
     },
 
-    // --- Построение DOM -------------------------------------------------------
+    // --- Building the DOM -----------------------------------------------------
 
     build() {
         const host = document.getElementById('inspector-groups');
@@ -111,7 +111,7 @@ const Inspector = {
         }
     },
 
-    // Общая часть строки: подпись, имя константы, ↺ к загруженному значению.
+    // The common part of a row: label, constant name, ↺ back to the loaded value.
     _row(f) {
         const row = document.createElement('div');
         row.className = 'field';
@@ -141,7 +141,7 @@ const Inspector = {
         const { row, controls } = this._row(f);
         const els = { row, field: f };
         if (f.kind === 'color') {
-            // В Constants.js цвет — число 0xRRGGBB, в UI — пипетка и hex-строка.
+            // In Constants.js a color is a 0xRRGGBB number, in the UI — a color picker and a hex string.
             const color = document.createElement('input');
             color.type = 'color';
             const text = document.createElement('input');
@@ -151,7 +151,7 @@ const Inspector = {
             color.addEventListener('input', () => this.apply(f, this.parseHex(color.value)));
             text.addEventListener('input', () => {
                 const v = this.parseHex(text.value);
-                // Поле, в котором печатают, не переписываем — иначе набор коверкается.
+                // The field being typed in is not rewritten — otherwise the typing gets mangled.
                 if (v !== null) this.apply(f, v, { skipText: true });
             });
             text.addEventListener('blur', () => { text.value = this.hex(this.get(f.name)); });
@@ -196,8 +196,8 @@ const Inspector = {
             els.color.value = this.hex(value);
             if (!opts.skipText) els.text.value = els.color.value;
         } else if (els.select) {
-            // Значение вне списка (руками в Constants.js) не теряется молча:
-            // для него появляется отдельный пункт.
+            // A value outside the list (set by hand in Constants.js) is not lost silently:
+            // a separate option appears for it.
             const sel = els.select;
             for (const opt of [...sel.options]) if (opt.dataset.extra) opt.remove();
             if (!f.options.some(o => Number(o.value) === Number(value))) {
@@ -214,7 +214,7 @@ const Inspector = {
         }
     },
 
-    // --- Правка значения ------------------------------------------------------
+    // --- Editing a value ------------------------------------------------------
 
     apply(f, value, opts = {}) {
         this.set(f.name, value);
@@ -249,7 +249,7 @@ const Inspector = {
         Toast.show(I18N.t('toast.reverted'));
     },
 
-    // --- Сохранение -----------------------------------------------------------
+    // --- Saving ---------------------------------------------------------------
 
     async save() {
         const dirty = this.dirtyList();
@@ -268,7 +268,7 @@ const Inspector = {
             const j = await r.json();
             const failed = (j.results || []).filter(x => !x.ok);
             if (j.patched > 0) {
-                // Успешно записанные становятся новой базой для dirty-подсветки.
+                // Successfully written ones become the new base for the dirty highlighting.
                 for (const res of j.results) {
                     if (res.ok && res.name in this.originals) {
                         this.originals[res.name] = this.get(res.name);
@@ -288,16 +288,16 @@ const Inspector = {
         }
     },
 
-    // Отказ сервера: по коду — на языке интерфейса, без кода — как прислал сервер.
+    // Server rejection: by code — in the UI language, without a code — as the server sent it.
     errorText(res) {
         const key = 'err.' + res.code;
         const text = res.code ? I18N.t(key) : '';
         return text && text !== key ? text : (res.error || '?');
     },
 
-    // --- Поиск ----------------------------------------------------------------
+    // --- Search ---------------------------------------------------------------
 
-    // Ищет по имени константы и подписям на ОБОИХ языках.
+    // Searches by constant name and by labels in BOTH languages.
     filter(query) {
         this.query = query;
         const q = query.trim().toLowerCase();
@@ -337,7 +337,7 @@ const Inspector = {
     },
 };
 
-// Мини-тосты (внизу справа).
+// Mini toasts (bottom right).
 /** @satisfies {Record<string, any>} */
 const Toast = {
     show(text, isError = false) {

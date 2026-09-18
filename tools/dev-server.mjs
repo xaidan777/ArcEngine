@@ -1,13 +1,13 @@
 // ============================================================================
-//  ArcEngine — локальный dev-сервер (Node, без зависимостей)
+//  ArcEngine — local dev server (Node, no dependencies)
 // ----------------------------------------------------------------------------
-//  Зачем не python -m http.server:
-//   1. no-store на ВСЁ. Сборки нет, скрипты подключены как есть, и браузер с
-//      удовольствием отдаёт закэшированный старый .js после правки;
-//   2. правильные MIME (.mjs, .mp3, .ttf, .webp, .glb);
-//   3. Range-запросы — Chrome шлёт их для аудио;
-//   4. на старте — проверка ассетов: недостающие файлы видно сразу;
-//   5. тихая консоль: на /favicon.ico — 204 вместо 404.
+//  Why not python -m http.server:
+//   1. no-store on EVERYTHING. There is no build step, scripts are included as is,
+//      and the browser happily serves a cached old .js after an edit;
+//   2. correct MIME types (.mjs, .mp3, .ttf, .webp, .glb);
+//   3. Range requests — Chrome sends them for audio;
+//   4. at startup — an asset check: missing files are visible right away;
+//   5. quiet console: /favicon.ico gets 204 instead of 404.
 // ============================================================================
 import http from 'node:http';
 import fs from 'node:fs';
@@ -17,8 +17,8 @@ import url from 'node:url';
 import { execFile } from 'node:child_process';
 
 const ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..');
-// Порт: --port=N > переменная окружения PORT (её ставит панель браузера
-// Claude Code при autoPort) > 8080. Занятый порт сервер сам меняет на +1.
+// Port: --port=N > the PORT environment variable (set by the Claude Code browser
+// pane with autoPort) > 8080. A busy port is changed to +1 by the server itself.
 const argPort = process.argv.find(a => /^--port=\d+$/.test(a));
 const envPort = /^\d+$/.test(process.env.PORT || '') ? Number(process.env.PORT) : null;
 const PORT_BASE = argPort ? Number(argPort.split('=')[1]) : (envPort ?? 8080);
@@ -54,8 +54,8 @@ const C = {
   red: '\x1b[31m', grn: '\x1b[32m', ylw: '\x1b[33m', cyn: '\x1b[36m',
 };
 
-// --- предполётная проверка ассетов -----------------------------------------
-// Тот же сканер, что и в build.mjs, но здесь он только предупреждает.
+// --- preflight asset check -------------------------------------------------
+// The same scanner as in build.mjs, but here it only warns.
 async function preflight() {
   const { collectRefs } = await import('./asset-scan.mjs');
   const { refs, missing } = await collectRefs(ROOT);
@@ -82,7 +82,7 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === '/') pathname = '/index.html';
 
-  // защита от выхода за корень
+  // guard against escaping the root
   const filePath = path.join(ROOT, pathname);
   if (!filePath.startsWith(ROOT + path.sep) && filePath !== ROOT) {
     return send(res, 403, { 'Content-Type': 'text/plain' }, 'Forbidden');
@@ -92,7 +92,7 @@ const server = http.createServer(async (req, res) => {
   try {
     st = await fsp.stat(filePath);
   } catch {
-    // Иконку браузер просит сам; у игры её нет.
+    // The browser requests the icon on its own; the game has none.
     if (pathname === '/favicon.ico') return send(res, 204, { 'Cache-Control': 'no-store' });
     console.log(`  ${C.red}404${C.r} ${pathname}`);
     return send(res, 404, { 'Content-Type': 'text/plain; charset=utf-8' }, 'Not found: ' + pathname);
@@ -100,8 +100,8 @@ const server = http.createServer(async (req, res) => {
   if (st.isDirectory()) return send(res, 403, { 'Content-Type': 'text/plain' }, 'Directory listing off');
 
   const type = MIME[path.extname(filePath).toLowerCase()] || 'application/octet-stream';
-  // no-store, а не no-cache: no-cache ещё допускает 304 по If-Modified-Since,
-  // и Chrome продолжает крутить старый .js. Для локальной разработки нужен именно no-store.
+  // no-store, not no-cache: no-cache still allows a 304 via If-Modified-Since,
+  // and Chrome keeps running the old .js. Local development needs exactly no-store.
   const base = {
     'Content-Type': type,
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
@@ -109,7 +109,7 @@ const server = http.createServer(async (req, res) => {
     'Expires': '0',
   };
 
-  // Range — Chrome шлёт его для <audio>/decodeAudioData
+  // Range — Chrome sends it for <audio>/decodeAudioData
   const range = req.headers.range;
   if (range) {
     const m = /^bytes=(\d*)-(\d*)$/.exec(range);
@@ -136,7 +136,7 @@ const server = http.createServer(async (req, res) => {
   fs.createReadStream(filePath).pipe(res);
 });
 
-// порт занят -> пробуем следующий, до +20
+// port busy -> try the next one, up to +20
 function listen(port, attempt = 0) {
   server.once('error', err => {
     if (err.code === 'EADDRINUSE' && attempt < 20) {

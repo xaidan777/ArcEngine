@@ -6,6 +6,7 @@
     <title>ArcEngine</title>
     <script src="libs/simplex-noise.js"></script>
     <script src="libs/babylon.js"></script>
+    <script src="libs/babylonjs.loaders.min.js"></script>
     <style>
         html, body {
             margin: 0;
@@ -66,17 +67,22 @@
         <div class="loading-text"></div>
     </div>
 
-    <!-- Порядок значим: Constants.js первым (остальные читают его глобалы), main.js последним -->
+    <!-- Order matters: Constants.js first (the others read its globals), main.js last -->
     <script src="js/Constants.js"></script>
     <script src="js/Objects.js"></script>
+    <script src="js/UILayout.js"></script>
     <script src="js/World3D.js"></script>
     <script src="js/Terrain3D.js"></script>
     <script src="js/CameraControl.js"></script>
     <script src="js/Model3D.js"></script>
+    <script src="js/Gltf3D.js"></script>
     <script src="js/Location3D.js"></script>
+    <script src="js/Debug3D.js"></script>
+    <script src="js/UI.js"></script>
+    <script src="js/Game.js"></script>
     <script src="js/main.js"></script>
     <script>
-        // Долгий тап и ПКМ не должны открывать меню браузера.
+        // A long tap and RMB must not open the browser menu.
         document.addEventListener('contextmenu', e => e.preventDefault());
     </script>
 </body>

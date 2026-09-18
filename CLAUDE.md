@@ -3,11 +3,13 @@
 Основа для 3D-игр в браузере, заточенная под работу с Claude Code: ванильный
 JS + Babylon.js 9.26 (`libs/babylon.js`, локально), ноль npm-зависимостей, никакой
 сборки — классические `<script>` и глобалы. Игра при запуске показывает локацию:
-земля с холмами, небо, свет, тени, toon-шейдер, камера и объекты из `Objects.js`
-(модели FBX из `assets/models/`). Рядом — веб-редактор (интерфейс EN/RU): тот же мир,
-камеры «свободная/игровая», toon вкл/выкл, вкладка Global Settings (все глобальные
-настройки, сохранение в `Constants.js`) и вкладка Objects (импорт FBX, гизмо, свойства
-объектов, анимация — вращение части модели, сохранение в `Objects.js`).
+земля с холмами, небо, свет, тени, toon-шейдер, камера, объекты из `Objects.js` (модели FBX и
+GLB из `assets/models/`; GLB — со скелетом и клипами анимации), HUD из `UILayout.js` и пример
+игры `Game.js`. Рядом — веб-редактор (интерфейс EN/RU): тот же мир, камеры
+«свободная/игровая», toon вкл/выкл, вкладка Global Settings (все глобальные настройки,
+сохранение в `Constants.js`), вкладка Objects (импорт FBX/GLB, гизмо, свойства объектов,
+анимация — вращение части или клип, сохранение в `Objects.js`) и вкладка UI (раскладка
+игрового интерфейса: драг и ресайз поверх вида, сохранение в `UILayout.js`).
 
 ## Скиллы — читать до правки кода
 
@@ -16,9 +18,12 @@ JS + Babylon.js 9.26 (`libs/babylon.js`, локально), ноль npm-зав�
 
 | Задача | Скилл |
 |---|---|
-| `js/` (`World3D.js`, `Terrain3D.js`, `Location3D.js`, `CameraControl.js`, `Model3D.js`, `Objects.js`, `main.js`), объекты в сцене, свет/тени/toon/контур, константы `CAMERA_*`/`WORLD3D_*`/`TERRAIN_*`/`LOCATION_*` | `claude/skills/world3d/SKILL.md` |
+| `js/` (`World3D.js`, `Terrain3D.js`, `Location3D.js`, `CameraControl.js`, `Model3D.js`, `Gltf3D.js`, `Objects.js`, `Game.js`, `main.js`), объекты в сцене, модели GLB и клипы анимации, свет/тени/toon/контур, константы `CAMERA_*`/`WORLD3D_*`/`TERRAIN_*`/`LOCATION_*` | `claude/skills/world3d/SKILL.md` |
+| ЛЮБОЙ элемент интерфейса игры (текст, счётчик, шкала, кнопка, панель, меню): `js/UI.js`, `js/UILayout.js`, вкладка UI редактора (`ui-panel.js`), новый вид элемента | `claude/skills/ui/SKILL.md` |
 | `_utils/`, редактор, инспектор, вкладка Objects, новая константа в редакторе, текст интерфейса | `claude/skills/editor/SKILL.md` |
 | `tools/`, `tests/`, ассеты, новый скрипт, архив, проверка типов и ошибки tsc | `claude/skills/build/SKILL.md` |
+| своя геометрия (сетка из вершин, порт генератора, импорт glTF), материал с картой нормалей, новый источник света, свой шейдер, thin instances и процедурная расстановка; «сетка вывернута», «свет не с той стороны», пропал свет или меш | `claude/skills/render-conventions/SKILL.md` |
+| проверка правки глазами и числами: панель браузера, `Debug3D` (удержание вида, кадры без rAF, замер, линтер сцены, отладочные режимы), замер цены кадра, воспроизведение состояния пользователя | `claude/skills/verify/SKILL.md` |
 
 ## Запуск и сборка
 
@@ -32,7 +37,8 @@ check.bat                # типы (tsc по JSDoc) + тесты; агенту 
 Git: что не едет в репозиторий — `.gitignore` (`.claude/`, бэкапы редактора, `build/`, `dist/`);
 `.gitattributes` — файлы едут байт в байт.
 
-После правки кода — `node tools/check.mjs`: должно пройти.
+После правки кода — `node tools/check.mjs`: должно пройти. После правки геометрии, материалов,
+света или шейдеров — ещё `await Debug3D.lint()` в игре (в редакторе — кнопка «Lint scene»): без ошибок.
 
 Нужен только Node. Серверы отдают всё с `no-store` — правку `.js` видно по F5.
 `python -m http.server` не использовать: браузер закэширует старый скрипт.
@@ -68,6 +74,11 @@ Git: что не едет в репозиторий — `.gitignore` (`.claude/`
    `claude/skills/<имя>/SKILL.md` (новый — ещё строка в таблице скиллов), шаблон панели
    браузера — `claude/launch.json`. В `.claude/` — только локальное (`settings.local.json`,
    копия `launch.json`); папку `.claude/skills/` тесты не пропустят.
+10. **Скиллы и комментарии в коде — на английском.** Кириллица в скилле — провал теста; в коде
+   русский остаётся только в строках (словарь `ru` редактора, вывод инструментов, имена тестов).
+11. **Любой элемент интерфейса — запись в `UILayout.js`, через вкладку UI редактора.** Код игры
+   не создаёт, не позиционирует и не красит HUD сам: берёт элемент по id — `UI.get('score').setText(…)`,
+   `setValue`, `show`, `onClick`. Элемент, созданный в коде, редактору не виден — его не подвинуть.
 
 ## Карта файлов
 
@@ -75,45 +86,60 @@ Git: что не едет в репозиторий — `.gitignore` (`.claude/`
 index.html        холст #world3d, экран загрузки, порядок скриптов (js/…)
 js/               код игры — классические скрипты:
   Constants.js    Store, IS_MOBILE, LOCATION_*, TERRAIN_*, CAMERA_*, WORLD3D_* (грузится первым)
-  Objects.js      LOCATION_OBJECTS — объекты локации (модель, вид, x/y/h, rot [x,y,z], scale [x,y,z],
-                  anim — вращение части); пишет редактор
+  Objects.js      LOCATION_OBJECTS — объекты локации (модель .fbx/.glb, вид, x/y/h, rot [x,y,z], scale [x,y,z],
+                  anim — вращение части, clip — клип GLB); пишет редактор
+  UILayout.js     UI_LAYOUT — раскладка интерфейса игры (id, вид, якорь, x/y, размеры, цвета); пишет редактор
   World3D.js      движок: init/renderFrame, View3D (камера, свет, тени, проекции), cfg(),
                   toon-шейдер ArcToonPlugin, контур рёбер, обводка силуэта, addObject
   Terrain3D.js    земля: поле высот из шума, сетка + кольцо за краем, heightAt/tiltAt
-  Model3D.js      модели: бинарный FBX -> меши Babylon (load с кэшем, build, dispose); 1 см = 1 px
+  Model3D.js      модели: бинарный FBX -> меши Babylon (load с кэшем, build, dispose); 1 см = 1 px; .glb уходит в Gltf3D
+  Gltf3D.js       модели glTF/GLB: скелет, текстуры, PBR -> StandardMaterial под toon; Clips3D — клипы анимации
+                  (Model3D.clips(root).play('run') с плавным переходом)
   Location3D.js   локация: View3D + Terrain3D + текстура земли (LOCATION_GROUND) + объекты (addObject/placeObject,
-                  update(dt) — вращение частей по anim)
+                  update(dt) — вращение частей по anim, клип по clip)
   CameraControl.js CameraController: цель/азимут/наклон/зум, мышь, клавиши, тач; игровой и свободный режимы
-  main.js         вход: World3D.init -> Location3D(LOCATION_OBJECTS) -> камера -> цикл кадров; window.app
-libs/             babylon.js (9.26 UMD), simplex-noise.js; *.d.ts — их типы для tsc
-assets/           ground_texture_{g,d,s}.jpg — трава, песок, снег; models/*.fbx — модели объектов
-tools/            dev-server.mjs, build.mjs, asset-scan.mjs, zip.mjs, check.mjs (типы + тесты)
+  Debug3D.js      инструменты разработки (в кадре не работают, пока не позвали): lint() — сетки изнанкой,
+                  конвенция карт нормалей, лимит света и солнце последним, лимиты шейдеров WebGL2, пустой кадр;
+                  hold(pose)/release() — вид мимо контроллера камеры, frames(n), bench()/benchToggle(), setMode()
+  UI.js           интерфейс игры: DOM поверх холста по UI_LAYOUT; UI.get(id).setText/setValue/show/onClick,
+                  якоря 9 точек, масштаб по UI_REF_HEIGHT
+  Game.js         пример игры: место игровой логики (кнопка Run — клипы idle/run персонажа, шкала энергии)
+  main.js         вход: World3D.init -> Location3D(LOCATION_OBJECTS) -> камера -> UI -> Game -> цикл кадров; window.app
+libs/             babylon.js (9.26 UMD), babylonjs.loaders.min.js (glTF-загрузчик той же версии), simplex-noise.js;
+                  *.d.ts — их типы для tsc
+assets/           ground_texture_{g,d,s}.jpg — трава, песок, снег; models/*.fbx, *.glb — модели объектов
+                  (character.glb — персонаж с клипами idle/run, генерируется tools/make-character.mjs)
+tools/            dev-server.mjs, build.mjs, asset-scan.mjs, zip.mjs, check.mjs (типы + тесты), make-character.mjs
 tsconfig.json     проверка типов игры; globals.d.ts — window.app, material.arcToon, записи объектов
 tests/            *.test.mjs (node --test): Store, heightAt, сканер ассетов, запись редактора, связка
                   скиллов; browser-scripts.mjs — скрипты игры в node:vm + пустышка Babylon
-_utils/editor/    редактор (в билд не едет): server.mjs (HTTP), save.mjs (запись Constants.js и
-                  Objects.js), index.html, i18n.js (EN/RU), schema.js, inspector.js (Global Settings),
-                  objects-panel.js (Objects: список, свойства, гизмо, импорт), history.js (EditHistory:
-                  Ctrl+Z / Ctrl+Shift+Z), loader.js, lab.js (вид), main.js; tsconfig.json — его типы
+_utils/editor/    редактор (в билд не едет): server.mjs (HTTP), save.mjs (запись Constants.js,
+                  Objects.js и UILayout.js), index.html, i18n.js (EN/RU), schema.js, inspector.js (Global Settings),
+                  objects-panel.js (Objects: список, свойства, гизмо, импорт), ui-panel.js (UI: элементы
+                  интерфейса, драг и ресайз поверх вида), history.js (EditHistory:
+                  Ctrl+Z / Ctrl+Shift+Z), loader.js, lab.js (вид), debug-tools.js (режим вида и «Lint scene»
+                  на панели вида — Debug3D), main.js; tsconfig.json — его типы
 claude/           для Claude Code, едет пользователям (в билд игры — нет): skills/<имя>/SKILL.md — скиллы,
                   launch.json — шаблон .claude/launch.json для панели браузера
 ```
 
 ## Как начать игру на наборе
 
-1. Логику и объекты — в новом файле (например `js/Game.js`), `<script>` между `Location3D.js` и
-   `main.js` + строка в `CODE_FILES`. В `main.js` после создания камеры — `new Game(window.app)`.
+1. Логика — в `js/Game.js` (пример в наборе: `constructor(app)` и `update(dt)`, зовётся из цикла
+   `main.js` до рендера); большая игра — новые файлы: `<script>` до `main.js` + строка в `CODE_FILES`.
 2. Статичные объекты локации — вкладка Objects редактора (`Objects.js`), в коде —
    `app.location.objects` (`{ def, mesh }`). Свои объекты: `BABYLON.MeshBuilder`/меши или
    `Model3D.load` + `Model3D.build` в `app.location.view.scene` -> `World3D.addObject` ->
    позиция на `app.location.terrain.heightAt(x, y)`.
-3. Кадр логики — в цикле `main.js` до `World3D.renderFrame()`; камера за героем —
-   `app.camera.follow(obj)` (объект с полями `x`, `y`).
-4. HUD — DOM поверх `#world3d`. Новые числа — в `Constants.js` и `_utils/editor/schema.js`.
+3. Персонаж с анимацией — модель `.glb`: `Model3D.clips(mesh).play('run')`, переход между клипами —
+   сам (скилл `world3d`). Камера за героем — `app.camera.follow(obj)` (объект с полями `x`, `y`).
+4. Интерфейс — записи в `UILayout.js` (вкладка UI редактора) + `UI.get(id)` в коде (скилл `ui`,
+   инвариант 11). Новые числа — в `Constants.js` и `_utils/editor/schema.js`.
 
 ## Чего в наборе нет
 
-Звука, UI-фреймворка, физики, текстур и анимации моделей, кроме вращения части (`anim` в
-`Objects.js`; `Model3D` — геометрия и цвета материалов бинарного FBX, центр и оси частей;
-glTF-лоадер Babylon не подключён), нескольких сцен/уровней
+Звука, физики и коллизий, готовых игрока и противника (`Game.js` — только образец места для
+логики), текстур и скелета у FBX (`Model3D` — геометрия и цвета материалов бинарного FBX, центр
+и оси частей; скелет, клипы и текстуры — только в GLB), картинок и привязки к точке мира в UI
+(виды элементов — текст, панель, шкала, кнопка), нескольких сцен/уровней
 (одна локация), сохранений прогресса, тестов рендера и ввода (тесты — только логика без 3D).

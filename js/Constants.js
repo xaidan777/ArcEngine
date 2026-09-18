@@ -1,11 +1,11 @@
-// Constants.js — ВСЕ числа набора: локация, камера, рендер. Грузится ПЕРВЫМ:
-// остальные модули читают эти глобалы. Правит редактор (_utils/editor): сервер
-// патчит только строки `const ИМЯ = <число>;` — значения держать числовыми
-// литералами (цвета — 0xRRGGBB), формулу редактор не тронет.
-const GAME_VERSION = '0.1.0'; // версия билда: ?v= у скриптов (tools/build.mjs) и имя архива
+// Constants.js — ALL the kit's numbers: location, camera, render. Loaded FIRST:
+// the other modules read these globals. Edited by the editor (_utils/editor): the server
+// patches only lines of the form `const NAME = <number>;` — keep values as numeric
+// literals (colors — 0xRRGGBB); the editor won't touch a formula.
+const GAME_VERSION = '0.1.0'; // build version: ?v= on scripts (tools/build.mjs) and the archive name
 
-// Шим localStorage: в sandbox-iframe и при запрете данных сайта прямой доступ бросает SecurityError.
-// Все обращения к хранилищу — только через Store.
+// localStorage shim: in a sandbox iframe and when site data is blocked, direct access throws SecurityError.
+// All storage access goes through Store only.
 /** @satisfies {Record<string, any>} */
 const Store = {
     get(key) {
@@ -15,9 +15,9 @@ const Store = {
         try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
     },
     remove(key) {
-        try { localStorage.removeItem(key); } catch (e) { /* нечего удалять */ }
+        try { localStorage.removeItem(key); } catch (e) { /* nothing to remove */ }
     },
-    // Разбор JSON без падения: битое значение = как будто сохранения нет.
+    // JSON parsing that never throws: a broken value = as if there were no save.
     getJSON(key, fallback = null) {
         const raw = Store.get(key);
         if (raw === null) return fallback;
@@ -32,7 +32,7 @@ const Store = {
     }
 };
 
-// Телефон или планшет: user agent, iPad под видом Mac, тач на небольшом экране.
+// Phone or tablet: user agent, iPad posing as a Mac, touch on a small screen.
 const IS_MOBILE = (() => {
     const userAgentMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const hasTouchScreen = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
@@ -42,80 +42,91 @@ const IS_MOBILE = (() => {
     return userAgentMobile || isiPad || (hasTouchScreen && isSmallScreen);
 })();
 
-// --- ЛОКАЦИЯ (Location3D.js, Terrain3D.js). Единицы мира — px: x вправо, y вниз
-// по карте, высота вверх (skills world3d, §Координаты). ---
-const LOCATION_WIDTH = 2048;            // px: ширина локации (область, в которой держится камера игры)
-const LOCATION_HEIGHT = 2048;           // px: высота локации
-const LOCATION_GROUND = 0;              // текстура земли: 0 — трава, 1 — песок, 2 — снег (Location3D.GROUNDS)
-const GROUND_TILE_SIZE = 512;           // px мира на один повтор текстуры земли
-const TERRAIN_NOISE_AMP = 66;           // px: амплитуда холмов (0 — плоская земля)
-const TERRAIN_NOISE_SCALE = 800;        // px: размер холма
-const TERRAIN_NOISE_SEED = 4;           // сид шума рельефа
-const TERRAIN_BASE = 0;                 // px: средний уровень земли
-const TERRAIN_CELL = 8;                 // px: шаг сетки террейна (мобильные — не мельче 12)
+// --- LOCATION (Location3D.js, Terrain3D.js). World units are px: x to the right, y down
+// the map, height up (skill world3d, §Coordinates). ---
+const LOCATION_WIDTH = 2048;            // px: location width (the area the game camera stays within)
+const LOCATION_HEIGHT = 2048;           // px: location height
+const LOCATION_GROUND = 0;              // ground texture: 0 — grass, 1 — sand, 2 — snow (Location3D.GROUNDS)
+const GROUND_TILE_SIZE = 512;           // world px per one repeat of the ground texture
+const TERRAIN_NOISE_AMP = 66;           // px: hill amplitude (0 — flat ground)
+const TERRAIN_NOISE_SCALE = 800;        // px: hill size
+const TERRAIN_NOISE_SEED = 4;           // terrain noise seed
+const TERRAIN_BASE = 0;                 // px: mean ground level
+const TERRAIN_CELL = 8;                 // px: terrain grid step (mobile — no finer than 12)
 
-// --- КАМЕРА (CameraControl.js): цель на карте, азимут, наклон и зум. Зум —
-// экранных px на мировой px в точке взгляда; расстояние выводится из него. ---
-const CAMERA_FOV_DEG = 52;              // вертикальный угол обзора
-const CAMERA_AZIMUTH_DEG = -90;         // куда смотрит камера по карте: −90 — север вверх, 0 — восток вверх
-const CAMERA_PITCH_DEG = 57;            // наклон к земле: 90 — строго сверху, меньше — больше перспективы
-const CAMERA_ZOOM = 1;                  // стартовый зум: ПК и планшеты
-const CAMERA_ZOOM_MOBILE = 0.7;         // стартовый зум: телефоны (большая сторона экрана < 1024)
-const CAMERA_ZOOM_MIN = 0.5;            // дальше колесо и щипок не отводят (ниже — в кадр попадёт край земли)
-const CAMERA_ZOOM_MAX = 3;              // ближе не приближают
-const CAMERA_ZOOM_WHEEL_STEP = 0.12;    // доля зума за один щелчок колеса
-const CAMERA_ZOOM_LERP = 0.18;          // сглаживание зума: доля остатка за кадр
-const CAMERA_FOLLOW_LERP = 0.05;        // слежение за объектом (follow): доля остатка за кадр
-const CAMERA_PAN_KEY_SPEED = 900;       // WASD и стрелки: экранных px/с
-const CAMERA_ORBIT = 1;                 // вращение камеры игроком (ПКМ): 0 — ориентация фиксирована, 1 — можно
-const CAMERA_ORBIT_DEG_PER_PX = 0.3;    // градусов поворота на экранный px драга
-const CAMERA_ORBIT_PITCH_MIN_DEG = 35;  // ниже к земле не опускается (предел поднимается и сам — край земли не в кадре)
-const CAMERA_ORBIT_PITCH_MAX_DEG = 88;  // выше — почти строго сверху
+// --- MODELS (Gltf3D.js) and UI (UI.js) ---
+const MODEL_CLIP_BLEND_SEC = 0.2;       // s: cross-fade between animation clips of a .glb model (idle -> run); 0 — instant
+const UI_REF_HEIGHT = 720;              // px: the screen height the UI layout (UILayout.js) is drawn for; the UI scales with the screen height, 0 — no scaling
 
-// --- РЕНДЕР (World3D.js): свет, тени, небо, материалы, toon и контур. Читает
-// World3D.cfg(), редактор применяет правки к живой сцене. ---
-// Солнце одно на весь мир. Азимут — КУДА падает тень по карте (0 — вправо, 90 — вниз).
+// --- SAMPLE GAME (Game.js): the "Run" button, the energy bar ---
+const GAME_RUN_SEC = 8;                 // s: a full energy bar lasts this long while running
+const GAME_REST_SEC = 4;                // s: an empty energy bar refills in this time while standing
+
+// --- CAMERA (CameraControl.js): target on the map, azimuth, pitch and zoom. Zoom is
+// screen px per world px at the look-at point; distance is derived from it. Flight
+// (WASD, Q/E) lifts the look-at point off the ground. ---
+const CAMERA_FOV_DEG = 52;              // vertical field of view
+const CAMERA_AZIMUTH_DEG = -90;         // where the camera looks on the map: −90 — north up, 0 — east up
+const CAMERA_PITCH_DEG = 57;            // pitch toward the ground: 90 — straight from above, less — more perspective
+const CAMERA_ZOOM = 1;                  // starting zoom: PC and tablets
+const CAMERA_ZOOM_MOBILE = 0.7;         // starting zoom: phones (longer screen side < 1024)
+const CAMERA_ZOOM_MIN = 0.5;            // wheel and pinch won't zoom out further (below this the ground edge gets into the frame)
+const CAMERA_ZOOM_MAX = 3;              // won't zoom in closer
+const CAMERA_ZOOM_WHEEL_STEP = 0.12;    // fraction of zoom per one wheel notch
+const CAMERA_ZOOM_LERP = 0.18;          // zoom smoothing: fraction of the remainder per frame
+const CAMERA_FOLLOW_LERP = 0.05;        // following an object (follow): fraction of the remainder per frame
+const CAMERA_FLY_SPEED = 900;           // flight on WASD, arrows and Q/E: screen px/s (over the world — divided by zoom)
+const CAMERA_LIMITS = 0;                // game camera limits: 0 — free flight, 1 — pitch within CAMERA_ORBIT_PITCH_*, target inside the location, flight ceiling; the ground edge stays out of the frame
+const CAMERA_LIFT_MAX = 600;            // px, with limits: how high above the ground flight lifts the look-at point (higher — the ground edge gets into the frame)
+const CAMERA_ORBIT = 1;                 // camera rotation by the player (RMB: look-around, orbit while following an object): 0 — orientation fixed, 1 — allowed
+const CAMERA_ORBIT_DEG_PER_PX = 0.3;    // degrees of rotation per screen px of drag
+const CAMERA_ORBIT_PITCH_MIN_DEG = 35;  // with limits: won't go lower toward the ground (the limit also rises on its own — ground edge stays out of the frame)
+const CAMERA_ORBIT_PITCH_MAX_DEG = 88;  // with limits: higher — almost straight from above
+
+// --- RENDER (World3D.js): light, shadows, sky, materials, toon and ink edges. Read by
+// World3D.cfg(); the editor applies edits to the live scene. ---
+// One sun for the whole world. Azimuth — WHERE the shadow falls on the map (0 — right, 90 — down).
 const WORLD3D_SUN_AZIMUTH_DEG = 32;
-const WORLD3D_SUN_ELEVATION_DEG = 41;   // высота солнца над горизонтом
-const WORLD3D_SUN_INTENSITY = 0.8;      // сила солнца (с небом в сумме ~1.0 на ровной земле — краска текстуры без изменений)
-const WORLD3D_SUN_COLOR = 0xffedc7;     // цвет солнца
-const WORLD3D_SKYLIGHT_INTENSITY = 0.45; // рассеянный свет неба (полусферический источник)
-const WORLD3D_SKYLIGHT_COLOR = 0xb1d8f7; // цвет света неба (грани, смотрящие вверх)
-const WORLD3D_GROUNDLIGHT_COLOR = 0xc2c7ad; // подсветка снизу (отражение от земли)
-const WORLD3D_SKY_COLOR = 0x8fc3e0;     // цвет неба и тумана
-const WORLD3D_FOG_DENSITY = 0.00032;    // экспоненциальный туман к горизонту (0 — выключить)
-// Тени: один цвет на все (красит toon-плагин, Babylon даёт только видимость солнца)
-const WORLD3D_SHADOW_COLOR = 0x0f3a4d;  // цвет тени
-const WORLD3D_SHADOW_STRENGTH = 0.52;    // сила тени 0..1: поверхность в тени умножается на смесь белого и цвета тени
-const WORLD3D_SHADOW_SOFT = 2;          // край: 0 — жёсткий (под toon), 1..3 — PCF низкое/среднее/высокое (мобильные — не выше 1)
-const WORLD3D_SHADOW_MAP = 1024;        // размер карты теней (мобильные — вдвое меньше); действует с новой сцены
-const WORLD3D_SHADOW_RADIUS = 840;      // px: ПРЕДЕЛ полуразмера ортокадра теней; сам кадр ужимается по объектам в кадре
-const WORLD3D_SHADOW_BIAS = 0.001;     // смещение глубины против «акне» (полосы тени на освещённых гранях)
-const WORLD3D_SHADOW_NORMAL_BIAS = 0.8; // смещение вдоль нормали против «акне» (полосы и «пила» на гранях под острым углом к солнцу), в текселях карты теней сверх радиуса сглаживания края (его прибавляет движок)
-// Материалы по группам (блик — доля 0..1, размер — показатель степени: больше — блик мельче)
-const WORLD3D_GROUND_SPECULAR = 0;      // блик земли (0 — матовая)
-const WORLD3D_GROUND_SPEC_POWER = 1;    // размер блика земли
-const WORLD3D_OUTER_TINT = 1;           // яркость земли ЗА краем локации (меньше 1 — граница локации видна)
-const WORLD3D_PROP_SPECULAR = 0.05;     // блик окружения (группа 'prop')
-const WORLD3D_PROP_SPEC_POWER = 7;     // размер блика окружения
-const WORLD3D_ACTOR_SPECULAR = 0;       // блик главных объектов (группа 'actor'); под toon — яркость «зайчика»
-const WORLD3D_ACTOR_SPEC_POWER = 23;    // размер блика главных объектов
-// Toon-шейдер (ArcToonPlugin): свет всех источников (солнце + небо, с тенью) квантуется в ступени
-const WORLD3D_TOON = 1;                 // 1 — toon-затенение и обводка силуэта, 0 — обычное плавное без обводки
-const WORLD3D_TOON_BANDS = 4;           // ступеней света (2..6)
-const WORLD3D_TOON_SOFT = 0.02;         // мягкость границы ступени (0 — резко, 0.5 — почти плавно)
-const WORLD3D_TOON_LOW = 0.48;          // яркость самой тёмной ступени (доля от полной)
-const WORLD3D_TOON_GROUND = 1;          // 1 — ступени и на земле, 0 — земля затеняется плавно
-const WORLD3D_TOON_SPEC = 0.25;            // сила блика-«зайчика» (0 — без блика)
-const WORLD3D_TOON_SPEC_SIZE = 0.075;    // порог блика (меньше — крупнее пятно)
-const WORLD3D_TOON_RIM = 0.28;           // светлый ободок по краю силуэта объектов (0 — нет)
-const WORLD3D_TOON_RIM_WIDTH = 0.24;    // ширина ободка
-// Контур рёбер (EdgesRenderer): рёбра, изломанные круче порога
-const WORLD3D_TOON_INK = 2;             // 0 — нет, 1 — главные объекты, 2 — и окружение
-const WORLD3D_TOON_INK_WIDTH = 25;      // толщина линии (≈ мировых px × 100; тоньше с удалением камеры)
-const WORLD3D_TOON_INK_COLOR = 0x171717; // цвет чернил: контур рёбер и обводка силуэта
-const WORLD3D_TOON_INK_ANGLE = 40;      // °: ребро рисуется, если грани изломаны круче
-// Обводка внешнего силуэта: постэффект (HighlightLayer, isStroke), толщина — в экранных px
-const WORLD3D_TOON_OUTLINE = 2;         // 0 — нет, 1 — главные объекты, 2 — и окружение (только при WORLD3D_TOON = 1)
-const WORLD3D_TOON_OUTLINE_ACTOR_WIDTH = 1.5;   // экранных px: обводка главных объектов
-const WORLD3D_TOON_OUTLINE_PROP_WIDTH = 1;  // экранных px: обводка окружения (его в кадре много — тоньше)
+const WORLD3D_SUN_ELEVATION_DEG = 41;   // sun elevation above the horizon
+const WORLD3D_SUN_INTENSITY = 0.8;      // sun strength (with the sky it sums to ~1.0 on flat ground — texture colors unchanged)
+const WORLD3D_SUN_COLOR = 0xffedc7;     // sun color
+const WORLD3D_SKYLIGHT_INTENSITY = 0.45; // diffuse sky light (hemispheric light source)
+const WORLD3D_SKYLIGHT_COLOR = 0xb1d8f7; // sky light color (faces looking up)
+const WORLD3D_GROUNDLIGHT_COLOR = 0xc2c7ad; // fill light from below (reflection off the ground)
+const WORLD3D_SKY_COLOR = 0x8fc3e0;     // sky and fog color
+const WORLD3D_FOG_DENSITY = 0.00032;    // exponential fog toward the horizon (0 — off)
+// Shadows: one color for all (painted by the toon plugin, Babylon only provides sun visibility)
+const WORLD3D_SHADOW_COLOR = 0x0f3a4d;  // shadow color
+const WORLD3D_SHADOW_STRENGTH = 0.52;    // shadow strength 0..1: a surface in shadow is multiplied by a blend of white and the shadow color
+const WORLD3D_SHADOW_SOFT = 2;          // edge: 0 — hard (for toon), 1..3 — PCF low/medium/high (mobile — no higher than 1)
+const WORLD3D_SHADOW_MAP = 1024;        // shadow map size (mobile — half as large); takes effect with a new scene
+const WORLD3D_SHADOW_RADIUS = 840;      // px: LIMIT of the shadow ortho frustum half-size; the frustum itself shrinks to the objects in the frame
+const WORLD3D_SHADOW_BIAS = 0.001;     // depth bias against shadow acne (shadow stripes on lit faces)
+const WORLD3D_SHADOW_NORMAL_BIAS = 0.8; // bias along the normal against shadow acne (stripes and sawtooth on faces at an acute angle to the sun), in shadow map texels on top of the edge smoothing radius (the engine adds it)
+// Materials by group (specular highlight — fraction 0..1, size — exponent: larger — smaller highlight)
+const WORLD3D_GROUND_SPECULAR = 0;      // ground specular highlight (0 — matte)
+const WORLD3D_GROUND_SPEC_POWER = 1;    // ground specular highlight size
+const WORLD3D_OUTER_TINT = 1;           // ground brightness BEYOND the location edge (less than 1 — the location boundary is visible)
+const WORLD3D_PROP_SPECULAR = 0.05;     // environment specular highlight (group 'prop')
+const WORLD3D_PROP_SPEC_POWER = 7;     // environment specular highlight size
+const WORLD3D_ACTOR_SPECULAR = 0;       // main objects specular highlight (group 'actor'); with toon — toon glint brightness
+const WORLD3D_ACTOR_SPEC_POWER = 23;    // main objects specular highlight size
+// Toon shader (ArcToonPlugin): light from all sources (sun + sky, with shadow) is quantized into bands
+const WORLD3D_TOON = 1;                 // 1 — toon shading and silhouette outline, 0 — regular smooth shading without outline
+const WORLD3D_TOON_BANDS = 4;           // number of light bands (2..6)
+const WORLD3D_TOON_SOFT = 0.02;         // band boundary softness (0 — sharp, 0.5 — almost smooth)
+const WORLD3D_TOON_LOW = 0.48;          // brightness of the darkest band (fraction of full)
+const WORLD3D_TOON_GROUND = 1;          // 1 — bands on the ground too, 0 — ground is shaded smoothly
+const WORLD3D_TOON_SPEC = 0.25;            // toon glint highlight strength (0 — no highlight)
+const WORLD3D_TOON_SPEC_SIZE = 0.075;    // highlight threshold (smaller — larger spot)
+const WORLD3D_TOON_RIM = 0.28;           // bright rim light along the objects' silhouette edge (0 — none)
+const WORLD3D_TOON_RIM_WIDTH = 0.24;    // rim light width
+// Ink edges (EdgesRenderer): edges creased more sharply than the threshold
+const WORLD3D_TOON_INK = 2;             // 0 — none, 1 — main objects, 2 — environment too
+const WORLD3D_TOON_INK_WIDTH = 25;      // line thickness (≈ world px × 100; thinner as the camera moves away)
+const WORLD3D_TOON_INK_COLOR = 0x171717; // ink color: ink edges and silhouette outline
+const WORLD3D_TOON_INK_ANGLE = 40;      // °: an edge is drawn if the faces are creased more sharply
+// Outer silhouette outline: post-effect (HighlightLayer, isStroke), thickness — in screen px
+const WORLD3D_TOON_OUTLINE = 2;         // 0 — none, 1 — main objects, 2 — environment too (only when WORLD3D_TOON = 1)
+const WORLD3D_TOON_OUTLINE_ACTOR_WIDTH = 1.5;   // screen px: main objects outline
+const WORLD3D_TOON_OUTLINE_PROP_WIDTH = 1;  // screen px: environment outline (there is a lot of it in the frame — thinner)

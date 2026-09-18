@@ -1,18 +1,18 @@
 // ============================================================================
-//  ArcEngine — проверка кода: типы (tsc) и тесты (node --test)
+//  ArcEngine — code check: types (tsc) and tests (node --test)
 // ----------------------------------------------------------------------------
-//  node tools/check.mjs            типы и тесты
-//  node tools/check.mjs --types    только типы
-//  node tools/check.mjs --tests    только тесты
+//  node tools/check.mjs            types and tests
+//  node tools/check.mjs --types    types only
+//  node tools/check.mjs --tests    tests only
 //
-//  Типы: TypeScript проверяет JS по JSDoc — tsconfig.json (игра) и
-//  _utils/editor/tsconfig.json (редактор). TypeScript — не зависимость проекта:
-//  npx берёт его из кэша npm (первый запуск скачивает). Типы Babylon —
-//  libs/babylon.d.ts, свои объявления — globals.d.ts. В архив ничего из этого не едет.
+//  Types: TypeScript checks the JS via JSDoc — tsconfig.json (game) and
+//  _utils/editor/tsconfig.json (editor). TypeScript is not a project dependency:
+//  npx takes it from the npm cache (the first run downloads it). Babylon types —
+//  libs/babylon.d.ts, own declarations — globals.d.ts. None of this goes into the archive.
 //
-//  Тесты: tests/*.test.mjs — логика без 3D: Store, Terrain3D.heightAt, сканер
-//  ассетов, запись редактором Constants.js и Objects.js (_utils/editor/save.mjs),
-//  связка скиллов claude/skills/ с CLAUDE.md.
+//  Tests: tests/*.test.mjs — logic without 3D: Store, Terrain3D.heightAt, the asset
+//  scanner, the editor's writing of Constants.js and Objects.js (_utils/editor/save.mjs),
+//  the link between the claude/skills/ skills and CLAUDE.md.
 // ============================================================================
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';

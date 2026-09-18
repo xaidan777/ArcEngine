@@ -1,4 +1,4 @@
-/* editor.css — тёмная тема редактора ArcEngine */
+/* editor.css — the ArcEngine editor dark theme */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -25,7 +25,7 @@ body {
     overflow: hidden;
 }
 
-/* --- Верхняя панель --- */
+/* --- Top bar --- */
 
 #topbar {
     display: flex;
@@ -38,17 +38,18 @@ body {
 }
 
 #brand { font-weight: 800; letter-spacing: 2px; font-size: 14px; }
-#brand span { color: var(--accent); font-weight: 500; letter-spacing: 0; margin-left: 6px; }
+#brand .brand-arc { color: #fbcb60; }
+#brand .brand-sub { color: var(--accent); font-weight: 500; letter-spacing: 0; margin-left: 6px; }
 
 #server-status { margin-left: auto; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
 #server-dot { width: 9px; height: 9px; border-radius: 50%; background: #555; }
 #server-dot.ok { background: #45d06c; box-shadow: 0 0 6px #45d06c88; }
 #server-dot.bad { background: var(--danger); box-shadow: 0 0 6px #ff3b3088; }
 
-/* Переключатель языка — справа вверху */
+/* Language switch — top right */
 #lang-switch button { padding: 3px 10px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; }
 
-/* --- Основная раскладка: вид локации слева, инспектор справа --- */
+/* --- Main page layout: location view on the left, inspector on the right --- */
 
 main { flex: 1 1 auto; display: flex; min-height: 0; }
 
@@ -117,18 +118,18 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 #view-info { left: 12px; top: 12px; }
 #view-hints { left: 12px; bottom: 12px; }
 
-/* --- Инспектор --- */
+/* --- Inspector --- */
 
 #inspector-pane {
     flex: 0 0 400px;
-    min-width: 0;         /* ширина — ровно 400: поля не распирают панель */
+    min-width: 0;         /* width — exactly 400: fields do not stretch the pane */
     display: flex;
     flex-direction: column;
     background: var(--panel);
     min-height: 0;
 }
 
-/* Вкладки: Global Settings | Objects */
+/* Tabs: Global Settings | Objects */
 #pane-tabs { margin: 10px 14px 0; flex: 0 0 auto; }
 #pane-tabs button { flex: 1 1 0; font-weight: 600; }
 #pane-tabs button.dirty::after { content: ' ●'; font-size: 9px; color: var(--dirty); }
@@ -138,7 +139,8 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 .pane-panel[hidden] { display: none; }
 
 #inspector-header,
-#objects-header {
+#objects-header,
+#ui-header {
     padding: 10px 14px;
     border-bottom: 1px solid var(--line);
     display: flex;
@@ -148,10 +150,12 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 }
 
 #inspector-actions,
-#objects-actions { display: flex; gap: 8px; }
+#objects-actions,
+#ui-actions { display: flex; gap: 8px; }
 
 #btn-save,
-#btn-objects-save {
+#btn-objects-save,
+#btn-ui-save {
     flex: 1 1 auto;
     background: var(--accent);
     color: #08211c;
@@ -163,11 +167,15 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
     cursor: pointer;
 }
 #btn-save:disabled,
-#btn-objects-save:disabled { background: var(--panel-2); color: var(--muted); cursor: default; font-weight: 500; }
+#btn-objects-save:disabled,
+#btn-ui-save:disabled { background: var(--panel-2); color: var(--muted); cursor: default; font-weight: 500; }
 
 #btn-revert,
 #btn-objects-revert,
+#btn-ui-revert,
 #btn-import,
+#ui-add button,
+.anchor-grid button,
 .object-actions button {
     background: var(--panel-2);
     color: var(--text);
@@ -178,11 +186,12 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 }
 #btn-revert:disabled,
 #btn-objects-revert:disabled,
+#btn-ui-revert:disabled,
 #btn-import:disabled { color: var(--muted); cursor: default; opacity: 0.6; }
 #btn-import { font-weight: 600; border-color: var(--accent); }
 #btn-import:hover:not(:disabled) { background: #1d3a35; }
 
-/* --- Вкладка Objects --- */
+/* --- Objects tab --- */
 
 #objects-list { flex: 0 1 auto; max-height: 38%; overflow-y: auto; border-bottom: 1px solid var(--line); padding: 6px 0; }
 .object-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 14px; cursor: pointer; user-select: none; }
@@ -341,7 +350,7 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 }
 #inspector-footer code { color: var(--text); font-size: 10.5px; }
 
-/* --- Тосты и ошибки --- */
+/* --- Toasts and errors --- */
 
 #toasts {
     position: fixed;
@@ -380,9 +389,72 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 }
 #boot-error.visible { display: block; }
 
-/* Узкое окно: инспектор уходит вниз */
+/* Narrow window: the inspector moves to the bottom */
 @media (max-width: 900px) {
     main { flex-direction: column; }
     #view-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--line); }
     #inspector-pane { flex: 1 1 45%; }
 }
+
+/* --- Debug tools (debug-tools.js): render mode select and scene lint results --- */
+
+.toolbar-group select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 5px 8px;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+#lint-panel {
+    position: absolute;
+    z-index: 5;
+    top: 12px;
+    right: 12px;
+    width: min(520px, calc(100% - 24px));
+    max-height: calc(100% - 60px);
+    overflow: auto;
+    background: rgba(16, 19, 24, 0.94);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text);
+}
+#lint-panel .lint-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-weight: 600; margin-bottom: 4px; }
+#lint-panel .lint-head button { background: none; border: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 0 2px; }
+#lint-panel .lint-stats { color: var(--muted); margin-bottom: 6px; }
+#lint-panel .lint-row { border-top: 1px solid var(--line); padding: 6px 0 6px 8px; border-left: 3px solid var(--muted); margin-top: 4px; }
+#lint-panel .lint-row b { font-weight: 600; }
+#lint-panel .lint-error { border-left-color: var(--danger); }
+#lint-panel .lint-warn { border-left-color: var(--dirty); }
+#lint-panel .lint-info { border-left-color: var(--accent); }
+
+/* --- UI tab: the element list and properties reuse the Objects tab styles --- */
+#ui-add { display: flex; gap: 6px; }
+#ui-add button { flex: 1 1 0; padding: 6px 4px; font-size: 12px; }
+#ui-list { flex: 0 1 auto; max-height: 34%; overflow-y: auto; border-bottom: 1px solid var(--line); padding: 6px 0; }
+#ui-props { flex: 1 1 auto; overflow-y: auto; padding: 8px 14px 16px; }
+#ui-props .objects-empty { padding: 4px 0; }
+#ui-props .field-controls input[type="number"], #ui-props .field-controls input[type="text"] { flex: 1 1 0; min-width: 0; width: 0; }
+#ui-props input.invalid { border-color: var(--danger); }
+#ui-props input[type="color"] { flex: 1 1 auto; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
+#ui-props input[type="color"]:disabled { opacity: 0.3; }
+#ui-footer { flex: 0 0 auto; padding: 8px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+.anchor-grid { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
+.anchor-grid button { width: 22px; height: 18px; padding: 0; border-radius: 3px; }
+.anchor-grid button.active { background: var(--accent); border-color: var(--accent); }
+/* The selection box lives inside the scaled UI root: --ui-inv brings lines and handles back to screen px. */
+.ui-select-box { position: absolute; box-sizing: border-box; pointer-events: none; outline: calc(1.5px * var(--ui-inv, 1)) solid #35e0c0; outline-offset: calc(2px * var(--ui-inv, 1)); }
+.ui-handle { position: absolute; width: calc(9px * var(--ui-inv, 1)); height: calc(9px * var(--ui-inv, 1)); margin: calc(-4.5px * var(--ui-inv, 1)); background: #35e0c0; border: calc(1px * var(--ui-inv, 1)) solid #08211c; pointer-events: auto; }
+.ui-select-box.no-resize .ui-handle { display: none; }
+.ui-handle[data-handle="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+.ui-handle[data-handle="n"] { left: 50%; top: 0; cursor: ns-resize; }
+.ui-handle[data-handle="ne"] { left: 100%; top: 0; cursor: nesw-resize; }
+.ui-handle[data-handle="e"] { left: 100%; top: 50%; cursor: ew-resize; }
+.ui-handle[data-handle="se"] { left: 100%; top: 100%; cursor: nwse-resize; }
+.ui-handle[data-handle="s"] { left: 50%; top: 100%; cursor: ns-resize; }
+.ui-handle[data-handle="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
+.ui-handle[data-handle="w"] { left: 0; top: 50%; cursor: ew-resize; }

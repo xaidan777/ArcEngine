@@ -1,21 +1,21 @@
-// schema.js — декларативная схема инспектора. Поле = одна константа Constants.js.
+// schema.js — the declarative inspector schema. A field = one Constants.js constant.
 //
-// Поле: { name, label, min, max, step, hint } — ползунок с числом (по умолчанию);
-//   kind: 'color'  — цвет 0xRRGGBB (пипетка + hex);
-//   kind: 'select' + options: [{ value, label }] — РЕЖИМ (0/1/2…). Режим ползунком
-//         не делать: промежуточных значений у него нет. В файле остаётся числом.
-// Группа: { id, label, fields }. При запуске все группы свёрнуты.
-// Тексты (label, hint, label варианта) — на двух языках: { en, ru } (i18n.js).
+// Field: { name, label, min, max, step, hint } — a slider with a number (the default);
+//   kind: 'color'  — a 0xRRGGBB color (color picker + hex);
+//   kind: 'select' + options: [{ value, label }] — a MODE (0/1/2…). Do not make a mode
+//         a slider: it has no intermediate values. It stays a number in the file.
+// Group: { id, label, fields }. At startup all groups are collapsed.
+// Texts (label, hint, option label) — in two languages: { en, ru } (i18n.js).
 //
-// Диапазоны — границы слайдера; в числовое поле можно вписать и значение за ними.
-// Новая константа = литерал в Constants.js + строка здесь + чтение в коде с дефолтом.
+// Ranges are the slider bounds; a value beyond them can still be typed into the numeric field.
+// A new constant = a literal in Constants.js + a line here + a read in the code with a default.
 
-// Версия серверного контракта, которую ждёт этот клиент. Должна совпадать с
-// EDITOR_API_VERSION в server.mjs — иначе редактор предупредит, что editor.bat
-// крутит старый код (Node читает серверные файлы только при старте процесса).
-const EDITOR_API_VERSION = 18;
+// The server contract version this client expects. Must match
+// EDITOR_API_VERSION in server.mjs — otherwise the editor warns that editor.bat
+// is running old code (Node reads server files only at process start).
+const EDITOR_API_VERSION = 19;
 
-// Уровни контура и обводки: 0 — нет, 1 — главные объекты (actor), 2 — и окружение (prop).
+// Ink edges and outline levels: 0 — off, 1 — main objects (actor), 2 — and environment (prop).
 const SCHEMA_LEVELS = [
     { value: 0, label: { en: 'off', ru: 'нет' } },
     { value: 1, label: { en: 'main objects', ru: 'главные объекты' } },
@@ -66,24 +66,34 @@ const KIT_SCHEMA = [
             { name: 'CAMERA_FOLLOW_LERP', min: 0.01, max: 1, step: 0.01,
               label: { en: 'Follow smoothing', ru: 'Сглаживание слежения' },
               hint: { en: 'camera.follow(obj): fraction of the remaining gap per frame', ru: 'camera.follow(obj): доля остатка за кадр' } },
-            { name: 'CAMERA_PAN_KEY_SPEED', min: 100, max: 3000, step: 50,
-              label: { en: 'WASD speed (screen px/s)', ru: 'WASD: скорость (экранных px/с)' } },
+            { name: 'CAMERA_FLY_SPEED', min: 100, max: 3000, step: 50,
+              label: { en: 'Flight speed (screen px/s)', ru: 'Скорость полёта (экранных px/с)' },
+              hint: { en: 'WASD and arrows fly along the view and strafe, Q/E go down/up. Set in screen px: zoomed out, the camera covers more of the world per second',
+                      ru: 'WASD и стрелки — полёт вдоль взгляда и вбок, Q/E — вниз/вверх. Задаётся в экранных px: при отдалении камера проходит по миру больше' } },
+            { name: 'CAMERA_LIMITS', kind: 'select', options: SCHEMA_NO_YES,
+              label: { en: 'Game camera limits', ru: 'Пределы игровой камеры' },
+              hint: { en: "No — free flight, as in the editor's free camera. Yes — pitch within its limits, target inside the location, flight ceiling: the ground edge beyond the location never comes into view",
+                      ru: 'Нет — свободный полёт, как у свободной камеры редактора. Да — наклон в своих пределах, цель внутри локации, потолок полёта: край земли за локацией в кадр не попадает' } },
+            { name: 'CAMERA_LIFT_MAX', min: 0, max: 3000, step: 50,
+              label: { en: 'Limits: flight ceiling (px)', ru: 'Пределы: потолок полёта (px)' },
+              hint: { en: 'How high above the ground flight lifts the look-at point. Too high and the ground edge beyond the location comes into view',
+                      ru: 'Как высоко над землёй полёт поднимает точку взгляда. Слишком высоко — в кадр попадёт край земли за локацией' } },
             { name: 'CAMERA_ORBIT', kind: 'select',
               label: { en: 'Player rotation', ru: 'Вращение игроком' },
               options: [
                   { value: 0, label: { en: 'off — heading fixed', ru: 'нет — ориентация фиксирована' } },
                   { value: 1, label: { en: 'RMB rotates', ru: 'ПКМ вращает' } },
               ],
-              hint: { en: "Game camera: whether the right mouse button rotates it. The editor's free camera always rotates",
-                      ru: 'Игровая камера: можно ли крутить её правой кнопкой. Свободная камера редактора вращается всегда' } },
+              hint: { en: "Game camera: whether the right mouse button rotates it — look-around from the camera's position, orbit while it follows an object. The editor's free camera always rotates",
+                      ru: 'Игровая камера: можно ли крутить её правой кнопкой — осмотр с места камеры, при слежении за объектом — орбита вокруг него. Свободная камера редактора вращается всегда' } },
             { name: 'CAMERA_ORBIT_DEG_PER_PX', min: 0.05, max: 1, step: 0.05,
               label: { en: 'Rotation speed (°/px)', ru: 'Скорость вращения (°/px)' } },
             { name: 'CAMERA_ORBIT_PITCH_MIN_DEG', min: 5, max: 89, step: 1,
-              label: { en: 'Pitch: lowest (°)', ru: 'Наклон не ниже (°)' },
+              label: { en: 'Limits: lowest pitch (°)', ru: 'Пределы: наклон не ниже (°)' },
               hint: { en: 'The limit also rises by itself: the ground edge beyond the location never comes into view',
                       ru: 'Предел поднимается и сам: край земли за локацией в кадр не попадает' } },
             { name: 'CAMERA_ORBIT_PITCH_MAX_DEG', min: 20, max: 89, step: 1,
-              label: { en: 'Pitch: highest (°)', ru: 'Наклон не выше (°)' },
+              label: { en: 'Limits: highest pitch (°)', ru: 'Пределы: наклон не выше (°)' },
               hint: { en: 'Close to 90 is straight down', ru: 'Почти 90 — строго сверху' } },
         ],
     },
@@ -299,6 +309,28 @@ const KIT_SCHEMA = [
               label: { en: 'Grid cell (px)', ru: 'Шаг сетки (px)' },
               hint: { en: 'Smaller gives smoother hills and a heavier mesh (phones: no finer than 12)',
                       ru: 'Мельче — глаже холмы, тяжелее меш (мобильные — не мельче 12)' } },
+        ],
+    },
+    {
+        id: 'models',
+        label: { en: 'Models, UI and sample game', ru: 'Модели, UI и пример игры' },
+        fields: [
+            { name: 'MODEL_CLIP_BLEND_SEC', min: 0, max: 1, step: 0.05,
+              label: { en: 'Clip cross-fade (s)', ru: 'Переход между клипами (с)' },
+              hint: { en: 'How long a .glb model blends from one animation clip to the next (idle → run). 0 switches instantly',
+                      ru: 'За сколько .glb-модель перетекает из одного клипа анимации в другой (idle → run). 0 — мгновенно' } },
+            { name: 'UI_REF_HEIGHT', min: 0, max: 2160, step: 10,
+              label: { en: 'UI reference height (px)', ru: 'Опорная высота UI (px)' },
+              hint: { en: 'The screen height the UI layout is drawn for: on other screens the whole UI scales with the height. 0 — no scaling, layout numbers are CSS px',
+                      ru: 'Высота экрана, под которую нарисован UI: на других экранах весь UI масштабируется по высоте. 0 — без масштаба, числа раскладки — CSS px' } },
+            { name: 'GAME_RUN_SEC', min: 1, max: 60, step: 1,
+              label: { en: 'Sample game: run time (s)', ru: 'Пример игры: время бега (с)' },
+              hint: { en: 'Game.js: how long a full energy bar lasts while the character runs',
+                      ru: 'Game.js: на сколько хватает полной шкалы энергии, пока персонаж бежит' } },
+            { name: 'GAME_REST_SEC', min: 1, max: 60, step: 1,
+              label: { en: 'Sample game: rest time (s)', ru: 'Пример игры: время отдыха (с)' },
+              hint: { en: 'Game.js: how long an empty energy bar takes to refill while the character stands',
+                      ru: 'Game.js: за сколько пустая шкала энергии восполняется, пока персонаж стоит' } },
         ],
     },
 ];

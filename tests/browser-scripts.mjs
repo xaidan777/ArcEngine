@@ -1,5 +1,5 @@
-// Классические скрипты игры в node:vm — один контекст на набор файлов, как <script> на
-// странице: верхнеуровневые const/class видны следующим файлам и достаются через get().
+// The game's classic scripts in node:vm — one context per set of files, like <script> on a
+// page: top-level const/class are visible to the following files and are fetched via get().
 import fs from 'node:fs';
 import path from 'node:path';
 import url from 'node:url';
@@ -7,11 +7,11 @@ import vm from 'node:vm';
 
 export const ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..');
 
-// Настольный браузер без тача: этого хватает Constants.js (IS_MOBILE).
+// Desktop browser without touch: that is enough for Constants.js (IS_MOBILE).
 const DESKTOP = { userAgent: 'Mozilla/5.0 (Windows NT 10.0)', platform: 'Win32', maxTouchPoints: 0 };
 
-// files — пути от корня проекта; globals — поля глобального объекта (navigator,
-// localStorage, BABYLON…). window — сам глобальный объект.
+// files — paths from the project root; globals — fields of the global object (navigator,
+// localStorage, BABYLON…). window — the global object itself.
 export function loadScripts(files, globals = {}) {
   const ctx = vm.createContext({ console, navigator: DESKTOP, innerWidth: 1920, innerHeight: 1080 });
   ctx.window = ctx;
@@ -24,8 +24,8 @@ export function loadScripts(files, globals = {}) {
   return { ctx, get: (name) => vm.runInContext(name, ctx) };
 }
 
-// Пустышка Babylon/World3D: любое поле, вызов и new возвращают её же. Для логики,
-// которой 3D не нужен, но конструктор по пути создаёт меши и материалы.
+// Babylon/World3D stub: any field, call and new return the stub itself. For logic that
+// does not need 3D, but whose constructor creates meshes and materials along the way.
 export function stub() {
   const target = function () {};
   const proxy = new Proxy(target, {

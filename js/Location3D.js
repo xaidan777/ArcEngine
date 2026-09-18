@@ -1,25 +1,25 @@
-// Location3D.js — локация: 3D-вид (свет, небо, туман, тени), земля (Terrain3D)
-// размером LOCATION_WIDTH × LOCATION_HEIGHT с текстурой LOCATION_GROUND и
-// объекты — модели из Objects.js (LOCATION_OBJECTS), их расставляет редактор.
-// Общая для игры (main.js) и редактора (_utils/editor/lab.js): оба зовут
-// update(dt) каждый кадр — вращение частей моделей (def.anim). Свои объекты игра
-// создаёт в location.view.scene и регистрирует World3D.addObject(location.view,
-// mesh, 'actor' | 'prop'); ставить на землю — по location.terrain.heightAt(x, y).
+// Location3D.js — the location: a 3D view (light, sky, fog, shadows), ground (Terrain3D)
+// of size LOCATION_WIDTH × LOCATION_HEIGHT with the LOCATION_GROUND texture, and
+// objects — models from Objects.js (LOCATION_OBJECTS), placed by the editor.
+// Shared by the game (main.js) and the editor (_utils/editor/lab.js): both call
+// update(dt) every frame — part spin of models (def.anim). The game creates its own
+// objects in location.view.scene and registers them with World3D.addObject(location.view,
+// mesh, 'actor' | 'prop'); put them on the ground via location.terrain.heightAt(x, y).
 
 class Location3D {
-    // opts: { assetBase?: '' — игра (пути от index.html) | '/' — редактор (от корня сервера),
-    //         objects?: записи LOCATION_OBJECTS }
+    // opts: { assetBase?: '' — game (paths from index.html) | '/' — editor (from the server root),
+    //         objects?: LOCATION_OBJECTS records }
     constructor(opts) {
         this.opts = opts || {};
         this.view = World3D.createView({});
         this.terrain = null;
         /** @type {LocationObject[]} */
-        this.objects = [];   // { def, mesh, error, loaded } — см. addObject
+        this.objects = [];   // { def, mesh, error, loaded } — see addObject
         this._groundImage = null;
         this._groundIndex = -1;
         this.buildTerrain();
         const models = (this.opts.objects || []).map(def => this.addObject(def).loaded);
-        // Готова — текстура земли и модели объектов пришли (или не нашлись) и шейдеры сцены собраны.
+        // Ready — the ground texture and object models have arrived (or were not found) and the scene shaders are built.
         this.ready = Promise.all([this.loadGround()].concat(models))
             .then(() => new Promise(resolve => this.view.scene.executeWhenReady(() => resolve(undefined))));
     }
@@ -27,8 +27,8 @@ class Location3D {
     get width() { return Math.max(64, (typeof LOCATION_WIDTH !== 'undefined') ? LOCATION_WIDTH : 2048); }
     get height() { return Math.max(64, (typeof LOCATION_HEIGHT !== 'undefined') ? LOCATION_HEIGHT : 2048); }
 
-    // (Пере)собрать землю по размерам локации и TERRAIN_* (редактор — живо).
-    // Объекты локации встают на новую землю; свои объекты игры — забота владельца.
+    // (Re)build the ground from the location size and TERRAIN_* (editor — live).
+    // Location objects settle onto the new ground; the game's own objects are the owner's concern.
     buildTerrain() {
         if (this.terrain) this.terrain.dispose();
         this.terrain = new Terrain3D(this.view, {
@@ -40,20 +40,20 @@ class Location3D {
         return this.terrain;
     }
 
-    // --- Объекты локации ------------------------------------------------------------
+    // --- Location objects -----------------------------------------------------------
 
-    // Запись LOCATION_OBJECTS -> объект: { def, mesh, error, loaded }. Запись
-    // возвращается сразу, меш появляется, когда модель догрузится (loaded —
-    // промис). Нет файла — объект без меша (error), сцена не падает.
-    // def: { name, model, kind, x, y, h, rot, scale, anim? } — поля живые: правка +
-    // placeObject; anim читается каждый кадр (spinPart).
+    // LOCATION_OBJECTS record -> object: { def, mesh, error, loaded }. The record
+    // is returned immediately; the mesh appears once the model finishes loading (loaded —
+    // a promise). No file — an object without a mesh (error), the scene doesn't crash.
+    // def: { name, model, kind, x, y, h, rot, scale, anim?, clip? } — the fields are live: edit +
+    // placeObject; anim and clip are read every frame (spinPart, playClip).
     /** @param {LocationObjectDef} def @returns {LocationObject} */
     addObject(def) {
         /** @type {LocationObject} */
         const rec = { def, mesh: null, error: null, loaded: null };
         this.objects.push(rec);
-        rec.loaded = Model3D.load((this.opts.assetBase || '') + def.model).then((model) => {
-            if (this.objects.indexOf(rec) < 0 || !this.view) return rec;   // сняли, пока грузилась
+        rec.loaded = Model3D.load((this.opts.assetBase || '') + def.model, this.view.scene).then((model) => {
+            if (this.objects.indexOf(rec) < 0 || !this.view) return rec;   // removed while loading
             rec.mesh = Model3D.build(model, this.view.scene, { name: def.name || 'object' });
             rec.mesh.metadata = { locationObject: rec };
             World3D.addObject(this.view, rec.mesh, def.kind);
@@ -67,9 +67,9 @@ class Location3D {
         return rec;
     }
 
-    // Меш — по полям def: позиция на земле + h; rot — [x, y, z] градусы (y — курс по
-    // карте, как heading: rotation.y = −y; x, z — наклон); scale — [x, y, z]. Старая
-    // запись с числами (rot — только курс, scale — равномерный) тоже читается.
+    // Mesh — from the def fields: position on the ground + h; rot — [x, y, z] degrees (y — heading
+    // on the map, like heading: rotation.y = −y; x, z — tilt); scale — [x, y, z]. An old
+    // record with numbers (rot — heading only, scale — uniform) is also read.
     /** @param {LocationObject} rec */
     placeObject(rec) {
         const m = rec.mesh, d = rec.def;
@@ -79,7 +79,7 @@ class Location3D {
         const s = Array.isArray(d.scale) ? d.scale : [d.scale, d.scale, d.scale];
         const k = (v) => (Number(v) > 0 ? Number(v) : 1);
         m.position.set(x, (this.terrain ? this.terrain.heightAt(x, y) : 0) + (Number(d.h) || 0), y);
-        m.rotationQuaternion = null;   // кватернион (его может поставить гизмо) перекрыл бы rotation
+        m.rotationQuaternion = null;   // a quaternion (the gizmo may set one) would override rotation
         m.rotation.set((Number(r[0]) || 0) * D, -(Number(r[1]) || 0) * D, (Number(r[2]) || 0) * D);
         m.scaling.set(k(s[0]), k(s[1]), k(s[2]));
     }
@@ -88,16 +88,35 @@ class Location3D {
         for (const rec of this.objects) this.placeObject(rec);
     }
 
-    // Кадр анимации объектов — до World3D.renderFrame().
+    // Object animation frame — before World3D.renderFrame().
     update(dt) {
         dt = Math.min(0.1, Math.max(0, dt || 0));
-        for (const rec of this.objects) this.spinPart(rec, dt);
+        for (const rec of this.objects) {
+            this.spinPart(rec, dt);
+            this.playClip(rec);
+        }
     }
 
-    // def.anim = { part, axis, speed, dir }: часть модели (объект FBX) вращается вокруг
-    // своего центра (origin из Blender) по своей оси axis — 'x' | 'y' | 'z', с минусом —
-    // обратный конец; speed — об/мин; dir — 'cw' | 'ccw', по/против часовой, если
-    // смотреть с конца оси. Сняли анимацию или сменили часть — прежняя встаёт на место.
+    // def.clip — the name of a looped animation clip of a glTF model ('idle'); none — the rest
+    // pose. The location acts only when def.clip CHANGES (the editor), so game code is free to
+    // drive the same model: Model3D.clips(rec.mesh).play('run').
+    /** @param {LocationObject} rec */
+    playClip(rec) {
+        const want = rec.mesh ? String(rec.def.clip || '') : '';
+        if (rec.clip === want && rec.clipRoot === rec.mesh) return;
+        const clips = rec.mesh ? Model3D.clips(rec.mesh) : null;
+        if (clips) {
+            if (want && clips.has(want)) clips.play(want);
+            else if (rec.clip) clips.stop();
+        }
+        rec.clip = want;
+        rec.clipRoot = rec.mesh;
+    }
+
+    // def.anim = { part, axis, speed, dir }: a model part (an FBX object) spins around its
+    // center (origin from Blender) about its own axis, axis — 'x' | 'y' | 'z', with a minus — the
+    // opposite end; speed — rpm; dir — 'cw' | 'ccw', clockwise/counterclockwise when viewed from
+    // the axis end. Animation removed or part changed — the previous part returns to its place.
     /** @param {LocationObject} rec @param {number} dt */
     spinPart(rec, dt) {
         const a = rec.def.anim;
@@ -120,7 +139,7 @@ class Location3D {
         const axis = String(a.axis || 'y'), dirs = s.mesh.metadata.axes;
         const v = dirs[axis.slice(-1)] || dirs.y, sign = axis[0] === '-' ? -1 : 1;
         s.axis.set(v[0] * sign, v[1] * sign, v[2] * sign);
-        // Сцена правосторонняя: положительный угол — против часовой с конца оси.
+        // The scene is right-handed: a positive angle is counterclockwise from the axis end.
         const turn = Math.max(0, Number(a.speed) || 0) * Math.PI / 30 * (a.dir === 'ccw' ? 1 : -1);
         s.angle = (s.angle + turn * dt) % (2 * Math.PI);
         BABYLON.Quaternion.RotationAxisToRef(s.axis, s.angle, s.q);
@@ -135,9 +154,9 @@ class Location3D {
         rec.mesh = null;
     }
 
-    // Текстура земли по LOCATION_GROUND. Пути — ЛИТЕРАЛАМИ в GROUNDS: сканер
-    // сборщика (tools/asset-scan.mjs) находит ассеты только так. Нет файла —
-    // земля остаётся ровного цвета, сцена не падает.
+    // Ground texture by LOCATION_GROUND. Paths — as LITERALS in GROUNDS: the builder's
+    // asset scanner (tools/asset-scan.mjs) finds assets only that way. No file —
+    // the ground stays a flat color, the scene doesn't crash.
     loadGround() {
         const list = Location3D.GROUNDS;
         const n = (typeof LOCATION_GROUND !== 'undefined') ? LOCATION_GROUND : 0;
@@ -167,7 +186,7 @@ class Location3D {
     }
 
     dispose() {
-        this.objects = [];   // меши и материалы умирают со сценой
+        this.objects = [];   // meshes and materials die with the scene
         if (this.terrain) this.terrain.dispose();
         this.terrain = null;
         if (this.view) this.view.dispose();
@@ -175,7 +194,7 @@ class Location3D {
     }
 }
 
-// Текстуры земли по LOCATION_GROUND: 0 — трава, 1 — песок, 2 — снег.
+// Ground textures by LOCATION_GROUND: 0 — grass, 1 — sand, 2 — snow.
 Location3D.GROUNDS = [
     'assets/ground_texture_g.jpg',
     'assets/ground_texture_d.jpg',

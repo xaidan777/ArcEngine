@@ -1,6 +1,6 @@
-// main.js — точка входа редактора: язык интерфейса -> константы игры -> инспектор
-// -> вид локации. Порядок обязателен: до EditorLoader.load() глобалов
-// CAMERA_*/WORLD3D_*/TERRAIN_* не существует.
+// main.js — the editor entry point: UI language -> game constants -> inspector
+// -> location view. The order is mandatory: before EditorLoader.load() the globals
+// CAMERA_*/WORLD3D_*/TERRAIN_* do not exist.
 
 window.addEventListener('DOMContentLoaded', async () => {
     I18N.init();
@@ -9,8 +9,8 @@ window.addEventListener('DOMContentLoaded', async () => {
         EditHistory.init();
         PaneTabs.init();
         Inspector.init();
-        // Инспектор правит window-глобалы напрямую; сцене нужно событие, чтобы применить
-        // правку, истории — запись (undo — прежним значением тем же путём).
+        // The inspector edits window globals directly; the scene needs an event to apply
+        // the edit, the history — an entry (undo — with the previous value via the same path).
         const origApply = Inspector.apply.bind(Inspector);
         Inspector.apply = (f, value, opts) => {
             const before = Inspector.get(f.name);

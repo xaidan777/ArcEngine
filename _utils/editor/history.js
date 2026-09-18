@@ -1,12 +1,12 @@
-// history.js — отмена и повтор правок редактора: Ctrl+Z, Ctrl+Shift+Z и Ctrl+Y.
+// history.js — undo and redo of editor edits: Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y.
 //
-// Запись — пара функций undo/redo. Правки с одним ключом подряд быстрее MERGE_MS
-// (слайдер, набор числа, ввод имени) склеиваются в одну: undo — от первой, redo —
-// от последней. Пока выполняется undo/redo, новые записи не принимаются (busy):
-// старое значение применяется теми же путями, что и правка.
-// Кто пишет: main.js (Inspector.apply — константы Global Settings) и
-// objects-panel.js (снимки раскладки Objects). Имя не History: так называется
-// встроенный класс браузера (window.History).
+// An entry — a pair of undo/redo functions. Consecutive edits with the same key faster than
+// MERGE_MS (a slider, typing a number, entering a name) are merged into one: undo — from the
+// first, redo — from the last. While undo/redo is running, new entries are not accepted (busy):
+// the old value is applied through the same paths as the edit.
+// Who writes: main.js (Inspector.apply — the Global Settings constants) and
+// objects-panel.js (Objects layout snapshots). The name is not History: that is the name of
+// a built-in browser class (window.History).
 
 /** @satisfies {Record<string, any>} */
 const EditHistory = {
@@ -32,7 +32,7 @@ const EditHistory = {
         this.redoStack = [];
     },
 
-    // Все записи внутри fn — один шаг истории (например, «Откатить» всех констант).
+    // All entries inside fn — one history step (for example, "Revert" of all constants).
     batch(fn) {
         if (this._batch || this.busy) { fn(); return; }
         const list = this._batch = [];
@@ -54,7 +54,7 @@ const EditHistory = {
         if (!entry) return false;
         this.busy = true;
         try { entry[dir](); } finally { this.busy = false; }
-        entry.key = null;   // отменённое не склеивается с новой правкой
+        entry.key = null;   // an undone entry is not merged with a new edit
         to.push(entry);
         return true;
     },
@@ -63,9 +63,9 @@ const EditHistory = {
         window.addEventListener('keydown', (e) => {
             if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
             const t = /** @type {HTMLInputElement | null} */ (e.target);
-            // Текст и числа в полях отменяет сам браузер.
+            // Text and numbers in fields are undone by the browser itself.
             if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && /^(text|number|search)$/.test(t.type)))) return;
-            // Клавиша — по e.code (в русской раскладке key у Z — «я»); без code — по key.
+            // The key — by e.code (in the Russian keyboard layout the key of Z is "я"); without code — by key.
             const is = (letter) => e.code ? e.code === 'Key' + letter : String(e.key).toUpperCase() === letter;
             if (is('Z') && !e.shiftKey) { e.preventDefault(); this.undo(); }
             else if ((is('Z') && e.shiftKey) || is('Y')) { e.preventDefault(); this.redo(); }

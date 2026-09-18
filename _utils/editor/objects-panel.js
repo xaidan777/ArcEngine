@@ -1,36 +1,36 @@
-// objects-panel.js — вкладка Objects: объекты локации (Objects.js) — список,
-// свойства выбранного (и секция «Анимация» — вращение части модели), гизмо
-// перемещения в виде, импорт FBX и сохранение.
+// objects-panel.js — the Objects tab: location objects (Objects.js) — the list,
+// properties of the selected one (and the "Animation" section — model part spin), the move
+// gizmo in the view, FBX import and saving.
 //
-// Записи живут в Location3D (location.objects: { def, mesh }): панель правит поля
-// def и зовёт location.placeObject(rec); def.anim Location3D читает сам каждый кадр.
-// Смена вида (kind) — пересборка объекта: группу материалов, контур и обводку
-// World3D.addObject раздаёт при добавлении.
+// Records live in Location3D (location.objects: { def, mesh }): the panel edits the def
+// fields and calls location.placeObject(rec); Location3D reads def.anim itself every frame.
+// Changing the object kind (kind) — rebuilding the object: the material group, ink edges
+// and outline are assigned by World3D.addObject on adding.
 //
-// Гизмо — BABYLON.GizmoManager (слой утилит поверх сцены). Он слушает указатель
-// СЦЕНЫ, а View3D его отключает (detachControl) — редактор включает обратно.
-// Нажатие на гизмо камера пропускает (camera.ignorePointer); клик без сдвига по
-// объекту выбирает его. Сдвиг по X/Z держит высоту над землёй (объект идёт по
-// рельефу), сдвиг по Y меняет h.
+// Gizmo — BABYLON.GizmoManager (a utility layer on top of the scene). It listens to the
+// SCENE pointer, and View3D turns it off (detachControl) — the editor turns it back on.
+// The camera skips a press on the gizmo (camera.ignorePointer); a click without movement on
+// an object selects it. A move along X/Z keeps the height above the ground (the object
+// follows the terrain), a move along Y changes h.
 //
-// Раскладка «грязная», когда JSON записей отличается от сохранённого (saved).
-// Точность полей — как пишет сервер: позиция и курс до 0.1, масштаб до 0.001.
+// The layout is dirty when the JSON of the records differs from the saved one (saved).
+// Field precision — as the server writes: position and heading to 0.1, scale to 0.001.
 
 /** @satisfies {Record<string, any>} */
 const ObjectsPanel = {
     /** @type {typeof Lab | null} */
     lab: null,
     /** @type {LocationObject | null} */
-    selected: null,     // запись location.objects
-    saved: '[]',        // JSON раскладки на момент загрузки или сохранения
+    selected: null,     // a location.objects record
+    saved: '[]',        // layout JSON as of load or save
     /** @type {BABYLON.GizmoManager | null} */
     gizmo: null,
-    propEls: null,      // поля свойств выбранного: { pos: { x, y, h }, rot, scale }
-    _down: null,        // точка нажатия ЛКМ: клик без сдвига выбирает объект
+    propEls: null,      // property fields of the selected one: { pos: { x, y, h }, rot, scale }
+    _down: null,        // LMB press point: a click without movement selects an object
     _importing: false,
 
-    // Копия LOCATION_OBJECTS — стартовые записи Location3D редактора и база «грязной»
-    // раскладки. Старые записи (rot — число-курс, scale — число) приводятся к тройкам.
+    // A copy of LOCATION_OBJECTS — the starting records of the editor's Location3D and the base
+    // of the dirty layout. Old records (rot — a heading number, scale — a number) become triples.
     initialObjects() {
         const list = (typeof LOCATION_OBJECTS !== 'undefined' && Array.isArray(LOCATION_OBJECTS)) ? LOCATION_OBJECTS : [];
         const defs = JSON.parse(JSON.stringify(list)).map((d) => Object.assign(d, {
@@ -70,7 +70,7 @@ const ObjectsPanel = {
         this.render();
     },
 
-    // --- Выбор ------------------------------------------------------------------
+    // --- Selection --------------------------------------------------------------
 
     select(rec, fromView) {
         this.selected = rec && this.lab.location.objects.includes(rec) ? rec : null;
@@ -79,7 +79,7 @@ const ObjectsPanel = {
         this.render();
     },
 
-    // Клик без сдвига: объект под курсором или пусто (снять выбор).
+    // A click without movement: the object under the cursor or nothing (deselect).
     onClick(e) {
         const d = this._down;
         this._down = null;
@@ -96,24 +96,24 @@ const ObjectsPanel = {
         return null;
     },
 
-    // Модель догрузилась (или нет): гизмо на выбранный, отметка ошибки в списке.
+    // The model finished loading (or failed): gizmo onto the selected one, error mark in the list.
     watch(rec) {
         rec.loaded.then(() => {
             if (rec === this.selected) {
                 this.gizmo.attachToMesh(rec.mesh);
-                this.renderProps();   // части модели для секции «Анимация»
+                this.renderProps();   // model parts for the "Animation" section
             }
             if (rec.error) Toast.show(I18N.t('toast.modelFailed', { url: rec.def.model, msg: rec.error }), true);
             this.renderList();
         });
     },
 
-    // --- Гизмо ------------------------------------------------------------------
+    // --- Gizmo ------------------------------------------------------------------
     //
-    // Линии стандартной толщины, цвета плоские, без света: иначе материалы гизмо
-    // квантует toon-плагин набора (он вешается на каждый StandardMaterial).
-    // Перемещение — оси и квадрат по земле, поворот — кольца X/Y/Z, масштаб — по
-    // осям, центр — равномерно. Оси мира: X — вправо по карте, Z — вниз, Y — вверх.
+    // Lines of standard thickness, flat colors, no lighting: otherwise the gizmo materials
+    // get quantized by the kit's toon plugin (it attaches to every StandardMaterial).
+    // Move — axes and a square along the ground, rotate — X/Y/Z rings, scale — along the
+    // axes, the center — uniform. World axes: X — right on the map, Z — down, Y — up.
     setupGizmos() {
         const gm = this.gizmo, C = (hex) => BABYLON.Color3.FromHexString(hex);
         const colors = { x: C('#f0525f'), y: C('#62d26f'), z: C('#4a90f0') }, hover = C('#ffd24a');
@@ -153,8 +153,8 @@ const ObjectsPanel = {
         for (const g of [sg.xGizmo, sg.yGizmo, sg.zGizmo, sg.uniformScaleGizmo]) track(g, () => this.onScaleDrag());
     },
 
-    // Под указателем ручка гизмо? isHovered обновляется только движением мыши —
-    // касание и быстрый клик приходят без него, поэтому ещё и прямой пик слоя утилит.
+    // Is a gizmo handle under the pointer? isHovered is updated only by mouse movement —
+    // a touch and a quick click arrive without it, hence also a direct pick of the utility layer.
     gizmoHit(e) {
         if (this.gizmo.isHovered) return true;
         const layer = this.gizmo.utilityLayer;
@@ -175,7 +175,7 @@ const ObjectsPanel = {
         }
     },
 
-    // Сдвиг: по X/Z и по земле высота над землёй прежняя (объект идёт по рельефу); по Y — меняется h.
+    // Move: along X/Z and along the ground the height above the ground stays (the object follows the terrain); along Y — h changes.
     onMoveDrag(vertical) {
         const rec = this.selected;
         if (!rec || !rec.mesh) return;
@@ -189,8 +189,8 @@ const ObjectsPanel = {
         this.renderHeader();
     },
 
-    // Кольца поворачивают меш (rotation, а если задан — rotationQuaternion); углы —
-    // в rot [x, y, z] градусами, y со знаком курса (rotation.y = −y).
+    // The rings rotate the mesh (rotation, or rotationQuaternion if it is set); the angles go
+    // into rot [x, y, z] in degrees, y with the heading sign (rotation.y = −y).
     onRotateDrag() {
         const rec = this.selected, m = rec && rec.mesh;
         if (!m) return;
@@ -209,7 +209,7 @@ const ObjectsPanel = {
         this.renderHeader();
     },
 
-    // Отпустили: меш — строго по def (округлённые числа, Euler вместо кватерниона гизмо), шаг — в историю.
+    // Released: the mesh — strictly per def (rounded numbers, Euler instead of the gizmo quaternion), the step — into history.
     onGizmoDragEnd() {
         if (this.selected) this.lab.location.placeObject(this.selected);
         this.syncProps();
@@ -217,11 +217,11 @@ const ObjectsPanel = {
         this._dragBefore = null;
     },
 
-    // --- История (history.js) ------------------------------------------------------
+    // --- History (history.js) ------------------------------------------------------
     //
-    // Шаг — пара снимков раскладки до и после: { defs: JSON записей, selected: индекс }.
-    // Тот же набор моделей и видов — поля записей правятся на месте (без пересборки
-    // мешей), иначе объекты пересобираются.
+    // A step — a pair of layout snapshots before and after: { defs: records JSON, selected: index }.
+    // The same set of models and kinds — record fields are edited in place (without rebuilding
+    // the meshes), otherwise the objects are rebuilt.
 
     snapshot() {
         return { defs: JSON.stringify(this.defs()), selected: this.lab.location.objects.indexOf(this.selected) };
@@ -252,7 +252,7 @@ const ObjectsPanel = {
         this.select(loc.objects[snap.selected] || null);
     },
 
-    // --- Правка -----------------------------------------------------------------
+    // --- Editing ----------------------------------------------------------------
 
     addObject(def) {
         const before = this.snapshot();
@@ -276,7 +276,7 @@ const ObjectsPanel = {
     duplicateSelected() {
         const d = this.selected && this.selected.def;
         if (!d) return;
-        const copy = JSON.parse(JSON.stringify(d));   // rot и scale — массивы: копия, не ссылка
+        const copy = JSON.parse(JSON.stringify(d));   // rot and scale are arrays: a copy, not a reference
         this.addObject(Object.assign(copy, { name: this.uniqueName(d.name), x: this.round(d.x + 40, 1), y: this.round(d.y + 40, 1) }));
     },
 
@@ -287,7 +287,7 @@ const ObjectsPanel = {
         this.lab.camera.lookAt(Number(d.x) || 0, Number(d.y) || 0);
     },
 
-    // Вид объекта раздаётся при добавлении в сцену — объект пересобирается на своём месте в списке.
+    // The object kind is assigned on adding to the scene — the object is rebuilt at its own place in the list.
     setKind(kind) {
         const rec = this.selected;
         if (!rec || rec.def.kind === kind) return;
@@ -302,7 +302,7 @@ const ObjectsPanel = {
         this.commit(null, before);
     },
 
-    // Поле выбранного; правки одного поля подряд склеиваются в один шаг истории.
+    // A field of the selected one; consecutive edits of one field are merged into a single history step.
     setField(key, value) {
         const rec = this.selected;
         if (!rec) return;
@@ -312,7 +312,7 @@ const ObjectsPanel = {
         this.commit('field:' + before.selected + ':' + key, before);
     },
 
-    // Анимация выбранного целиком ({ part, axis, speed, dir }); null — снять.
+    // The whole animation of the selected one ({ part, axis, speed, dir }); null — remove.
     setAnim(anim) {
         const rec = this.selected;
         if (!rec) return;
@@ -322,9 +322,19 @@ const ObjectsPanel = {
         this.commit('field:' + before.selected + ':anim', before);
     },
 
-    // Ось по умолчанию: самая тонкая сторона части (крылья, колесо, винт), конец оси —
-    // наружу от центра модели, чтобы «по часовой» было таким, как видно снаружи.
-    // Координаты — файла модели: в них лежат вершины частей, pivot и axes (Model3D).
+    // The looped clip of the selected .glb model; '' — remove (the rest pose).
+    setClip(name) {
+        const rec = this.selected;
+        if (!rec) return;
+        const before = this.snapshot();
+        if (name) rec.def.clip = name;
+        else delete rec.def.clip;
+        this.commit('field:' + before.selected + ':clip', before);
+    },
+
+    // Default axis: the thinnest side of the part (blades, wheel, propeller), the axis end —
+    // outward from the model center, so that "clockwise" is what is seen from outside.
+    // Coordinates — of the model file: part vertices, pivot and axes (Model3D) are in them.
     guessAxis(rec, name) {
         const parts = rec.mesh ? rec.mesh.getChildMeshes(true) : [];
         const mesh = parts.find(m => m.metadata && m.metadata.part === name);
@@ -359,7 +369,8 @@ const ObjectsPanel = {
     },
 
     onKey(e) {
-        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') { this.save(); return; }   // default гасит инспектор
+        if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') { this.save(); return; }   // the default is suppressed by the inspector
+        if (PaneTabs.current === 'ui') return;   // Del, Esc, Ctrl+D belong to the UI tab's element
         const t = e.target;
         if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
         const mode = { Digit1: 'move', Digit2: 'rotate', Digit3: 'scale' }[e.code];
@@ -371,7 +382,7 @@ const ObjectsPanel = {
         else if ((e.ctrlKey || e.metaKey) && e.code === 'KeyD') { e.preventDefault(); this.duplicateSelected(); }
     },
 
-    // --- Файл: импорт, сохранение, откат -------------------------------------------
+    // --- File: import, save, revert ------------------------------------------------
 
     defs() {
         return this.lab.location.objects.map(r => r.def);
@@ -386,7 +397,7 @@ const ObjectsPanel = {
         return r.json();
     },
 
-    // Системный диалог сервера открывается в assets/models; где его нет — выбор файла браузером.
+    // The server's system dialog opens in assets/models; where there is none — a browser file picker.
     async importModel() {
         if (this._importing) return;
         if (!Inspector.saveAvailable) { Toast.show(I18N.t('toast.noSave'), true); return; }
@@ -397,7 +408,7 @@ const ObjectsPanel = {
             if (res.code === 'unsupported') res = await this.uploadModel();
             if (!res || res.code === 'cancelled') return;
             if (!res.ok) throw new Error(Inspector.errorText(res));
-            const t = this.lab.camera.target;
+            const t = this.lab.camera.groundFocus();   // frame center on the ground: in flight the target hangs in the air
             this.addObject({ name: this.uniqueName(res.name), model: res.path, kind: 'prop',
                 x: this.round(t.x, 1), y: this.round(t.y, 1), h: 0, rot: [0, 0, 0], scale: [1, 1, 1] });
             PaneTabs.show('objects');
@@ -414,7 +425,7 @@ const ObjectsPanel = {
         return new Promise((resolve, reject) => {
             const input = document.createElement('input');
             input.type = 'file';
-            input.accept = '.fbx';
+            input.accept = '.fbx,.glb';
             input.addEventListener('cancel', () => resolve({ ok: false, code: 'cancelled' }));
             input.addEventListener('change', () => {
                 const file = input.files && input.files[0];
@@ -532,11 +543,21 @@ const ObjectsPanel = {
         host.appendChild(actions);
     },
 
-    // Секция «Анимация»: часть модели (объект FBX) и её вращение — ось, об/мин, направление.
-    // Модель не догрузилась — частей в списке нет, но сохранённая часть остаётся выбранной.
+    // The "Animation" section. A .glb model — its looped clip (Location3D.playClip reads def.clip
+    // every frame). An FBX model — a part (an FBX object) and its spin: axis, rpm, direction.
+    // The model has not loaded — no parts or clips in the list, but the saved one stays selected.
     renderAnim(host, rec) {
         const a = rec.def.anim;
         host.appendChild(this.el('div', 'props-section', I18N.t('obj.anim')));
+        const clips = rec.mesh ? Model3D.clips(rec.mesh) : null;
+        if (clips || rec.def.clip) {
+            const list = clips ? clips.names() : [];
+            if (rec.def.clip && !list.includes(rec.def.clip)) list.push(rec.def.clip);
+            const clip = this.choice([['', I18N.t('obj.animNone')]].concat(list.map(n => [n, n])), rec.def.clip || '');
+            clip.addEventListener('change', () => this.setClip(clip.value));
+            host.appendChild(this.row('obj.animClip', 'obj.animClipHint', clip));
+            return;
+        }
         const names = rec.mesh ? rec.mesh.getChildMeshes(true).map(m => m.metadata && m.metadata.part).filter(Boolean) : [];
         if (a && !names.includes(a.part)) names.push(a.part);
         const part = this.choice([['', I18N.t('obj.animNone')]].concat(names.map(n => [n, n])), a ? a.part : '');
@@ -569,7 +590,7 @@ const ObjectsPanel = {
         host.appendChild(this.row('obj.animDir', 'obj.animDirHint', dir));
     },
 
-    // Поля выбранного догоняют def (гизмо двигает объект); поле с фокусом не трогаем.
+    // Fields of the selected one catch up with def (the gizmo moves the object); the focused field is left alone.
     syncProps() {
         const els = this.propEls, rec = this.selected;
         if (!els || !rec) return;
@@ -579,7 +600,7 @@ const ObjectsPanel = {
         }
     },
 
-    // Три числовых поля с подписями осей: get(i) — значение, set(i, v) — правка.
+    // Three numeric fields with axis labels: get(i) — the value, set(i, v) — an edit.
     vector(labels, step, get, set) {
         const inputs = [], parts = [];
         labels.forEach((label, i) => {
@@ -596,7 +617,7 @@ const ObjectsPanel = {
         return { inputs, parts };
     },
 
-    // Строка свойства в стиле инспектора: подпись (+ подсказка) и контролы.
+    // A property row in the inspector style: a label (+ hint) and controls.
     row(labelKey, hintKey, ...controls) {
         const row = this.el('div', 'field');
         if (hintKey) row.title = I18N.t(hintKey);
@@ -615,7 +636,7 @@ const ObjectsPanel = {
         return el;
     },
 
-    // <select> из пар [значение, подпись].
+    // A <select> from [value, label] pairs.
     choice(options, value) {
         const sel = document.createElement('select');
         for (const [v, label] of options) {
@@ -644,24 +665,28 @@ const ObjectsPanel = {
     },
 };
 
-// Вкладки правой панели: Global Settings (Constants.js) и Objects (Objects.js).
-// Открытая вкладка запоминается в localStorage.
+// Right pane tabs: Global Settings (Constants.js), Objects (Objects.js) and UI (UILayout.js).
+// The open tab is remembered in localStorage; a switch — the window 'pane-tab' event.
 /** @satisfies {Record<string, any>} */
 const PaneTabs = {
     KEY: 'arcengine.editor.tab',
+    TABS: ['settings', 'objects', 'ui'],
+    current: 'settings',
 
     init() {
         for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#pane-tabs [data-tab]'))) {
             btn.addEventListener('click', () => this.show(btn.dataset.tab));
         }
         let saved = null;
-        try { saved = localStorage.getItem(this.KEY); } catch (e) { /* хранилище закрыто */ }
-        this.show(saved === 'objects' ? 'objects' : 'settings');
+        try { saved = localStorage.getItem(this.KEY); } catch (e) { /* storage is unavailable */ }
+        this.show(this.TABS.includes(saved) ? saved : 'settings');
     },
 
     show(tab) {
+        this.current = tab;
         for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#pane-tabs [data-tab]'))) btn.classList.toggle('active', btn.dataset.tab === tab);
         for (const panel of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.pane-panel'))) panel.hidden = panel.dataset.tab !== tab;
-        try { localStorage.setItem(this.KEY, tab); } catch (e) { /* выбор проживёт до F5 */ }
+        try { localStorage.setItem(this.KEY, tab); } catch (e) { /* the choice will last until F5 */ }
+        window.dispatchEvent(new CustomEvent('pane-tab', { detail: tab }));
     },
 };

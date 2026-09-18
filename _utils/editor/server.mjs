@@ -1,21 +1,22 @@
 // ============================================================================
-//  ArcEngine — сервер РЕДАКТОРА (_utils/editor). Node, без зависимостей.
+//  ArcEngine — the EDITOR server (_utils/editor). Node, no dependencies.
 // ----------------------------------------------------------------------------
-//  Зачем отдельный сервер, а не tools/dev-server.mjs:
-//   1. редактору нужен POST /api/save-constants — точечный патч чисел в
-//      Constants.js (иначе «Сохранить» некуда);
-//   2. свой порт (8090+), чтобы жить рядом с игрой на 8080.
-//  Статика раздаётся от КОРНЯ ПРОЕКТА (редактор грузит /js/Constants.js,
-//  /js/World3D.js, /assets/* игры напрямую), с no-store — как в dev-server.
+//  Why a separate server instead of tools/dev-server.mjs:
+//   1. the editor needs POST /api/save-constants — a pinpoint patch of numbers in
+//      Constants.js (otherwise "Save" has nowhere to go);
+//   2. its own port (8090+), to live next to the game on 8080.
+//  Static files are served from the PROJECT ROOT (the editor loads the game's
+//  /js/Constants.js, /js/World3D.js, /assets/* directly), with no-store — as in dev-server.
 //
-//  Запись файлов игры — save.mjs (патч Constants.js, Objects.js целиком, бэкапы).
+//  Writing game files — save.mjs (Constants.js patch, the whole Objects.js and UILayout.js,
+//  backups). POST /api/save-ui — UILayout.js from a validated element list (UI tab).
 //
-//  Объекты локации (вкладка Objects):
-//   - POST /api/save-objects — Objects.js из проверенного списка;
-//   - POST /api/pick-model — системный диалог выбора .fbx, открытый в
-//     assets/models (Windows: PowerShell + WinForms); файл не из assets/
-//     копируется в assets/models. Другие ОС — code 'unsupported', клиент шлёт
-//     файл сам: POST /api/import-model?name=<имя> с байтами файла.
+//  Location objects (Objects tab):
+//   - POST /api/save-objects — Objects.js from a validated list;
+//   - POST /api/pick-model — a system model (.fbx, .glb) picker dialog opened in
+//     assets/models (Windows: PowerShell + WinForms); a file from outside assets/
+//     is copied to assets/models. Other OSes — code 'unsupported', the client sends
+//     the file itself: POST /api/import-model?name=<name> with the file bytes.
 // ============================================================================
 import http from 'node:http';
 import fs from 'node:fs';
@@ -23,11 +24,11 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import url from 'node:url';
 import { execFile } from 'node:child_process';
-import { failure, isModelPath, saveConstants, saveObjects } from './save.mjs';
+import { failure, isModelPath, saveConstants, saveObjects, saveUI } from './save.mjs';
 
-// Версия серверного контракта. Поднимать при КАЖДОМ изменении эндпоинтов или
-// формата ответа — клиент сверяет её с EDITOR_API_VERSION в schema.js.
-const EDITOR_API_VERSION = 18;
+// Server contract version. Bump on EVERY change of the endpoints or the
+// response format — the client checks it against EDITOR_API_VERSION in schema.js.
+const EDITOR_API_VERSION = 19;
 
 const ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..');
 const MODELS_DIR = path.join(ROOT, 'assets', 'models');
@@ -63,14 +64,16 @@ const C = {
   red: '\x1b[31m', grn: '\x1b[32m', ylw: '\x1b[33m', cyn: '\x1b[36m',
 };
 
-// --- Импорт моделей: assets/models/ -------------------------------------------
+// --- Model import: assets/models/ ---------------------------------------------
 
-// Байты модели -> путь 'assets/…'. Файл уже внутри assets/ с годным путём берётся
-// как есть; иначе копируется в assets/models/ (имя — латиница без пробелов; тот же
-// файл повторно не копируется, другой с тем же именем получает суффикс -2, -3…).
+// Model bytes -> an assets/… path. A file already inside assets/ with a valid path is taken
+// as is; otherwise it is copied to assets/models/ (name — Latin letters, no spaces; the same
+// file is not copied again, a different one with the same name gets a suffix -2, -3…).
 async function storeModel(data, fileName, srcPath) {
-  if (path.extname(fileName).toLowerCase() !== '.fbx') return failure('not_fbx');
-  if (data.subarray(0, 18).toString('latin1') !== 'Kaydara FBX Binary') return failure('not_binary');
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext !== '.fbx' && ext !== '.glb') return failure('not_model');
+  if (ext === '.fbx' && data.subarray(0, 18).toString('latin1') !== 'Kaydara FBX Binary') return failure('not_binary');
+  if (ext === '.glb' && data.subarray(0, 4).toString('latin1') !== 'glTF') return failure('not_glb');
   const label = path.basename(fileName, path.extname(fileName));
   if (srcPath) {
     const rel = path.relative(ROOT, srcPath).split(path.sep).join('/');
@@ -79,26 +82,26 @@ async function storeModel(data, fileName, srcPath) {
   await fsp.mkdir(MODELS_DIR, { recursive: true });
   const base = label.normalize('NFKD').replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'model';
   for (let i = 1; ; i++) {
-    const file = base + (i > 1 ? '-' + i : '') + '.fbx';
+    const file = base + (i > 1 ? '-' + i : '') + ext;
     const dest = path.join(MODELS_DIR, file);
     let existing = null;
-    try { existing = await fsp.readFile(dest); } catch { /* имя свободно */ }
+    try { existing = await fsp.readFile(dest); } catch { /* the name is free */ }
     if (existing && !existing.equals(data)) continue;
     if (!existing) await fsp.writeFile(dest, data);
     return { ok: true, path: 'assets/models/' + file, name: label, copied: !existing };
   }
 }
 
-// Системный диалог выбора .fbx, открытый в папке dir. Windows — PowerShell +
-// WinForms (-STA обязателен); путь и заголовок идут через env — без экранирования.
-// Невидимое окно-владелец TopMost: иначе диалог открывается за браузером.
+// A system model (.fbx, .glb) picker dialog opened in the dir folder. Windows — PowerShell +
+// WinForms (-STA is required); the path and the title go through env — no escaping.
+// An invisible TopMost owner window: otherwise the dialog opens behind the browser.
 function openFileDialog(dir, title) {
   if (process.platform !== 'win32') return Promise.resolve({ unsupported: true });
   const script = [
     '[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false',
     'Add-Type -AssemblyName System.Windows.Forms',
     '$d = New-Object System.Windows.Forms.OpenFileDialog',
-    "$d.Filter = 'FBX (*.fbx)|*.fbx'",
+    "$d.Filter = 'Models (*.fbx;*.glb)|*.fbx;*.glb'",
     '$d.InitialDirectory = $env:ARC_DIALOG_DIR',
     '$d.Title = $env:ARC_DIALOG_TITLE',
     '$w = New-Object System.Windows.Forms.Form -Property @{ TopMost = $true; ShowInTaskbar = $false }',
@@ -115,7 +118,7 @@ function openFileDialog(dir, title) {
 
 async function pickModel(title) {
   await fsp.mkdir(MODELS_DIR, { recursive: true });
-  const r = await openFileDialog(MODELS_DIR, String(title || 'Import FBX').slice(0, 120));
+  const r = await openFileDialog(MODELS_DIR, String(title || 'Import model').slice(0, 120));
   if (r.unsupported) return failure('unsupported');
   if (r.error) return failure('dialog_failed', { detail: r.error });
   if (!r.file) return { ok: false, code: 'cancelled' };
@@ -162,7 +165,7 @@ const server = http.createServer(async (req, res) => {
     return send(res, 400, { 'Content-Type': 'text/plain' }, 'Bad URL');
   }
 
-  // --- API редактора ---
+  // --- Editor API ---
   if (pathname === '/api/status') {
     return sendJson(res, 200, { ok: true, editor: 'arcengine', api: EDITOR_API_VERSION, root: ROOT });
   }
@@ -195,6 +198,19 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 500, { ok: false, error: e.message });
     }
   }
+  if (pathname === '/api/save-ui') {
+    if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
+    try {
+      const body = JSON.parse(await readBody(req) || '{}');
+      const result = await saveUI(ROOT, body.elements);
+      if (result.ok) console.log(`  ${C.grn}save${C.r} ${result.count} UI element(s) -> UILayout.js ${C.dim}(backup: ${result.backup})${C.r}`);
+      else console.log(`  ${C.ylw}skip${C.r} UILayout.js: ${result.error} (#${result.index})`);
+      return sendJson(res, 200, result);
+    } catch (e) {
+      console.log(`  ${C.red}save FAILED${C.r} ${e.message}`);
+      return sendJson(res, 500, { ok: false, error: e.message });
+    }
+  }
   if (pathname === '/api/pick-model' || pathname === '/api/import-model') {
     if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
     try {
@@ -214,7 +230,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // --- Статика от корня проекта ---
+  // --- Static files from the project root ---
   if (pathname === '/') {
     return send(res, 302, { Location: EDITOR_URL_PATH });
   }
@@ -231,7 +247,7 @@ const server = http.createServer(async (req, res) => {
   try {
     st = await fsp.stat(filePath);
   } catch {
-    // Иконку браузер просит сам; у редактора её нет.
+    // The browser requests the icon on its own; the editor has none.
     if (pathname === '/favicon.ico') return send(res, 204, { 'Cache-Control': 'no-store' });
     console.log(`  ${C.red}404${C.r} ${pathname}`);
     return send(res, 404, { 'Content-Type': 'text/plain; charset=utf-8' }, 'Not found: ' + pathname);
@@ -248,7 +264,7 @@ const server = http.createServer(async (req, res) => {
   fs.createReadStream(filePath).pipe(res);
 });
 
-// Порт занят -> пробуем следующий, до +20 (как в tools/dev-server.mjs).
+// Port busy -> try the next one, up to +20 (as in tools/dev-server.mjs).
 function listen(port, attempt = 0) {
   server.once('error', err => {
     if (err.code === 'EADDRINUSE' && attempt < 20) {
@@ -265,7 +281,7 @@ function listen(port, attempt = 0) {
     console.log(`  ${C.grn}${C.b}${addr}${C.r}`);
     console.log(`${C.dim}  root: ${ROOT}${C.r}`);
     console.log(`${C.dim}  saving: patches Constants.js, writes Objects.js, backups in _utils/.backups/${C.r}`);
-    console.log(`${C.dim}  models: assets/models/ (Import FBX)${C.r}`);
+    console.log(`${C.dim}  models: assets/models/ (Import model)${C.r}`);
     console.log(`${C.dim}  Ctrl+C to stop${C.r}\n`);
     if (!NO_OPEN) {
       const cmd = process.platform === 'win32' ? 'cmd' : (process.platform === 'darwin' ? 'open' : 'xdg-open');

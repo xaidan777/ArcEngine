@@ -1,50 +1,54 @@
 ---
 name: world3d
-description: 3D-движок набора — World3D (движок, View3D, свет, тени, toon-шейдер, контур и обводка, addObject), Terrain3D (земля), Location3D (локация), CameraControl (камера). Читать перед правками World3D.js, Terrain3D.js, Location3D.js, CameraControl.js, main.js и блоков CAMERA_*/WORLD3D_*/TERRAIN_*/LOCATION_* в Constants.js, а также перед добавлением объектов в сцену.
+description: The kit's 3D engine — World3D (engine, View3D, light, shadows, toon shader, ink edges and silhouette outline, addObject), Terrain3D (ground), Location3D (location), Model3D and Gltf3D (FBX and GLB models, skeleton, animation clips), CameraControl (camera), Game.js (sample game). Read before editing World3D.js, Terrain3D.js, Location3D.js, Model3D.js, Gltf3D.js, CameraControl.js, Game.js, main.js and the CAMERA_*/WORLD3D_*/TERRAIN_*/LOCATION_* blocks of Constants.js, before adding objects or animated characters to the scene.
 ---
 
-# 3D-мир: World3D, Terrain3D, Location3D, камера
+# 3D world: World3D, Terrain3D, Location3D, camera
 
-Babylon.js 9.26 (`libs/babylon.js`, UMD, глобал `BABYLON`), без сборки. Цикл кадра
-держит владелец: `main.js` в игре, `_utils/editor/lab.js` в редакторе.
+Babylon.js 9.26 (`libs/babylon.js`, UMD, global `BABYLON`), no build step. The frame loop
+belongs to the owner: `main.js` in the game, `_utils/editor/lab.js` in the editor.
 
 ```
-main.js: World3D.init(canvas) -> new Location3D() -> new CameraController(view)
-         runRenderLoop: location.update(dt) -> camera.update(dt) -> World3D.renderFrame()
+main.js: World3D.init(canvas) -> new Location3D() -> new CameraController(view) -> UI.init(canvas) -> new Game(app)
+         runRenderLoop: game.update(dt) -> location.update(dt) -> camera.update(dt) -> World3D.renderFrame()
 ```
 
-## Файлы (`js/`)
+## Files (`js/`)
 
-| Файл | Что |
+| File | What |
 |---|---|
-| `World3D.js` | `World3D`: `init(canvas)`, `renderFrame()`, `createView(opts)`, `cfg()` (все константы рендера), `applyRenderConstants(view)`, `addObject/removeObject`, контур (`inkMesh`), обводка (`outlineAdd/Remove`, тон по туману `outlineFog`, `fogFactor`), `sunDirection()`, `hexColor3()`. `ArcToonPlugin` + `World3D.toon` (объект `ArcToon`). `View3D`: сцена, камера, свет, тени, `pointerToGround`, `projectToScreen`, `dispose` |
-| `Terrain3D.js` | поле высот из шума, сетка `[0..W]×[0..H]`, кольцо земли за краем, `heightAt`, `tiltAt`, `setGroundImage`, `applyTileSize` |
-| `Location3D.js` | локация = `View3D` + `Terrain3D` + текстура земли (`GROUNDS`) + объекты (`opts.objects` = `LOCATION_OBJECTS`); `ready` (промис: земля, модели, шейдеры), `buildTerrain()` (объекты встают на новую землю), `loadGround()`, `objects` (`{ def, mesh, error, loaded }`), `addObject(def)`, `placeObject(rec)`, `removeObject(rec)`, `update(dt)` (каждый кадр: `spinPart` по `def.anim`) |
-| `Model3D.js` | бинарный FBX -> меши: `load(url)` (разбор с кэшем), `build(model, scene, { name })` (корень без геометрии, части с `MultiMaterial`; у меша части `metadata = { part, pivot, axes }` — имя объекта FBX, его origin и единичные локальные оси в координатах файла), `dispose(view, root)` (с материалами). 1 см файла = 1 px, начало координат — из файла |
-| `Objects.js` | `LOCATION_OBJECTS`: `{ name, model: 'assets/models/….fbx', kind, x, y, h, rot: [x, y, z]°, scale: [x, y, z], anim? }`; `rot[1]` — курс (`rotation.y = −rot[1]`); `anim: { part, axis: 'x'\|'-x'\|'y'\|…, speed: об/мин, dir: 'cw'\|'ccw' }`. Пишет редактор |
-| `CameraControl.js` | `CameraController`: цель, азимут, наклон, зум; DOM-ввод; игровой и свободный режимы; `ignorePointer(e)` — нажатие не для камеры |
+| `World3D.js` | `World3D`: `init(canvas)`, `renderFrame()`, `createView(opts)`, `cfg()` (all render constants), `applyRenderConstants(view)`, `addObject/removeObject`, ink edges (`inkMesh`), outline (`outlineAdd/Remove`, fog tint `outlineFog`, `fogFactor`), `sunDirection()`, `hexColor3()`. `ArcToonPlugin` + `World3D.toon` (the `ArcToon` object). `View3D`: scene, camera, light, shadows, `pointerToGround`, `projectToScreen`, `dispose` |
+| `Terrain3D.js` | height field from noise, grid `[0..W]×[0..H]`, ground ring beyond the edge, `heightAt`, `tiltAt`, `setGroundImage`, `applyTileSize` |
+| `Location3D.js` | location = `View3D` + `Terrain3D` + ground texture (`GROUNDS`) + objects (`opts.objects` = `LOCATION_OBJECTS`); `ready` (promise: ground, models, shaders), `buildTerrain()` (objects settle on the new ground), `loadGround()`, `objects` (`{ def, mesh, error, loaded }`), `addObject(def)`, `placeObject(rec)`, `removeObject(rec)`, `update(dt)` (every frame: `spinPart` per `def.anim`, `playClip` per `def.clip`) |
+| `Model3D.js` | binary FBX -> meshes: `load(url)` (parse with cache), `build(model, scene, { name })` (root without geometry, parts with `MultiMaterial`; a part mesh has `metadata = { part, pivot, axes }` — FBX object name, its origin and unit local axes in file coordinates), `dispose(view, root)` (with materials). 1 cm in the file = 1 px, the origin comes from the file. A `.glb` / `.gltf` url goes through the same `load(url, scene)` / `build` / `dispose` into `Gltf3D`; `clips(root)` — its `Clips3D` (null for FBX) |
+| `Gltf3D.js` | glTF/GLB through Babylon's loader (`libs/babylonjs.loaders.min.js`): skeleton, textures, animation clips; PBR -> `StandardMaterial` for the toon shader. `Clips3D`: `names()`, `has(name)`, `play(name, { loop, speed, blend, then })`, `stop()`, `current` — §GLB models |
+| `Objects.js` | `LOCATION_OBJECTS`: `{ name, model: 'assets/models/….fbx' \| '….glb', kind, x, y, h, rot: [x, y, z]°, scale: [x, y, z], anim?, clip? }`; `rot[1]` is the heading (`rotation.y = −rot[1]`); `anim: { part, axis: 'x'\|'-x'\|'y'\|…, speed: rpm, dir: 'cw'\|'ccw' }` (FBX part spin); `clip: 'idle'` — looped clip of a GLB. Written by the editor |
+| `Game.js` | the sample game — where game logic starts: `constructor(app)`, `update(dt)` before the render; keeps its own state (`running`, `energy`) and shows it through `Model3D.clips` and `UI.get` (skill `ui`) |
+| `Debug3D.js` | dev tools, inert until called: `lint(view?)` (inside-out meshes, normal map convention, light limit and sun order, WebGL2 shader limits, heavy meshes, blank frame — zero findings on the kit's scene), `hold(pose)`/`release()` (a view that bypasses the camera controller, eye kept above the ground), `frames(n)`, `bench()`/`benchToggle(target)`, `setMode('backfaces' \| 'normals' \| 'wireframe' \| 'off')`. Skills `render-conventions` and `verify` |
+| `CameraControl.js` | `CameraController`: target, azimuth, pitch, zoom; DOM input; game and free modes; `ignorePointer(e)` — a press that is not for the camera |
 
-## Координаты
+## Coordinates
 
-| Карта (px) | Babylon | |
+| Map (px) | Babylon | |
 |---|---|---|
-| `x` | `position.x` | вправо |
-| `y` | `position.z` | вниз по карте = +Z |
-| высота | `position.y` | вверх |
-| курс `heading` (рад, `atan2(vy, vx)`) | `rotation.y = -heading` | нос модели вдоль +X |
+| `x` | `position.x` | right |
+| `y` | `position.z` | down the map = +Z |
+| height | `position.y` | up |
+| `heading` (rad, `atan2(vy, vx)`) | `rotation.y = -heading` | model nose along +X |
 
-Сцена **правосторонняя** (`useRightHandedSystem`): в левосторонней мир выходил
-зеркальным. «Вправо на экране» при азимуте `az` — `(−sin az, cos az)`; единственное
-место со знаком — `CameraController.screenDeltaToWorld/worldDeltaToScreen`.
+The scene is **right-handed** (`useRightHandedSystem`): left-handed, the world came out
+mirrored. "Right on screen" at azimuth `az` is `(−sin az, cos az)`; the only place with
+that sign is `CameraController.screenDeltaToWorld/worldDeltaToScreen`.
 
-Проекции — только через `View3D`:
-- `pointerToGround(px, py, h, terrain?)` — CSS px канваса -> `{x, y}` карты: с
-  `terrain` — пересечение с рельефом (марш + бисекция), без — плоскость `Y = h`;
-  `null` — луч в небо. `createPickingRay` ждёт CSS px: масштаб рендера он учитывает сам.
-- `projectToScreen(x, y, h)` -> `{x, y, visible, behind}` в CSS px.
-- Камеру двигали, кадр не рисовался — сначала `view.refreshMatrices()`.
+Projections — only through `View3D`:
+- `pointerToGround(px, py, h, terrain?)` — canvas CSS px -> map `{x, y}`: with `terrain` —
+  intersection with the terrain (march + bisection), without — the plane `Y = h`;
+  `null` — the ray goes into the sky. `createPickingRay` expects CSS px: it accounts for the
+  render scale itself.
+- `projectToScreen(x, y, h)` -> `{x, y, visible, behind}` in CSS px.
+- Camera moved but no frame rendered yet — call `view.refreshMatrices()` first.
 
-## Объекты мира
+## World objects
 
 ```js
 const mesh = BABYLON.MeshBuilder.CreateBox('crate', { size: 64 }, location.view.scene);
@@ -52,151 +56,205 @@ mesh.material = new BABYLON.StandardMaterial('crate-mat', location.view.scene);
 World3D.addObject(location.view, mesh, 'prop');          // 'actor' | 'prop'
 mesh.position.set(x, location.terrain.heightAt(x, y) + 32, y);
 // ...
-World3D.removeObject(location.view, mesh);               // материалы — забота владельца
+World3D.removeObject(location.view, mesh);               // materials are the owner's job
 ```
 
-`addObject` раздаёт материалам группу (`metadata.toonGroup`: блик из констант,
-toon), ставит корень в карту теней, рёбра — в контур, все части — в ОДИН слой
-обводки (линия по общему силуэту). `actor` — главные объекты кадра (уровень 1
-контура/обводки), `prop` — окружение (уровень 2). Земля — группа `ground`.
+`addObject` assigns the materials a group (`metadata.toonGroup`: specular from constants,
+toon), puts the root into the shadow map, the edges into the ink edges, and all parts into
+ONE outline layer (the line follows the common silhouette). `actor` — main objects of the
+frame (ink/outline level 1), `prop` — environment (level 2). The ground is group `ground`.
 
-Всё, что создано в сцене, умирает с `view.dispose()`. Отдельный `removeObject`
-нужен только тому, что умирает раньше сцены.
+Everything created in the scene dies with `view.dispose()`. A separate `removeObject` is
+needed only for what dies before the scene.
 
-## Свет, тени, toon, контур
+## Light, shadows, toon, ink edges
 
-Все числа рендера читает ОДНО место — `World3D.cfg()` (typeof по каждому имени +
-дефолт: в игре константы лексические, в редакторе — `window`).
-`applyRenderConstants(view)` применяет их к живой сцене без пересборки.
+All render numbers are read in ONE place — `World3D.cfg()` (typeof per name + default: in
+the game the constants are lexical, in the editor they live on `window`).
+`applyRenderConstants(view)` applies them to the live scene without a rebuild.
 
-- **Свет:** `HemisphericLight` (небо) создаётся ПЕРВЫМ, `DirectionalLight` (солнце)
-  — последним. Ровная земля ≈1.0 при `SUN 0.8 + SKYLIGHT 0.45`; суммы > ~1.2 клампятся в белый.
-- **Тени:** `ShadowGenerator`, darkness всегда 0 — цвет и силу тени красит плагин
-  (define `ARCSHADOW`): свет в тени = свет без тени × `mix(1, SHADOW_COLOR, STRENGTH)`.
-  Ортокадр солнца ездит за целью камеры и ужимается по ГАБАРИТАМ кастеров
-  (`fitShadowFrustum`: bounding box в мире + высота × cos высоты солнца, квант 32 px,
-  центр по сетке текселей, гистерезис). По позициям кадр резал тень большой модели.
-  `shadowMinZ/MaxZ = LIGHT_DIST ∓ 1200` — узкий диапазон, иначе тени пропадают.
-  «Акне» (полосы и «пила» на гранях под острым углом к солнцу) гасит смещение по
-  нормали `WORLD3D_SHADOW_NORMAL_BIAS` — в ТЕКСЕЛЯХ карты: кадр «дышит» (140–720 px),
-  в px его пересчитывает `updateLightFrustum`. PCF сравнивает глубину и на соседних
-  текселях, поэтому `applyLighting` сам прибавляет радиус фильтра края (`WORLD3D_SHADOW_SOFT`
-  1/2/3 — 0.5/1.5/2.5 текселя): без этого на мягком крае «пила» возвращалась.
-- **Toon:** `ArcToonPlugin` (плагин `StandardMaterial`), регистрируется в
-  `World3D.init` ДО первой сцены — вешается на материалы при создании. Врезка —
-  после строки `aggShadow=aggShadow/numLights;` в `default.fragment`: яркость
-  `diffuseBase` квантуется в ступени, блик — порогом, ободок — fresnel.
-  Значения — uniform'ами, вкл/выкл `WORLD3D_TOON` — `markAllDefinesAsDirty`.
-  `metadata.toon = false` снимает ступени с материала; unlit не трогается.
-- **Контур рёбер:** `EdgesRenderer` (`inkMesh`), `checkVerticesInsteadOfIndices` —
-  у lowpoly треугольники разъединены. Толщина ≈ мировые px × 100.
-- **Обводка силуэта:** `HighlightLayer` с `isStroke`, слой на пару «вид × группа
-  рендера» (`view._outlines['actor@0']`, `meshes`: меш -> его цвет линии). Толщина в
-  экранных px. Часть toon-вида: при `WORLD3D_TOON = 0` (галочка «toon shader»
-  редактора) `outlineAdd` меш не ставит, `applyOutlines` снимает и возвращает обводку
-  живо; контур рёбер от `WORLD3D_TOON` не зависит. Линия ложится на готовый кадр — туман сцены её не касается, поэтому
-  `outlineFog` (из `renderFrame`, до `scene.render()`) каждый кадр красит линию меша
-  формулой тумана Babylon: `mix(fogColor, WORLD3D_TOON_INK_COLOR, f)`, `f` — по
-  расстоянию от камеры до центра меша (`fogFactor`). Своих констант нет. Тон один на
-  меш: у меша с инстансами (thin или обычными) центр габарита — середина всей
-  россыпи, поэтому расстояние берётся до точки взгляда камеры (`camera.getTarget()`).
-  Фон маски слоя (`hl.neutralColor`) — самый тёмный тон его мешей с альфой 0.
+- **Light:** `HemisphericLight` (sky) is created FIRST, `DirectionalLight` (sun) — last.
+  Flat ground ≈1.0 at `SUN 0.8 + SKYLIGHT 0.45`; sums > ~1.2 clamp to white.
+- **Shadows:** `ShadowGenerator`, darkness always 0 — shadow color and strength are painted
+  by the plugin (define `ARCSHADOW`): light in shadow = unshadowed light × `mix(1, SHADOW_COLOR, STRENGTH)`.
+  The sun's ortho frustum follows the camera target and shrinks to the caster BOUNDS
+  (`fitShadowFrustum`: world bounding box + height × cos of sun elevation, 32 px quantum,
+  center snapped to the texel grid, hysteresis). Fitting by positions cut the shadow of a big model.
+  `shadowMinZ/MaxZ = LIGHT_DIST ∓ 1200` — a narrow range, otherwise shadows vanish.
+  Shadow acne (stripes and a sawtooth on faces at a sharp angle to the sun) is removed by the
+  normal offset `WORLD3D_SHADOW_NORMAL_BIAS` — in shadow map TEXELS: the frustum "breathes"
+  (140–720 px), `updateLightFrustum` converts it to px. PCF also compares depth at the
+  neighbouring texels, so `applyLighting` itself adds the edge filter radius (`WORLD3D_SHADOW_SOFT`
+  1/2/3 — 0.5/1.5/2.5 texels): without it the sawtooth came back on a soft edge.
+- **Toon:** `ArcToonPlugin` (a `StandardMaterial` plugin), registered in `World3D.init`
+  BEFORE the first scene — it attaches to materials on creation. Injection point — after the
+  line `aggShadow=aggShadow/numLights;` in `default.fragment`: `diffuseBase` brightness is
+  quantized into bands, specular by a threshold, rim light by fresnel. Values go in as
+  uniforms; toggling `WORLD3D_TOON` — `markAllDefinesAsDirty`.
+  `metadata.toon = false` removes bands from a material; unlit materials are left alone.
+- **Ink edges:** `EdgesRenderer` (`inkMesh`), `checkVerticesInsteadOfIndices` — lowpoly
+  triangles are disconnected. Width ≈ world px × 100.
+- **Silhouette outline:** `HighlightLayer` with `isStroke`, one layer per "view × rendering
+  group" pair (`view._outlines['actor@0']`, `meshes`: mesh -> its line color). Width in screen
+  px. Part of the toon look: at `WORLD3D_TOON = 0` (the editor's "toon shader" checkbox)
+  `outlineAdd` does not add the mesh, `applyOutlines` removes and restores the outline live;
+  ink edges do not depend on `WORLD3D_TOON`. The line is drawn over the finished frame — scene
+  fog does not touch it, so `outlineFog` (from `renderFrame`, before `scene.render()`) tints
+  each mesh's line every frame with Babylon's fog formula: `mix(fogColor, WORLD3D_TOON_INK_COLOR, f)`,
+  `f` — by the distance from the camera to the mesh center (`fogFactor`). No constants of its
+  own. One tint per mesh: for a mesh with instances (thin or regular) the bounds center is the
+  middle of the whole scatter, so the distance is taken to the camera look-at point
+  (`camera.getTarget()`). The layer's mask background (`hl.neutralColor`) is the darkest tint
+  among its meshes with alpha 0.
 
-## Terrain3D и Location3D
+## Terrain3D and Location3D
 
-- Высота = `TERRAIN_BASE + шум` (две октавы). `heightAt` интерполирует ПО ТЕМ ЖЕ
-  треугольникам, что меш (диагональ `(i,j)-(i+1,j+1)`); за сеткой — шум, как у кольца.
-- Обход треугольников выбирается проверкой нормали (+Y) и страхуется после
-  `ComputeNormals`; кольцо берёт тот же обход (`_swap`).
-- Материал — тайл (`DynamicTexture`, `invertY = false`), повтор `GROUND_TILE_SIZE`,
-  UV `(x/W, y/H)` у сетки и кольца — шва на краю нет. Кольцо — яркость `WORLD3D_OUTER_TINT`.
-- Мобильные: клетка не мельче 12 px. Террейн — картинка: логика игры высоту у 3D не
-  спрашивает (клетка зависит от устройства).
-- `Location3D` грузит текстуру по `LOCATION_GROUND` из `GROUNDS` — пути
-  ЛИТЕРАЛАМИ (сканер сборщика видит только так); нет файла — земля ровного цвета.
-  В редакторе `assetBase: '/'`, в игре пути относительные.
-- Вращение части (`def.anim`, `spinPart`): меш части с `metadata.part === anim.part` —
-  `setPivotPoint(pivot)` и `rotationQuaternion` вокруг `axes[axis]` (минус — обратный
-  конец); угол копится в `rec.spin`, `def` не трогается. Положительный угол — против
-  часовой, если смотреть с конца оси (сцена правосторонняя): `dir: 'ccw'` → +. Сняли
-  `anim` или сменили часть — кватернион и пивот прежней сбрасываются. Вращается
-  только отдельный объект FBX: в Blender часть — свой объект с origin на оси.
+- Height = `TERRAIN_BASE + noise` (two octaves). `heightAt` interpolates over THE SAME
+  triangles as the mesh (diagonal `(i,j)-(i+1,j+1)`); beyond the grid — noise, like the ring.
+- Triangle winding is picked by a normal check (+Y) and double-checked after
+  `ComputeNormals`; the ring takes the same winding (`_swap`).
+- Material — a tile (`DynamicTexture`, `invertY = false`), repeat `GROUND_TILE_SIZE`,
+  UV `(x/W, y/H)` for both grid and ring — no seam at the edge. Ring brightness — `WORLD3D_OUTER_TINT`.
+- Mobile: cell no finer than 12 px. Terrain is a picture: game logic does not ask 3D for
+  height (the cell depends on the device).
+- `Location3D` loads the texture by `LOCATION_GROUND` from `GROUNDS` — paths as LITERALS
+  (the builder's asset scanner sees only those); file missing — flat-colored ground.
+  In the editor `assetBase: '/'`, in the game paths are relative.
+- Part spin (`def.anim`, `spinPart`): the part mesh with `metadata.part === anim.part` gets
+  `setPivotPoint(pivot)` and a `rotationQuaternion` around `axes[axis]` (minus — the opposite
+  end); the angle accumulates in `rec.spin`, `def` is untouched. A positive angle is
+  counterclockwise as seen from the end of the axis (right-handed scene): `dir: 'ccw'` → +.
+  `anim` removed or part changed — the previous part's quaternion and pivot are reset. Only a
+  separate FBX object spins: in Blender the part is its own object with the origin on the axis.
 
-## Камера
+## GLB models: skeleton and animation clips
 
-Зум — экранных px на мировой px в точке взгляда; `dist = H / (2·tan(fov/2)·zoom)`.
-Камера = цель − (cos az, sin az)·cos(pitch)·dist, высота + sin(pitch)·dist, не ниже земли + 40.
+```js
+const model = await Model3D.load('assets/models/character.glb', view.scene);   // a LITERAL path
+const hero = Model3D.build(model, view.scene, { name: 'hero' });
+World3D.addObject(view, hero, 'actor');
+hero.position.set(x, terrain.heightAt(x, y), y);
+hero.rotation.y = -heading;                       // the model's nose looks along +X, like FBX
+const clips = Model3D.clips(hero);                // Clips3D
+clips.play(moving ? 'run' : 'idle');              // every frame is fine: the current clip is not restarted
+clips.play('attack', { loop: false, then: 'idle' });
+```
 
-| | игровой режим | свободный (`setFree(true)`, редактор) |
+- A model placed in the editor: `rec = app.location.objects.find(o => o.def.name === 'character')`,
+  `Model3D.clips(rec.mesh)` — `rec.mesh` is null until the file has loaded (`rec.loaded`).
+  `def.clip` is the clip the location loops by itself; it acts only when the field CHANGES, so
+  game code may drive the same model.
+- `play` cross-fades from whatever is playing over `MODEL_CLIP_BLEND_SEC` (weights move
+  before the scene's animations, their sum is kept at 1; switching back mid-fade continues from
+  the current weights). `stop()` — the rest pose.
+- Units and axes: glTF is meters with the front along +Z — `build` wraps the file's nodes in
+  a node scaled by 100 (1 cm = 1 px) and turned by 90°. The root it returns is a plain
+  `Mesh` without geometry: position, heading and scale go on it, like for an FBX model.
+- Materials: glTF gives PBR, the toon plugin lives on `StandardMaterial` — every build gets
+  its own `StandardMaterial` (base color linear -> gamma, base color texture, normal map with
+  its invert flags, alpha, culling, `sideOrientation`). The file is loaded once per scene
+  (`AssetContainer`), each `build` instantiates it: own meshes, skeleton and clips.
+- Blender: one armature, actions named `idle`, `run`… pushed to NLA or exported as separate
+  animations, format glTF Binary (`.glb`), +Y up. The kit's `character.glb` is generated by
+  `node tools/make-character.mjs` (skill `build`) — a stand-in to replace.
+- No loader script on the page — a `.glb` fails like a missing file (the object has `error`),
+  the scene lives on.
+
+## Camera
+
+Zoom — screen px per world px at the look-at point; `dist = H / (2·tan(fov/2)·zoom)`.
+Camera = target − (cos az, sin az)·cos(pitch)·dist, height + sin(pitch)·dist, no lower than
+ground + 40 (`EYE_MIN`). The target normally sits on the ground; flight lifts it:
+`target.h = ground + lift` (`lift` may be negative — the target goes under the ground while the
+camera descends). Pitch is the angle below the horizon: negative — looking up.
+
+| | game mode | free (`setFree(true)`, editor) |
 |---|---|---|
-| ЛКМ | не берёт (ввод игры) | орбита; Shift — панорама |
-| ПКМ | орбита, если `CAMERA_ORBIT = 1` | орбита |
-| средняя, палец | панорама «за указателем» | то же |
-| колесо / щипок | зум к курсору в `CAMERA_ZOOM_MIN..MAX` | пределы шире |
-| наклон | `CAMERA_ORBIT_PITCH_*` и край земли не в кадре | 8°..88° |
-| цель | внутри локации | без пределов |
+| WASD, arrows | flight: W/S along the view (pitch included), A/D — strafe; speed `CAMERA_FLY_SPEED` screen px/s (÷ zoom over the world) | same |
+| Q / E | down / up along the world vertical | same |
+| RMB | look around if `CAMERA_ORBIT = 1`: the camera stays, the target swings around it (`_look`); while `follow` is active — orbit around the object | look around |
+| LMB | not taken (game input) | orbit around the target; Shift — pan |
+| middle, finger | pan "follows the pointer" | same |
+| wheel / pinch | zoom to cursor within `CAMERA_ZOOM_MIN..MAX` | wider limits |
+| limits | none by default; `CAMERA_LIMITS = 1`: pitch `CAMERA_ORBIT_PITCH_*` and ground edge kept out of frame, target inside the location, `lift ≤ CAMERA_LIFT_MAX` | none: pitch −85°..88°, orbit not below 8° |
 
-`home()` (клавиша R) — ориентация и зум из констант, цель — `follow`-объект или центр.
-`applyConstants()` перечитывает константы (FOV — сразу). Клавиши (`e.code`: WASD,
-стрелки, R) не перехватываются в полях ввода. Панорама держит точку земли под
-курсором пересечением с плоскостью её высоты, в два прохода.
+`home()` (key R) — orientation and zoom from constants, target — the `follow` object or the
+center, on the ground (`lift = 0`; `lookAt(x, y)` drops `lift` too, `follow` decays it).
+`applyConstants()` re-reads constants (FOV — immediately). Keys (`e.code`: WASD, arrows, Q, E,
+R — `FLY_KEYS`) are not intercepted inside input fields. Flight (`_fly`) moves the target by a
+world vector normalized to the step, keeps absolute height (`_setTarget3` turns it into
+`lift`) and holds the camera above the ground (`_floorEye` raises `lift`, the view direction
+stays). Pan keeps the ground point under the cursor by intersecting the plane at its height,
+in two passes. `groundFocus()` — the ground point at the frame center (`{ x, y, h, k }`): in
+flight it is ahead of the target; the shadow frustum is fitted around it, the editor drops new
+objects there.
 
-## Ловушки (каждая уже стоила итерации)
+## Pitfalls (each one already cost an iteration)
 
-- `emissiveColor` у материала с `emissiveTexture` — ЧЁРНЫЙ, иначе белый прибавится к
-  текстуре и выбелит её. `disableLighting` + `diffuseTexture` рисует чёрным.
-- Вершинные цвета при `disableLighting`: наоборот, `emissiveColor` БЕЛЫЙ — иначе всё чёрное.
-- `clone()` копирует `metadata` по ссылке: у клона контур и обводка писали бы в
-  общий объект (`addObject` раздаёт свои копии).
-- Обводке нужен трафарет: движок поднят с `stencil: true`.
-- Толщина обводки — в текселях размытия (`outlineKernel`), иначе на мобильных линия вчетверо толще.
-- Слой обводки рисует только меши своей группы рендера: слой заводится на каждую группу.
-- `preserveDrawingBuffer: false`: пропущенный кадр показывает мусор — рисовать каждый тик.
-- Инстансы не отбрасывают тени, если в кастерах только прототип: thin instances или
-  каждый инстанс в `addShadowCaster`.
-- Склейка обводки идёт в `ALPHA_PREMULTIPLIED`: шейдер слияния STROKE уже умножает
-  цвет на альфу, а `ALPHA_COMBINE` умножал второй раз — у линии цвета тумана кромка
-  темнее фона, объект вдали растворялся, а «призрак» контура оставался. Режим лежит в
-  приватном `hl._thinEffectLayer._options.alphaBlendingMode`, и `outlineLayer` ставит
-  его ТОЛЬКО на время склейки (`onBeforeComposeObservable` → 7, `onAfterComposeObservable`
-  → 2). Те же опции слой читает при пересоздании текстур (смена размера канваса): с
-  PREMULTIPLIED в опциях цепочка размытия собиралась другой (2 прохода вместо 3),
-  текстура размытия оставалась пустой, и обводка пропадала совсем (так было в редакторе
-  ArcTrack). Опцией конструктора нельзя по той же причине.
-- Фон маски обводки — в тон линии (`outlineFog` ставит `hl.neutralColor`). По
-  умолчанию маска чистится чёрным, и размытие у края маски смешивало с ним цвет
-  линии: при дробной толщине (1.5, 0.5 px) и на мобильных линия цвета тумана
-  получала тёмную кайму. Светлее самого тёмного тона слоя нельзя — размытие берёт
-  самый яркий отсчёт и перекрасило бы линию ближнего объекта. `neutralColor` у слоя
-  свой (`outlineLayer`): по умолчанию все слои делят статический
-  `HighlightLayer.NeutralColor`.
-- Апгрейд Babylon: пропала строка врезки — toon молча перестанет работать (шейдер цел);
-  пропало поле `_thinEffectLayer._options` — вернётся «призрак» контура в тумане.
-- У 90° наклона вырождается `setTarget` — пределы 88–89°.
-- `Model3D`: треугольники пишутся в обратном к FBX порядке (соглашение мешей Babylon,
-  как у `Terrain3D`) — «починишь» обход, и `backFaceCulling` вывернет модель наизнанку.
-  `DiffuseColor` в файле линейный (Blender) — без `toGammaSpace()` краски темнее.
-- Путь `'assets/…'` в кавычках даже в КОММЕНТАРИИ сканер сборщика считает ссылкой на
-  ассет — сборка падает на «пропавшем» файле. В комментариях — без кавычек.
-- `placeObject` сбрасывает `rotationQuaternion`: гизмо редактора может его завести, и
-  тогда `rotation` из `Objects.js` молча не действует.
+- `emissiveColor` of a material with `emissiveTexture` — BLACK, otherwise white is added to
+  the texture and washes it out. `disableLighting` + `diffuseTexture` renders black.
+- Vertex colors with `disableLighting`: the opposite, `emissiveColor` WHITE — otherwise all black.
+- `clone()` copies `metadata` by reference: a clone's ink edges and outline would write into
+  the shared object (`addObject` hands out its own copies).
+- The outline needs a stencil: the engine is created with `stencil: true`.
+- Outline width is in blur texels (`outlineKernel`), otherwise the line is four times thicker on mobile.
+- An outline layer draws only meshes of its rendering group: a layer is created per group.
+- `preserveDrawingBuffer: false`: a skipped frame shows garbage — render every tick.
+- Instances cast no shadows if only the prototype is among the casters: use thin instances or
+  `addShadowCaster` for each instance.
+- The outline compose runs in `ALPHA_PREMULTIPLIED`: the STROKE merge shader already
+  multiplies color by alpha, and `ALPHA_COMBINE` multiplied a second time — a fog-colored
+  line got a rim darker than the background, the far object dissolved while a "ghost" of the
+  line remained. The mode lives in the private `hl._thinEffectLayer._options.alphaBlendingMode`,
+  and `outlineLayer` sets it ONLY for the compose (`onBeforeComposeObservable` → 7,
+  `onAfterComposeObservable` → 2). The layer reads the same options when recreating textures
+  (canvas resize): with PREMULTIPLIED in the options the blur chain was built differently
+  (2 passes instead of 3), the blur texture stayed empty and the outline vanished completely
+  (this happened in the ArcTrack editor). A constructor option is ruled out for the same reason.
+- The outline mask background matches the line tint (`outlineFog` sets `hl.neutralColor`).
+  By default the mask is cleared to black, and the blur at the mask edge mixed it into the line
+  color: at fractional widths (1.5, 0.5 px) and on mobile a fog-colored line got a dark fringe.
+  It must not be lighter than the layer's darkest tint — the blur takes the brightest sample
+  and would recolor the line of a near object. The layer has its own `neutralColor`
+  (`outlineLayer`): by default all layers share the static `HighlightLayer.NeutralColor`.
+- Babylon upgrade: if the injection line disappears, toon silently stops working (the shader
+  stays intact); if the `_thinEffectLayer._options` field disappears, the outline "ghost" in
+  fog comes back.
+- `setTarget` degenerates at ±90° pitch — limits are 88–89° (−85° looking up).
+- Camera math goes through `_eye()` (position from target/azimuth/pitch/zoom), not through
+  `cam.position`: the Babylon camera also carries shake and the ground floor.
+- `Model3D`: triangles are written in reverse FBX order (Babylon mesh convention, same as
+  `Terrain3D`) — "fix" the winding and `backFaceCulling` turns the model inside out.
+  `DiffuseColor` in the file is linear (Blender) — without `toGammaSpace()` colors are darker.
+- A quoted `'assets/…'` path even in a COMMENT is treated by the builder's asset scanner as an
+  asset reference — the build fails on a "missing" file. In comments — no quotes.
+- A skinned mesh gets no ink edges (`addObject` skips `mesh.skeleton`): `EdgesRenderer` builds
+  its lines once from the rest pose, and they stay behind while the bones move the mesh. The
+  silhouette outline and shadows follow the skeleton.
+- glTF front faces are counter-clockwise: the loader marks it with `sideOrientation` on the
+  material — a material made by hand for a glTF mesh must copy it, or the model is inside out
+  (skill `render-conventions`).
+- `placeObject` resets `rotationQuaternion`: the editor gizmo may create one, and then
+  `rotation` from `Objects.js` silently has no effect.
 
-## Константы
+## Constants
 
-Группы в `Constants.js`: `LOCATION_*`/`GROUND_TILE_SIZE`/`TERRAIN_*` (локация),
-`CAMERA_*` (камера), `WORLD3D_*` (рендер). Значения — в файле, их крутит редактор.
+Groups in `Constants.js`: `LOCATION_*`/`GROUND_TILE_SIZE`/`TERRAIN_*` (location),
+`CAMERA_*` (camera), `WORLD3D_*` (render), `MODEL_*` (clips), `UI_*` (skill `ui`), `GAME_*` (the sample game). Values live in the file; the editor tunes them.
 
-## Чеклист правки
+## Edit checklist
 
-1. Новая константа: числовой литерал в `Constants.js` + чтение через `typeof` с
-   дефолтом (`World3D.cfg()` / `CameraController.cfg()`) + строка в `_utils/editor/schema.js`
-   (подписи `{ en, ru }`, скилл `editor`).
-2. Новый скрипт: файл в `js/`, `<script src="js/…">` в `index.html` (после `Constants.js`,
-   до `main.js`) и строка в `CODE_FILES` (`tools/asset-scan.mjs`); редактору — тот же скрипт
-   в его `index.html` (`/js/…`).
-3. Новый объект мира — через `World3D.addObject`; проекции экран↔мир — через `View3D`.
-4. Не трогать: `useRightHandedSystem`, CSS px в `createPickingRay`, порядок света,
-   `shadowMinZ/MaxZ`, проверку нормалей террейна.
-5. `node tools/check.mjs` проходит (типы и тесты, скилл `build`); новое поле на объекте
-   Babylon — в `globals.d.ts`.
-6. Проверить в браузере игру (`run.bat`) и редактор (`editor.bat`): консоль без ошибок.
+1. New constant: numeric literal in `Constants.js` + read via `typeof` with a default
+   (`World3D.cfg()` / `CameraController.cfg()`) + a row in `_utils/editor/schema.js`
+   (labels `{ en, ru }`, skill `editor`).
+2. New script: file in `js/`, `<script src="js/…">` in `index.html` (after `Constants.js`,
+   before `main.js`) and a line in `CODE_FILES` (`tools/asset-scan.mjs`); for the editor — the
+   same script in its `index.html` (`/js/…`).
+3. New world object — through `World3D.addObject`; screen↔world projections — through `View3D`.
+4. Do not touch: `useRightHandedSystem`, CSS px in `createPickingRay`, light order,
+   `shadowMinZ/MaxZ`, the terrain normal check.
+5. `node tools/check.mjs` passes (types and tests, skill `build`); a new field on a Babylon
+   object goes into `globals.d.ts`.
+6. Check the game (`run.bat`) and the editor (`editor.bat`) in the browser: console without errors.
+7. Own geometry, a material with a normal map, a new light or shader: `await Debug3D.lint()` — no
+   errors (skill `render-conventions`); how to look and measure — skill `verify`.

@@ -1,32 +1,32 @@
 // ============================================================================
-//  Сканер ссылок на ассеты. Один источник правды для dev-server и build.
+//  Asset reference scanner. Single source of truth for dev-server and build.
 // ----------------------------------------------------------------------------
-//  В проекте нет сборки и нет манифеста: пути к ассетам живут строковыми
-//  литералами в .js и в CSS внутри index.html. Сканер собирает их все,
-//  сверяет с диском и заодно показывает, что на диске лежит мёртвым грузом.
+//  The project has no build step and no manifest: asset paths live as string
+//  literals in .js and in the CSS inside index.html. The scanner collects them all,
+//  checks them against the disk and also shows what lies on disk as dead weight.
 //
-//  ВАЖНО: путь, собранный из кусков ('assets/' + key + '.png'), сканер НЕ
-//  увидит. Такие места добавлять в EXTRA_REFS ниже руками.
+//  IMPORTANT: a path assembled from pieces ('assets/' + key + '.png') will NOT be
+//  seen by the scanner. Add such places to EXTRA_REFS below by hand.
 //
-//  Ссылка на ПАПКУ ассетом не считается: файлы внутри код собирает из кусков.
-//  Такие ссылки возвращаются отдельно (dirs) и не дают ни «нет ассета», ни
-//  «используется».
+//  A reference to a FOLDER does not count as an asset: the code assembles the files
+//  inside it from pieces. Such references are returned separately (dirs) and produce
+//  neither "missing asset" nor "used".
 // ============================================================================
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
-// Пути, которые нельзя выцепить литералом. Пока пусто — все ссылки литеральные.
+// Paths that cannot be picked up as a literal. Empty for now — all references are literal.
 export const EXTRA_REFS = [];
 
-// Файлы, нужные в сборке, но не являющиеся «ассетами». Новый <script> в
-// index.html = новая строка здесь, иначе файл не попадёт в архив.
+// Files needed in the build that are not "assets". A new <script> in
+// index.html = a new line here, otherwise the file will not get into the archive.
 export const CODE_FILES = [
   'index.html',
-  'js/Constants.js', 'js/Objects.js', 'js/World3D.js', 'js/Terrain3D.js', 'js/CameraControl.js', 'js/Model3D.js', 'js/Location3D.js', 'js/main.js',
-  'libs/simplex-noise.js', 'libs/babylon.js',
+  'js/Constants.js', 'js/Objects.js', 'js/UILayout.js', 'js/World3D.js', 'js/Terrain3D.js', 'js/CameraControl.js', 'js/Model3D.js', 'js/Gltf3D.js', 'js/Location3D.js', 'js/Debug3D.js', 'js/UI.js', 'js/Game.js', 'js/main.js',
+  'libs/simplex-noise.js', 'libs/babylon.js', 'libs/babylonjs.loaders.min.js',
 ];
 
-// Что заведомо не едет в сборку.
+// What definitely does not go into the build.
 export const BUILD_EXCLUDE = [
   'tools', 'build', 'dist', '.git', '.claude', 'claude', '_utils', 'tests',
   'CLAUDE.md', 'run.bat', 'build.bat', 'check.bat', 'upload.bat', 'editor.bat', 'README.md', 'tsconfig.json', 'globals.d.ts',
@@ -46,20 +46,20 @@ async function walk(dir, root, out = []) {
 
 /**
  * @returns {{refs:string[], missing:string[], onDisk:string[], unused:string[]}}
- *   refs    — пути assets/... , на которые ссылается код (нормализованные, без ?v=)
- *   missing — из refs, чего нет на диске  (будущие 404)
- *   onDisk  — всё, что физически лежит в assets/
- *   unused  — лежит на диске, но ни одна ссылка не ведёт  (мёртвый вес архива)
+ *   refs    — assets/... paths referenced by the code (normalized, without ?v=)
+ *   missing — those of refs that are not on disk  (future 404s)
+ *   onDisk  — everything physically present in assets/
+ *   unused  — is on disk, but no reference leads to it  (dead weight of the archive)
  */
 export async function collectRefs(root) {
   const all = await walk(root, root);
 
-  // 1) вытаскиваем литералы
+  // 1) extract the literals
   const refs = new Set(EXTRA_REFS);
   const rx = /['"`]\s*(assets\/[^'"`)\s]+?)\s*['"`)]/g;
   for (const rel of all) {
     if (!SCAN_EXT.has(path.extname(rel).toLowerCase())) continue;
-    if (rel.startsWith('libs/')) continue;           // сторонние библиотеки не трогаем
+    if (rel.startsWith('libs/')) continue;           // third-party libraries are left alone
     const text = await fsp.readFile(path.join(root, rel), 'utf8');
     for (const m of text.matchAll(rx)) {
       refs.add(m[1].split('?')[0].split('#')[0]);
@@ -69,13 +69,13 @@ export async function collectRefs(root) {
   const onDisk  = all.filter(f => f.startsWith('assets/')).sort();
   const diskSet = new Set(onDisk);
 
-  // Папки — не ассеты (см. шапку): выносим из refs, чтобы не считались пропавшими.
+  // Folders are not assets (see the header): taken out of refs so they do not count as missing.
   const dirs = [];
   const fileRefs = [];
   for (const r of [...refs].sort()) {
     const clean = r.replace(/\/+$/, '');
     let isDir = false;
-    try { isDir = (await fsp.stat(path.join(root, clean))).isDirectory(); } catch { /* нет на диске — обычная проверка ниже */ }
+    try { isDir = (await fsp.stat(path.join(root, clean))).isDirectory(); } catch { /* not on disk — the regular check below */ }
     if (isDir) { dirs.push(clean); refs.delete(r); } else fileRefs.push(r);
   }
 

@@ -1,4 +1,4 @@
-// Запись редактором (_utils/editor/save.mjs): патч чисел Constants.js и Objects.js целиком.
+// Editor writes (_utils/editor/save.mjs): number patching of Constants.js and the whole Objects.js.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -28,7 +28,7 @@ const backups = (root, prefix) => {
   return fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.startsWith(prefix + '-')).sort() : [];
 };
 
-// Значения верхнеуровневых const исходника (как их увидит игра).
+// Values of the source's top-level consts (as the game will see them).
 function evalConsts(src, names) {
   const ctx = vm.createContext({ navigator: {}, window: {}, innerWidth: 1, innerHeight: 1 });
   vm.runInContext(src, ctx);
@@ -121,7 +121,7 @@ const MILL = {
 };
 
 function evalObjects(src) {
-  new vm.Script(src, { filename: 'Objects.js' });   // синтаксис — как node --check
+  new vm.Script(src, { filename: 'Objects.js' });   // syntax — like node --check
   return JSON.parse(JSON.stringify(vm.runInContext(src + '\nLOCATION_OBJECTS', vm.createContext({}))));
 }
 
@@ -138,6 +138,14 @@ test('Objects.js: запись читается игрой, числа окру�
     { name: 'bush', model: 'assets/models/Bush_3.fbx', kind: 'actor', x: 1, y: 2, h: 0, rot: [0, 90, 0], scale: [2, 2, 2] },
     { name: 'rock', model: 'assets/rock.FBX', kind: 'prop', x: 3, y: 4, h: -1, rot: [1, 2, 3], scale: [1, 1, 1], anim: { part: 'p', axis: 'z', speed: 0, dir: 'cw' } },
   ]);
+});
+
+test('Objects.js: модель .glb и её клип пишутся, пустой клип — нет', () => {
+  const hero = { name: 'hero', model: 'assets/models/character.glb', kind: 'actor', x: 1, y: 2, h: 0, rot: [0, 0, 0], scale: [1, 1, 1] };
+  const r = formatObjects([{ ...hero, clip: "id'le" }, { ...hero, name: 'npc', clip: '' }]);
+  assert.equal(r.ok, true);
+  assert.deepEqual(evalObjects(r.src), [{ ...hero, clip: 'idle' }, { ...hero, name: 'npc' }]);
+  assert.equal(formatObjects([{ ...hero, model: 'assets/models/character.gltf' }]).code, 'bad_model');
 });
 
 test('Objects.js: кавычки и управляющие символы в имени не ломают файл', () => {

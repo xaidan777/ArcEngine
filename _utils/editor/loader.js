@@ -1,18 +1,18 @@
-// loader.js — загрузка НАСТОЯЩИХ констант игры с возможностью live-правки.
+// loader.js — loading the REAL game constants with live editing possible.
 //
-// Проблема: Constants.js объявляет верхнеуровневые `const` — это лексические
-// глобалы, их нельзя ни переприсвоить, ни перекрыть через window.X (лексическая
-// привязка сильнее свойства window). А модули движка читают константы как
-// свободные переменные (World3D.cfg(), CameraController.cfg()).
+// The problem: Constants.js declares top-level `const`s — these are lexical
+// globals, they can be neither reassigned nor shadowed via window.X (a lexical
+// binding is stronger than a window property). And the engine modules read constants as
+// free variables (World3D.cfg(), CameraController.cfg()).
 //
-// Решение: тянем исходник Constants.js по сети, меняем `const ` на `var `
-// (только в началах строк — внутренние const в IIFE не трогаются) и исполняем
-// косвенным eval в глобальной области. Верхнеуровневый var в sloppy mode
-// создаёт ПЕРЕЗАПИСЫВАЕМЫЕ свойства window — инспектор правит их напрямую,
-// и модули видят новое значение при следующем чтении.
+// The solution: fetch the Constants.js source over the network, replace `const ` with `var `
+// (only at line starts — inner consts inside IIFEs are not touched) and execute it
+// with an indirect eval in the global scope. A top-level var in sloppy mode
+// creates WRITABLE window properties — the inspector edits them directly,
+// and the modules see the new value on the next read.
 //
-// Сам файл при этом не меняется — правки уезжают в него только по кнопке
-// «Сохранить» через POST /api/save-constants.
+// The file itself is not changed by this — edits go into it only on the
+// "Save" button through POST /api/save-constants.
 
 /** @satisfies {Record<string, any>} */
 const EditorLoader = {
@@ -22,7 +22,7 @@ const EditorLoader = {
         let src = await resp.text();
         src = src.replace(/^\uFEFF/, '');
         src = src.replace(/^const\s+/gm, 'var ');
-        (0, eval)(src); // косвенный eval = глобальная область видимости
+        (0, eval)(src); // indirect eval = global scope
         if (typeof /** @type {any} */ (window).WORLD3D_TOON !== 'number') {
             throw new Error(I18N.t('boot.badConstants'));
         }

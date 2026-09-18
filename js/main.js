@@ -1,13 +1,13 @@
-// main.js — точка входа: 3D-движок -> локация с объектами из Objects.js -> камера ->
-// цикл кадров. window.app = { location, camera } — для консоли и для кода игры,
-// который строится поверх набора.
+// main.js — entry point: 3D engine -> location with objects from Objects.js -> camera ->
+// UI (UILayout.js) -> game (Game.js) -> frame loop. window.app = { location, camera, game } —
+// for the console and for game code built on top of the kit.
 
 function updateLoadingProgress(percent) {
     const bar = /** @type {HTMLElement | null} */ (document.querySelector('.loading-progress'));
     if (bar) bar.style.width = percent + '%';
 }
 
-// Экран загрузки уходит, когда локация готова.
+// The loading screen goes away when the location is ready.
 function hideLoader() {
     updateLoadingProgress(100);
     setTimeout(() => {
@@ -23,7 +23,7 @@ function showBootError(text) {
 }
 
 function startGame() {
-    if (window.app) return;                 // защита от повторного запуска
+    if (window.app) return;                 // guard against a repeated start
     if (typeof SimplexNoise === 'undefined') { showBootError('Нет libs/simplex-noise.js'); return; }
     const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('world3d'));
     updateLoadingProgress(40);
@@ -35,7 +35,9 @@ function startGame() {
         bounds: { w: location.width, h: location.height }
     });
     camera.attach(canvas);
-    window.app = { location, camera };
+    UI.init(canvas);
+    window.app = { location, camera, game: null };
+    const game = window.app.game = new Game(window.app);
     console.log('ArcEngine: локация запущена, объектов ' + location.objects.length + '.');
     updateLoadingProgress(70);
 
@@ -43,6 +45,7 @@ function startGame() {
     World3D.engine.runRenderLoop(() => {
         const now = performance.now(), dt = (now - last) / 1000;
         last = now;
+        game.update(Math.min(0.1, dt));
         location.update(dt);
         camera.update(dt);
         World3D.renderFrame();

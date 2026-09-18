@@ -1,5 +1,5 @@
-// Папка claude/ (скиллы, шаблон launch.json): связана с CLAUDE.md и доезжает до пользователей —
-// веб-загрузка на GitHub пропускает имена с точкой, поэтому скиллам в .claude/ не место.
+// The claude/ folder (skills, launch.json template): linked to CLAUDE.md and reaches the users —
+// GitHub web upload skips dot-prefixed names, so skills do not belong in .claude/.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +19,13 @@ test('скилл из claude/skills/: front matter (name = папка, descripti
     assert.match(head[1], new RegExp('^name: ' + rel.split('/')[2] + '$', 'm'), rel);
     assert.match(head[1], /^description: \S/m, rel);
     assert.ok(claudeMd.includes('`' + rel + '`'), 'CLAUDE.md не ведёт к ' + rel);
+  }
+});
+
+test('скиллы написаны на английском: кириллицы в claude/skills/ нет', () => {
+  for (const rel of SKILLS) {
+    const line = read(rel).split('\n').findIndex(s => /\p{Script=Cyrillic}/u.test(s));
+    assert.equal(line, -1, rel + ':' + (line + 1) + ' — кириллица');
   }
 });
 

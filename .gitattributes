@@ -1,2 +1,2 @@
-# Файлы едут на GitHub байт в байт, как на диске: Git не меняет концы строк.
+# Files go to GitHub byte for byte, as on disk: Git does not change line endings.
 * -text

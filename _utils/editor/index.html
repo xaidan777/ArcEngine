@@ -7,10 +7,10 @@
     <link rel="stylesheet" href="./editor.css">
 </head>
 <body>
-    <!-- Тексты разметки — английские по умолчанию; data-i18n* подменяет их на
-         язык из переключателя (i18n.js). -->
+    <!-- Markup texts are English by default; data-i18n* replaces them with the
+         language from the switch (i18n.js). -->
     <header id="topbar">
-        <div id="brand">ARCENGINE <span data-i18n="brand">editor</span></div>
+        <div id="brand"><span class="brand-arc">ARC</span>ENGINE <span class="brand-sub" data-i18n="brand">editor</span></div>
         <div id="server-status">
             <span id="server-dot"></span>
             <span id="server-label" data-i18n="server.checking">checking server…</span>
@@ -22,7 +22,7 @@
     </header>
 
     <main>
-        <!-- ЛЕВАЯ ПАНЕЛЬ: локация в 3D -->
+        <!-- LEFT PANE: the location in 3D -->
         <section id="view-pane">
             <div id="view-toolbar">
                 <div class="mode-tabs" id="camera-modes">
@@ -39,21 +39,33 @@
                 </div>
                 <div class="toolbar-spacer"></div>
                 <div class="toolbar-group">
+                    <select id="debug-mode" data-i18n-title="debug.modeTitle">
+                        <option value="off" data-i18n="debug.off">view: normal</option>
+                        <option value="backfaces" data-i18n="debug.backfaces">view: back faces</option>
+                        <option value="normals" data-i18n="debug.normals">view: normals</option>
+                        <option value="wireframe" data-i18n="debug.wireframe">view: wireframe</option>
+                    </select>
+                    <button id="btn-lint" data-i18n="debug.lint" data-i18n-title="debug.lintTitle">Lint scene</button>
+                </div>
+                <div class="toolbar-group">
                     <label data-i18n-title="opt.toonTitle"><input type="checkbox" id="opt-toon"> <span data-i18n="opt.toon">toon shader</span></label>
+                    <label data-i18n-title="opt.uiTitle"><input type="checkbox" id="opt-ui" checked> <span data-i18n="opt.ui">UI</span></label>
                 </div>
             </div>
             <div id="view-wrap">
                 <canvas id="view-canvas"></canvas>
                 <div id="view-info" class="float-chip"></div>
                 <div id="view-hints" class="float-chip"></div>
+                <div id="lint-panel" hidden></div>
             </div>
         </section>
 
-        <!-- ПРАВАЯ ПАНЕЛЬ: вкладки Global Settings (Constants.js) и Objects (Objects.js) -->
+        <!-- RIGHT PANE: the Global Settings (Constants.js), Objects (Objects.js) and UI (UILayout.js) tabs -->
         <aside id="inspector-pane">
             <div id="pane-tabs" class="mode-tabs">
                 <button data-tab="settings" data-i18n="tab.settings">Global Settings</button>
                 <button data-tab="objects" data-i18n="tab.objects">Objects</button>
+                <button data-tab="ui" data-i18n="tab.ui">UI</button>
             </div>
 
             <section class="pane-panel" data-tab="settings">
@@ -73,7 +85,7 @@
 
             <section class="pane-panel" data-tab="objects" hidden>
                 <div id="objects-header">
-                    <button id="btn-import" data-i18n-title="obj.importTitle">Import FBX…</button>
+                    <button id="btn-import" data-i18n-title="obj.importTitle">Import model…</button>
                     <div id="objects-actions">
                         <button id="btn-objects-save" disabled data-i18n="obj.save">Save to Objects.js</button>
                         <button id="btn-objects-revert" disabled data-i18n="obj.revert" data-i18n-title="obj.revertTitle">↺ Revert</button>
@@ -83,28 +95,48 @@
                 <div id="object-props"></div>
                 <div id="objects-footer" data-i18n="obj.footer">Gizmo arrows move the selected object. Click an object in the view to select it.</div>
             </section>
+
+            <section class="pane-panel" data-tab="ui" hidden>
+                <div id="ui-header">
+                    <div id="ui-add"></div>
+                    <div id="ui-actions">
+                        <button id="btn-ui-save" disabled data-i18n="ui.save">Save to UILayout.js</button>
+                        <button id="btn-ui-revert" disabled data-i18n="obj.revert" data-i18n-title="ui.revertTitle">↺ Revert</button>
+                    </div>
+                </div>
+                <div id="ui-list"></div>
+                <div id="ui-props"></div>
+                <div id="ui-footer" data-i18n="ui.footer">Drag an element in the view, resize it by the handles. Arrows nudge by 1 px, Shift — by 10.</div>
+            </section>
         </aside>
     </main>
 
     <div id="toasts"></div>
     <div id="boot-error"></div>
 
-    <!-- Порядок значим: язык, схема и загрузчик -> модули набора с корня проекта -> UI редактора -->
+    <!-- The order matters: language, schema and loader -> kit modules from the project root -> editor UI -->
     <script src="./i18n.js"></script>
     <script src="./schema.js"></script>
     <script src="./loader.js"></script>
     <script src="/libs/simplex-noise.js"></script>
     <script src="/libs/babylon.js"></script>
+    <script src="/libs/babylonjs.loaders.min.js"></script>
     <script src="/js/Objects.js"></script>
+    <script src="/js/UILayout.js"></script>
     <script src="/js/World3D.js"></script>
     <script src="/js/Terrain3D.js"></script>
     <script src="/js/CameraControl.js"></script>
     <script src="/js/Model3D.js"></script>
+    <script src="/js/Gltf3D.js"></script>
     <script src="/js/Location3D.js"></script>
+    <script src="/js/Debug3D.js"></script>
+    <script src="/js/UI.js"></script>
     <script src="./history.js"></script>
     <script src="./inspector.js"></script>
     <script src="./objects-panel.js"></script>
+    <script src="./ui-panel.js"></script>
     <script src="./lab.js"></script>
+    <script src="./debug-tools.js"></script>
     <script src="./main.js"></script>
 </body>
 </html>

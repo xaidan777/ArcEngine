@@ -1,15 +1,15 @@
-// lab.js — вид локации в редакторе: тот же мир, что при запуске игры
-// (Location3D с объектами Objects.js + CameraController), вкладка Objects
-// (ObjectsPanel: выбор, гизмо) и живое применение констант инспектора
-// (событие constants-changed из main.js).
+// lab.js — the location view in the editor: the same world as at game startup
+// (Location3D with the Objects.js objects + CameraController), the Objects tab
+// (ObjectsPanel: selection, gizmo) and live application of the inspector constants
+// (the constants-changed event from main.js).
 //
-// Камеры: «свободная» — навигация редактора (ЛКМ/ПКМ — орбита, средняя и
-// Shift+ЛКМ — панорама, колесо — зум к курсору, пределы игры сняты);
-// «игровая» — ровно камера игры: те же пределы и управление, старт по R.
+// Cameras: "free" — editor navigation (LMB/RMB — orbit, middle button and
+// Shift+LMB — pan, wheel — zoom to cursor, the game limits are lifted);
+// "game" — exactly the game camera: the same limits and controls, start on R.
 //
-// Кадр рисуется КАЖДЫЙ тик: движок поднят с preserveDrawingBuffer: false, и
-// пропущенный кадр Babylon показывает не прошлую картинку, а мусор из буфера.
-// В фоновой вкладке браузер сам останавливает requestAnimationFrame.
+// The frame is drawn EVERY tick: the engine is created with preserveDrawingBuffer: false, and
+// on a skipped frame Babylon shows not the previous picture but garbage from the buffer.
+// In a background tab the browser stops requestAnimationFrame by itself.
 
 /** @satisfies {Record<string, any>} */
 const Lab = {
@@ -43,6 +43,7 @@ const Lab = {
 
         this.bindUi();
         ObjectsPanel.init(this);
+        UIPanel.init(this.canvas);
         this.setCameraMode('free');
         this.camera.home();
         window.addEventListener('constants-changed', (e) => {
@@ -58,12 +59,12 @@ const Lab = {
             btn.addEventListener('click', () => this.setCameraMode(btn.dataset.camera));
         }
         document.getElementById('btn-home').addEventListener('click', () => this.camera.home());
-        // Быстрый переключатель toon — та же константа WORLD3D_TOON, что в инспекторе.
+        // The quick toon toggle — the same WORLD3D_TOON constant as in the inspector.
         document.getElementById('opt-toon').addEventListener('change', (e) => {
             Inspector.apply(Inspector.fieldByName.WORLD3D_TOON, /** @type {HTMLInputElement} */ (e.target).checked ? 1 : 0);
         });
         this.syncToonToggle();
-        // Клавиши камеры не работают, пока фокус в поле инспектора: клик по виду его снимает.
+        // Camera keys do not work while the focus is in an inspector field: a click on the view removes it.
         this.canvas.addEventListener('pointerdown', () => {
             const focused = /** @type {HTMLElement | null} */ (document.activeElement);
             if (focused && focused !== document.body) focused.blur();
@@ -76,7 +77,7 @@ const Lab = {
             btn.classList.toggle('active', btn.dataset.camera === this.mode);
         }
         this.camera.setFree(this.mode === 'free');
-        if (this.mode === 'game') this.camera.home();   // ровно стартовый кадр игры
+        if (this.mode === 'game') this.camera.home();   // exactly the game's starting frame
         this.renderHint();
     },
 
@@ -97,22 +98,23 @@ const Lab = {
         }
         if (name.indexOf('CAMERA_') === 0) {
             this.camera.applyConstants();
-            // Ориентация и стартовый зум живут в home(): игровой вид показывает их сразу.
+            // Orientation and the starting zoom live in home(): the game view shows them right away.
             if (this.mode === 'game' && /^CAMERA_(AZIMUTH_DEG|PITCH_DEG|ZOOM|ZOOM_MOBILE)$/.test(name)) this.camera.home();
             return;
         }
+        if (name.indexOf('UI_') === 0) { UIPanel.refresh(); return; }
         if (name === 'LOCATION_GROUND') { this.location.loadGround(); return; }
         if (name === 'GROUND_TILE_SIZE') { if (this.location.terrain) this.location.terrain.applyTileSize(); return; }
         if (name.indexOf('TERRAIN_') === 0 || name.indexOf('LOCATION_') === 0) this.rebuildTerrainSoon();
     },
 
-    // Слайдер шлёт правку на каждое движение — рельеф пересобирается не чаще кадра.
+    // The slider sends an edit on every movement — the terrain is rebuilt at most once per frame.
     rebuildTerrainSoon() {
         if (this._terrainQueued) return;
         this._terrainQueued = true;
         requestAnimationFrame(() => {
             this._terrainQueued = false;
-            const terrain = this.location.buildTerrain();   // объекты локации встают на новую землю сами
+            const terrain = this.location.buildTerrain();   // location objects settle onto the new ground on their own
             this.camera.setTerrain(terrain, { w: this.location.width, h: this.location.height });
         });
     },
@@ -120,7 +122,7 @@ const Lab = {
     tick(now) {
         const dt = Math.min(0.1, (now - (this._lastT || now)) / 1000);
         this._lastT = now;
-        this.location.update(dt);   // вращение частей моделей (def.anim) — как в игре
+        this.location.update(dt);   // model part spin (def.anim) — as in the game
         this.camera.update(dt);
         World3D.renderFrame();
         if (dt > 0) this._fps += (1 / dt - this._fps) * 0.05;
