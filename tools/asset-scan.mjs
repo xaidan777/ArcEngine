@@ -24,6 +24,7 @@ export const CODE_FILES = [
   'index.html',
   'js/Constants.js', 'js/Objects.js', 'js/World3D.js', 'js/Terrain3D.js', 'js/CameraControl.js', 'js/Model3D.js', 'js/Location3D.js', 'js/main.js',
   'libs/simplex-noise.js', 'libs/babylon.js',
+  'libs/babylon.LICENSE.txt', // Apache-2.0: текст лицензии едет вместе с babylon.js
 ];
 
 // Что заведомо не едет в сборку.
