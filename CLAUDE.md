@@ -29,6 +29,9 @@ build.bat                # dist/arcengine-<GAME_VERSION>.zip
 check.bat                # типы (tsc по JSDoc) + тесты; агенту — node tools/check.mjs [--types|--tests]
 ```
 
+Linux / macOS: те же команды — `./run.sh`, `./editor.sh`, `./build.sh`, `./check.sh`
+(аргументы те же, что у `.bat`).
+
 Git: что не едет в репозиторий — `.gitignore` (`.claude/`, бэкапы редактора, `build/`, `dist/`);
 `.gitattributes` — файлы едут байт в байт.
 

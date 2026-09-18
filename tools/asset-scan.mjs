@@ -29,7 +29,7 @@ export const CODE_FILES = [
 // Что заведомо не едет в сборку.
 export const BUILD_EXCLUDE = [
   'tools', 'build', 'dist', '.git', '.claude', 'claude', '_utils', 'tests',
-  'CLAUDE.md', 'run.bat', 'build.bat', 'check.bat', 'upload.bat', 'editor.bat', 'README.md', 'tsconfig.json', 'globals.d.ts',
+  'CLAUDE.md', 'run.bat', 'build.bat', 'check.bat', 'upload.bat', 'editor.bat', 'run.sh', 'build.sh', 'check.sh', 'editor.sh', 'README.md', 'tsconfig.json', 'globals.d.ts',
 ];
 
 const SCAN_EXT = new Set(['.js', '.html', '.css']);
