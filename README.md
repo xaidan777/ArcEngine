@@ -2,6 +2,10 @@
 
 **An LLM-native starter kit for 3D browser games.** Plain JavaScript + [Babylon.js](https://www.babylonjs.com/), zero npm dependencies, no build step. It is built to be developed together with an AI coding agent such as Claude Code.
 
+[![ArcEngine: 3D engine for AI coding — video overview (2:22, in Russian)](https://img.youtube.com/vi/QpsV96WBWBA/maxresdefault.jpg)](https://youtu.be/QpsV96WBWBA)
+
+▶ **[Watch the 2-minute overview on YouTube](https://youtu.be/QpsV96WBWBA)** (in Russian)
+
 ![Game scene: toon-shaded mill on generated terrain](docs/screenshot-game.jpg)
 
 ## What's inside
