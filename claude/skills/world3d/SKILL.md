@@ -1,6 +1,6 @@
 ---
 name: world3d
-description: The kit's 3D engine — World3D (engine, View3D, light, shadows, toon shader, ink edges and silhouette outline, addObject), Terrain3D (ground), Location3D (location), Model3D and Gltf3D (FBX and GLB models, skeleton, animation clips), CameraControl (camera), Game.js (sample game). Read before editing World3D.js, Terrain3D.js, Location3D.js, Model3D.js, Gltf3D.js, CameraControl.js, Game.js, main.js and the CAMERA_*/WORLD3D_*/TERRAIN_*/LOCATION_* blocks of Constants.js, before adding objects or animated characters to the scene.
+description: The kit's 3D engine — World3D (engine, View3D, light, shadows, toon shader, ink edges and silhouette outline, addObject), Terrain3D (ground), Location3D (location), Model3D and Gltf3D (FBX and GLB models, skeleton, animation clips), Instances3D (many copies in one draw call), CameraControl (camera), Game.js (sample game). Read before editing World3D.js, Terrain3D.js, Location3D.js, Model3D.js, Gltf3D.js, Instances3D.js, CameraControl.js, Game.js, main.js and the CAMERA_*/WORLD3D_*/TERRAIN_*/LOCATION_* blocks of Constants.js, before adding objects, many copies of one object, or animated characters to the scene.
 ---
 
 # 3D world: World3D, Terrain3D, Location3D, camera
@@ -24,6 +24,7 @@ main.js: World3D.init(canvas) -> new Location3D() -> new CameraController(view) 
 | `Gltf3D.js` | glTF/GLB through Babylon's loader (`libs/babylonjs.loaders.min.js`): skeleton, textures, animation clips; PBR -> `StandardMaterial` for the toon shader. `Clips3D`: `names()`, `has(name)`, `play(name, { loop, speed, blend, then })`, `stop()`, `current` — §GLB models |
 | `Objects.js` | `LOCATION_OBJECTS`: `{ name, model: 'assets/models/….fbx' \| '….glb', kind, x, y, h, rot: [x, y, z]°, scale: [x, y, z], anim?, clip? }`; `rot[1]` is the heading (`rotation.y = −rot[1]`); `anim: { part, axis: 'x'\|'-x'\|'y'\|…, speed: rpm, dir: 'cw'\|'ccw' }` (FBX part spin); `clip: 'idle'` — looped clip of a GLB. Written by the editor |
 | `Game.js` | the sample game — where game logic starts: `constructor(app)`, `update(dt)` before the render; keeps its own state (`running`, `energy`) and shows it through `Model3D.clips` and `UI.get` (skill `ui`) |
+| `Instances3D.js` | `World3D.addInstances(view, source, kind, items, opts)` — many copies of one mesh or model in one draw call per part (thin instances): `set(i, item)`, `setAll(items)`, `flush()`, `dispose()`, `ok`; pure `Instances3D.fill` — §Many copies |
 | `Debug3D.js` | dev tools, inert until called: `lint(view?)` (inside-out meshes, normal map convention, light limit and sun order, WebGL2 shader limits, heavy meshes, blank frame — zero findings on the kit's scene), `hold(pose)`/`release()` (a view that bypasses the camera controller, eye kept above the ground), `frames(n)`, `bench()`/`benchToggle(target)`, `setMode('backfaces' \| 'normals' \| 'wireframe' \| 'off')`. Skills `render-conventions` and `verify` |
 | `CameraControl.js` | `CameraController`: target, azimuth, pitch, zoom; DOM input; game and free modes; `ignorePointer(e)` — a press that is not for the camera |
 
@@ -66,6 +67,31 @@ frame (ink/outline level 1), `prop` — environment (level 2). The ground is gro
 
 Everything created in the scene dies with `view.dispose()`. A separate `removeObject` is
 needed only for what dies before the scene.
+
+### Many copies of one thing
+
+```js
+const forest = World3D.addInstances(view, treeMesh, 'prop', items);   // items: [{ x, y, h, heading?, scale? }]
+forest.set(7, { x, y, h, heading }); forest.flush();                  // move copies; every frame — opts.dynamic
+forest.setAll(items);  forest.dispose();
+```
+
+More than a couple of hundred copies of one mesh or model (a forest, identical props, bullets,
+fence posts) go through `addInstances`, not through a loop of `addObject`. A separate mesh is a
+draw call of its own in the main pass, the shadow map, the outline mask and the ink edges:
+10–15 µs of CPU per frame. Measured in the kit: 1000 two-part trees as 2000 separate meshes —
+26 ms of CPU per frame (the whole frame budget is 16.6); as instances — 0.1 ms, with the same
+toon, shadows, outline and ink edges. `Debug3D.lint()` warns from 200 look-alike meshes
+(`many-copies`) and 1000 separate meshes (`many-meshes`).
+
+- `item.h` is the height of the copy's origin — the helper does not ask the terrain:
+  `h: terrain.heightAt(x, y)`. `heading` — rad, `scale` — a number or `[x, y, z]`.
+- `source` — a mesh with geometry or a model root from `Model3D.build`; its own position is
+  reset, parts with their own transforms are baked into vertices once. A SKINNED model is
+  refused (`ok === false`, a console warning): one skeleton is one pose.
+- The copies share the material, the kind and everything else of the mesh: no per-copy color,
+  visibility or picking. `opts.dynamic` — copies that move every frame: the mesh is always drawn
+  and its bounds are not refreshed on `flush()`.
 
 ## Light, shadows, toon, ink edges
 
@@ -200,8 +226,12 @@ objects there.
 - Outline width is in blur texels (`outlineKernel`), otherwise the line is four times thicker on mobile.
 - An outline layer draws only meshes of its rendering group: a layer is created per group.
 - `preserveDrawingBuffer: false`: a skipped frame shows garbage — render every tick.
-- Instances cast no shadows if only the prototype is among the casters: use thin instances or
-  `addShadowCaster` for each instance.
+- Instances cast no shadows if only the prototype is among the casters: use thin instances
+  (`World3D.addInstances`) or `addShadowCaster` for each instance.
+- A thin instance matrix is applied in the mesh's LOCAL space: the mesh has to stand at the
+  origin with no rotation or scale (`Instances3D.prepare` resets the root and bakes the parts).
+  A static thin instance buffer ignores `thinInstanceBufferUpdated` without a word — set the
+  buffer again (`flush()` does) or create it dynamic.
 - The outline compose runs in `ALPHA_PREMULTIPLIED`: the STROKE merge shader already
   multiplies color by alpha, and `ALPHA_COMBINE` multiplied a second time — a fog-colored
   line got a rim darker than the background, the far object dissolved while a "ghost" of the

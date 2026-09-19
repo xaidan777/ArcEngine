@@ -75,7 +75,8 @@ Debug3D.benchToggle({ on() { /* feature on */ }, off() { /* feature off */ } });
 
 `await Debug3D.lint()` (editor: "Lint scene") — inside-out meshes, normal map convention,
 lights over the material limit and the sun not being last, shaders that failed or sit at the
-WebGL2 limits, heavy meshes, a fully white or black frame. Zero findings on the kit's own
+WebGL2 limits, heavy meshes, hundreds of separate look-alike meshes that should be instances,
+a fully white or black frame. Zero findings on the kit's own
 scene; every finding text says what to change. `Debug3D.setMode('backfaces' | 'normals' |
 'wireframe' | 'off')` (editor: the "view:" select). Skill `render-conventions` explains each rule.
 

@@ -39,7 +39,10 @@ const Debug3D = {
     /** @type {View3D | null} */
     _modeView: null,
 
-    LIMITS: { meshTriangles: 300000, sampleTriangles: 20000 },
+    // copies — separate meshes that look like one model before instancing is advised; meshes —
+    // separate meshes in a scene at all. A mesh costs the CPU 2 µs per frame bare and 10–15 µs
+    // with shadow, outline and ink edges (World3D.addObject): 1000 such meshes ≈ 13 ms.
+    LIMITS: { meshTriangles: 300000, sampleTriangles: 20000, copies: 200, meshes: 1000 },
 
     // --- Lint: pure parts (tests/debug3d.test.mjs) ----------------------------------------
 
@@ -85,6 +88,20 @@ const Debug3D = {
         return (gl ? !!invertY : !invertY) ? 'ok' : 'wrong';
     },
 
+    // Separate meshes that are copies of one model: list — [{ name, key }], key — what makes two
+    // meshes "the same" (vertex and index counts: a model built twice has two geometries, but
+    // the same counts). Returns the groups of at least limit meshes, the biggest first.
+    copyGroups(list, limit) {
+        /** @type {Map<string, { key: string, name: string, count: number }>} */
+        const groups = new Map();
+        for (const m of list) {
+            const g = groups.get(m.key);
+            if (g) g.count++;
+            else groups.set(m.key, { key: m.key, name: m.name, count: 1 });
+        }
+        return [...groups.values()].filter(g => g.count >= limit).sort((a, b) => b.count - a.count);
+    },
+
     // Map pose -> Babylon vectors. pose: { eye: [x, y, h], target: [x, y, h] } or
     // { eye, yaw, pitch } (yaw — heading in map radians, pitch — up is positive). The eye is
     // lifted to clearance px above the ground when a terrain is known.
@@ -125,6 +142,8 @@ const Debug3D = {
         const overLimit = new Map();          // 'lights/limit' -> mesh names
         /** @type {{ mat: BABYLON.Material, mesh: BABYLON.Mesh }[]} */
         const notReady = [];
+        /** @type {{ name: string, key: string }[]} */
+        const separate = [];                  // meshes drawn one by one: candidates for instancing
         for (const m of scene.meshes) {
             const mesh = /** @type {BABYLON.Mesh} */ (m);
             if (!mesh.isEnabled() || !mesh.isVisible || mesh.isAnInstance || !mesh.getTotalVertices || !mesh.getTotalVertices()) continue;
@@ -136,6 +155,7 @@ const Debug3D = {
             if (tris > this.LIMITS.meshTriangles) {
                 add('warn', 'heavy-mesh', mesh.name, Math.round(tris / 1000) + 'K triangles in one mesh (x' + copies + ' copies): decimate or add a LOD');
             }
+            if (!mesh.hasThinInstances && !mesh.skeleton) separate.push({ name: mesh.name, key: mesh.getTotalVertices() + '/' + mesh.getTotalIndices() });
             this._lintWinding(mesh, add);
             this._lintMeshLights(mesh, overLimit);
             for (const mat of this._materialsOf(mesh)) {
@@ -149,6 +169,15 @@ const Debug3D = {
             const [n, max] = key.split('/').map(Number);
             add('error', 'light-limit', names.length + ' mesh(es)', n + ' lights reach ' + names.slice(0, 4).join(', ') + (names.length > 4 ? ', …' : '') +
                 ', their materials take ' + max + ': the last ' + (n - max) + ' (the sun first) are dropped. Raise maxSimultaneousLights, narrow lights with includedOnlyMeshes or move them into a ClusteredLightContainer');
+        }
+        for (const g of this.copyGroups(separate, this.LIMITS.copies)) {
+            add('warn', 'many-copies', g.name, g.count + ' separate meshes look like copies of one model (' + g.key + ' vertices/indices): each is a draw call of its own in the main pass, ' +
+                'the shadow map, the outline mask and the ink edges — 2 to 15 µs of CPU per frame. Draw them with World3D.addInstances(view, mesh, kind, items) — one draw call for all');
+        }
+        if (separate.length > this.LIMITS.meshes) {
+            const n = separate.length;
+            add('warn', 'many-meshes', n + ' meshes', 'per-mesh work takes about ' + Math.round(n * 0.002) + '–' + Math.round(n * 0.015) + ' ms of CPU per frame (bare — with shadow, outline and ink edges). ' +
+                'Draw copies with World3D.addInstances, merge static parts of one material (BABYLON.Mesh.MergeMeshes), freeze what never moves (mesh.freezeWorldMatrix())');
         }
         // Shaders compile in parallel: a material changed a moment ago is not a finding yet.
         if (notReady.length) {

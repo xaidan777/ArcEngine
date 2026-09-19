@@ -18,7 +18,7 @@ GLB из `assets/models/`; GLB — со скелетом и клипами ан�
 
 | Задача | Скилл |
 |---|---|
-| `js/` (`World3D.js`, `Terrain3D.js`, `Location3D.js`, `CameraControl.js`, `Model3D.js`, `Gltf3D.js`, `Objects.js`, `Game.js`, `main.js`), объекты в сцене, модели GLB и клипы анимации, свет/тени/toon/контур, константы `CAMERA_*`/`WORLD3D_*`/`TERRAIN_*`/`LOCATION_*` | `claude/skills/world3d/SKILL.md` |
+| `js/` (`World3D.js`, `Terrain3D.js`, `Location3D.js`, `CameraControl.js`, `Model3D.js`, `Gltf3D.js`, `Instances3D.js`, `Objects.js`, `Game.js`, `main.js`), объекты в сцене, много копий одной модели, модели GLB и клипы анимации, свет/тени/toon/контур, константы `CAMERA_*`/`WORLD3D_*`/`TERRAIN_*`/`LOCATION_*` | `claude/skills/world3d/SKILL.md` |
 | ЛЮБОЙ элемент интерфейса игры (текст, счётчик, шкала, кнопка, панель, меню): `js/UI.js`, `js/UILayout.js`, вкладка UI редактора (`ui-panel.js`), новый вид элемента | `claude/skills/ui/SKILL.md` |
 | `_utils/`, редактор, инспектор, вкладка Objects, новая константа в редакторе, текст интерфейса | `claude/skills/editor/SKILL.md` |
 | `tools/`, `tests/`, ассеты, новый скрипт, архив, проверка типов и ошибки tsc | `claude/skills/build/SKILL.md` |
@@ -59,7 +59,9 @@ Git: что не едет в репозиторий — `.gitignore` (`.claude/`
    Babylon высоты или пересечения для решений, которые должны совпадать на всех
    устройствах (клетка террейна на мобильных крупнее).
 5. **Объекты мира — через `World3D.addObject(view, mesh, 'actor' | 'prop')`**: группа
-   материала, тень, контур и обводка. Проекции экран↔мир — только через `View3D`.
+   материала, тень, контур и обводка. Больше пары сотен копий одной модели (лес, одинаковые
+   пропсы, пули) — `World3D.addInstances(view, mesh, kind, items)`: один draw call вместо
+   10–15 мкс CPU на каждый отдельный меш. Проекции экран↔мир — только через `View3D`.
 6. **Отсутствующий ассет не роняет сцену** (`Location3D.loadGround`: `onerror` -> ровный цвет).
    Пути ассетов — литералами `'assets/…'`: иначе сканер сборщика их не увидит.
 7. **Хранилище — только `Store`** (`Constants.js`): в sandbox-iframe прямой
@@ -95,10 +97,12 @@ js/               код игры — классические скрипты:
   Model3D.js      модели: бинарный FBX -> меши Babylon (load с кэшем, build, dispose); 1 см = 1 px; .glb уходит в Gltf3D
   Gltf3D.js       модели glTF/GLB: скелет, текстуры, PBR -> StandardMaterial под toon; Clips3D — клипы анимации
                   (Model3D.clips(root).play('run') с плавным переходом)
+  Instances3D.js  много копий одной модели одним draw call (thin instances): World3D.addInstances ->
+                  set/setAll/flush/dispose; тени, toon, контур и обводка — как у addObject
   Location3D.js   локация: View3D + Terrain3D + текстура земли (LOCATION_GROUND) + объекты (addObject/placeObject,
                   update(dt) — вращение частей по anim, клип по clip)
   CameraControl.js CameraController: цель/азимут/наклон/зум, мышь, клавиши, тач; игровой и свободный режимы
-  Debug3D.js      инструменты разработки (в кадре не работают, пока не позвали): lint() — сетки изнанкой,
+  Debug3D.js      инструменты разработки (в кадре не работают, пока не позвали): lint() — сетки изнанкой, сотни одинаковых отдельных мешей,
                   конвенция карт нормалей, лимит света и солнце последним, лимиты шейдеров WebGL2, пустой кадр;
                   hold(pose)/release() — вид мимо контроллера камеры, frames(n), bench()/benchToggle(), setMode()
   UI.js           интерфейс игры: DOM поверх холста по UI_LAYOUT; UI.get(id).setText/setValue/show/onClick,

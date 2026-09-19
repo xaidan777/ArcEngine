@@ -92,7 +92,8 @@ number patching, BOM, backups, every number of `Constants.js` is rewritten lossl
 `ui` (anchor math of `js/UI.js`, `UI_FIELDS` of `save.mjs` = `UI.DEFAULTS`, `formatUI`, the kit's
 `UILayout.js` round-trips through the editor format), `gltf` (`character.glb` on disk equals the
 generator — after editing `tools/make-character.mjs` run it; the file's skeleton and seamless
-clips; `Clips3D` cross-fade on fake animation groups), `debug3d`
+clips; `Clips3D` cross-fade on fake animation groups), `instances` (`Instances3D.fill` — the
+matrix of a copy as Babylon applies it: position, heading, scale; `Debug3D.copyGroups`), `debug3d`
 (the pure parts of `js/Debug3D.js`: winding against normals, the side verdict with a mirrored
 matrix, the normal map verdict by file name, the held view pose kept above the ground), `claude`
 (skills in `claude/skills/` are linked to the CLAUDE.md table, `claude/launch.json` starts the

@@ -83,8 +83,10 @@ lint judges by it and only leaves a note when the name says nothing.
 
 ## Thin instances and procedural placement
 
-- One mesh per kind + `thinInstanceSetBuffer`; after changing the buffer —
-  `thinInstanceRefreshBoundingInfo()`, or frustum culling works on stale bounds.
+- Copies of one mesh or model — `World3D.addInstances(view, source, kind, items)` (skill
+  `world3d`, §Many copies): it keeps the rules below. By hand: one mesh per kind AT THE ORIGIN +
+  `thinInstanceSetBuffer`; after changing the buffer — `thinInstanceRefreshBoundingInfo()`, or
+  frustum culling works on stale bounds.
   `scene.pick` does not see thin instances of a multi-material mesh — pick with your own ray
   against per-instance bounds.
 - Placement rules are written in RELATIVE terms (fractions of the snow line, of the map size),

@@ -31,7 +31,8 @@
 //
 // WORLD OBJECTS are registered by addObject(view, mesh, kind): material group,
 // shadow, ink edges and outline. kind: 'actor' — the main objects of the frame
-// (characters, cars), 'prop' — environment (cubes, walls, trees).
+// (characters, cars), 'prop' — environment (cubes, walls, trees). Hundreds of copies of one
+// thing — addInstances(view, mesh, kind, items): one draw call (Instances3D.js).
 //
 // The toon shader is ArcToonPlugin (BABYLON.MaterialPluginBase, registered on
 // ALL StandardMaterial at World3D.init): after the light of all sources is summed,
@@ -239,6 +240,15 @@ const World3D = {
         }
         if (o.castShadow !== false) view.addShadowCaster(mesh, true);
         return mesh;
+    },
+
+    // Many copies of ONE mesh or model (a forest, identical props, bullets): thin instances, one
+    // draw call per part whatever the count — a separate addObject mesh costs the CPU 10–15 µs
+    // per frame (main pass, shadow map, outline mask, ink edges): 2000 of them are a whole frame.
+    // items: [{ x, y, h, heading?, scale? }]; returns Instances3D (set / setAll / flush / dispose),
+    // .ok is false for a skinned model. Details — Instances3D.js.
+    addInstances(view, source, kind, items, opts) {
+        return new Instances3D(view, source, kind, items, opts);
     },
 
     // Remove an object: outline, shadows, the mesh with its children. Materials stay with the owner.
