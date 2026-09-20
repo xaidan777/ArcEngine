@@ -232,9 +232,9 @@ const World3D = {
                 this.applyMaterialConstants(sm, c);
             }
             const solid = m.getTotalVertices && m.getTotalVertices() > 0;
-            // A skinned mesh gets no ink edges: EdgesRenderer builds its lines once, from the
-            // rest pose, and they would stay behind while the bones move the mesh.
-            if (solid && o.ink !== false && !m.skeleton) this.inkMesh(m, k, c);
+            // Every part gets ink edges, a skinned one too: its lines are built from the rest
+            // pose and re-posed with the bones before each draw (InkSkin).
+            if (solid && o.ink !== false) this.inkMesh(m, k, c);
             // All parts — into ONE outline layer: the line follows the overall silhouette, not a part.
             if (solid && o.outline !== false) this.outlineAdd(view, m, k, c);
         }
@@ -264,14 +264,17 @@ const World3D = {
 
     // Mesh edges creased sharper than WORLD3D_TOON_INK_ANGLE are drawn as lines in the ink
     // color. group: 'actor' (level 1) | 'prop' (level 2). Cost: ~5 ms per
-    // mesh of 1300 triangles, once.
+    // mesh of 1300 triangles, once. Ink edges are part of the toon look, like the
+    // silhouette outline: at WORLD3D_TOON = 0 they are off. EVERY object of the scene gets
+    // them — a skinned one keeps its lines on the bones through InkSkin.
     inkMesh(mesh, group, c) {
         if (!mesh || !mesh.enableEdgesRendering) return;
         c = c || this.cfg();
         const md = mesh.metadata || (mesh.metadata = {});
         md.ink = group;
-        const want = c.ink >= (group === 'prop' ? 2 : 1) && c.inkWidth > 0;
+        const want = c.toon > 0 && c.ink >= (group === 'prop' ? 2 : 1) && c.inkWidth > 0;
         if (!want) {
+            this.inkSkinRelease(mesh);
             if (mesh.edgesRenderer) mesh.disableEdgesRendering();
             md.inkEps = null;
             return;
@@ -280,6 +283,7 @@ const World3D = {
         if (!mesh.edgesRenderer || md.inkEps !== eps) {
             // checkVerticesInsteadOfIndices: in flat-shaded lowpoly the
             // triangles are disconnected, adjacency is found by vertex coordinates.
+            this.inkSkinRelease(mesh);   // the new renderer brings its own lines and buffers
             mesh.enableEdgesRendering(eps, true);
             md.inkEps = eps;
         }
@@ -287,6 +291,25 @@ const World3D = {
         const col = this.hexColor3(c.inkColor);
         mesh.edgesColor = new BABYLON.Color4(col.r, col.g, col.b, 1);
         if (group === 'prop') mesh.edgesShareWithInstances = true;
+        if (mesh.skeleton) this.inkSkin(mesh);
+    },
+
+    // Lines of a SKINNED mesh follow its bones (InkSkin, below): one helper per mesh, built
+    // on the current edges renderer. Returns null when the mesh carries no skinning data.
+    inkSkin(mesh) {
+        const md = mesh.metadata || (mesh.metadata = {});
+        if (md.inkSkin) return md.inkSkin;
+        const skin = new InkSkin(mesh);
+        md.inkSkin = skin.ok ? skin : null;
+        return md.inkSkin;
+    },
+
+    // Drop the follow — BEFORE the edges renderer that owns the line buffers goes away.
+    inkSkinRelease(mesh) {
+        const md = mesh && mesh.metadata;
+        if (!md || !md.inkSkin) return;
+        md.inkSkin.dispose();
+        md.inkSkin = null;
     },
 
     applyInk(scene, c) {
@@ -529,6 +552,159 @@ const World3D = {
         return new BABYLON.Color3(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
     }
 };
+
+// --- Ink edges of a skinned mesh ------------------------------------------------
+
+// EdgesRenderer builds its lines ONCE, out of the rest pose, and Babylon's "line" shader
+// knows nothing about bones: on a character the ink would hang in the rest pose while the
+// bones move the mesh (that is why skinned meshes used to be left without ink at all).
+// The SET of lines never changes — only where their ends are. So each line end is mapped
+// ONCE to the mesh vertex it was copied from, and before every draw the posed ends are
+// written into the line buffers. The mesh itself is still skinned on the GPU: the CPU here
+// touches only the vertices the lines use (812 of them on the kit's character — ~0.05 ms).
+//
+// Created by World3D.inkMesh for a mesh with a skeleton, dropped by inkSkinRelease before
+// the edges renderer that owns the buffers goes away (mesh.metadata.inkSkin).
+class InkSkin {
+    constructor(mesh) {
+        this.mesh = mesh;
+        this.ok = false;
+        this._frame = -1;
+        const VB = BABYLON.VertexBuffer;
+        const er = /** @type {any} */ (mesh.edgesRenderer);
+        const scene = mesh.getScene();
+        if (!er || !mesh.skeleton || !er.linesPositions.length) return;
+        const pos = mesh.getVerticesData(VB.PositionKind);
+        const indices = mesh.getIndices();
+        const bones = mesh.getVerticesData(VB.MatricesIndicesKind);
+        const weights = mesh.getVerticesData(VB.MatricesWeightsKind);
+        if (!pos || !indices || !bones || !weights) return;   // a skeleton without skinning data
+        this._rest = pos;
+        this._bones = bones;
+        this._weights = weights;
+        this._bonesExtra = mesh.numBoneInfluencers > 4 ? mesh.getVerticesData(VB.MatricesIndicesExtraKind) : null;
+        this._weightsExtra = this._bonesExtra ? mesh.getVerticesData(VB.MatricesWeightsExtraKind) : null;
+        if (!this._weightsExtra) this._bonesExtra = null;   // 5..8 influences, but no weights for them
+        this._map(er, pos, indices);
+        this._own(er, scene.getEngine());
+        this._observer = mesh.onBeforeRenderObservable.add(() => this.update());
+        this.ok = true;
+        this.update();
+    }
+
+    // Line end -> mesh vertex. The renderer copies vertex coordinates verbatim
+    // (createLine: p0, p0, p1, p1 for the positions and the opposite end in the normals), so
+    // the position is an exact key. Lowpoly duplicates every vertex per face, so a key
+    // usually has several candidates: the pair that shares a TRIANGLE wins — at a seam where
+    // two bones meet, the other candidate would fly away with the wrong bone. The four
+    // vertices of one line quad are resolved together, or the quad would be stretched
+    // between two bones.
+    _map(er, pos, indices) {
+        const n = pos.length / 3;
+        const byPos = new Map();
+        for (let v = 0; v < n; v++) {
+            const key = pos[3 * v] + '|' + pos[3 * v + 1] + '|' + pos[3 * v + 2];
+            const list = byPos.get(key);
+            if (list) list.push(v); else byPos.set(key, [v]);
+        }
+        const pair = new Set();
+        for (let t = 0; t + 2 < indices.length; t += 3) {
+            const a = indices[t], b = indices[t + 1], c = indices[t + 2];
+            pair.add(a * n + b); pair.add(b * n + a);
+            pair.add(b * n + c); pair.add(c * n + b);
+            pair.add(c * n + a); pair.add(a * n + c);
+        }
+        const lp = er.linesPositions, ln = er.linesNormals;
+        const count = lp.length / 3;
+        const from = this._from = new Int32Array(count);     // vertex of the line end itself
+        const to = this._to = new Int32Array(count);         // vertex of the other end (normal.xyz)
+        const used = new Set();
+        for (let i = 0; i < count; i += 4) {
+            const A = byPos.get(lp[3 * i] + '|' + lp[3 * i + 1] + '|' + lp[3 * i + 2]) || [0];
+            const B = byPos.get(ln[4 * i] + '|' + ln[4 * i + 1] + '|' + ln[4 * i + 2]) || [0];
+            let a = A[0], b = B[0];
+            if (A.length > 1 || B.length > 1) {
+                search: for (const x of A) {
+                    for (const y of B) if (pair.has(x * n + y)) { a = x; b = y; break search; }
+                }
+            }
+            from[i] = from[i + 1] = a; from[i + 2] = from[i + 3] = b;
+            to[i] = to[i + 1] = b; to[i + 2] = to[i + 3] = a;
+            used.add(a); used.add(b);
+        }
+        this._used = Int32Array.from(used);
+        this._posed = new Float32Array(n * 3);
+    }
+
+    // The renderer's own line buffers are static (updatable = false) and updateDirectly on
+    // them does nothing at all, without a word — the pair is replaced with updatable ones.
+    // They belong to the renderer from here on: it disposes and rebuilds them as its own.
+    _own(er, engine) {
+        const VB = BABYLON.VertexBuffer;
+        const line = this._line = new Float32Array(er.linesPositions);
+        const next = this._next = new Float32Array(er.linesNormals);
+        const bufLine = new VB(engine, line, VB.PositionKind, true, false, 3);
+        const bufNext = new VB(engine, next, VB.NormalKind, true, false, 4);
+        er._buffers[VB.PositionKind].dispose();
+        er._buffers[VB.NormalKind].dispose();
+        er._buffers[VB.PositionKind] = bufLine;
+        er._buffers[VB.NormalKind] = bufNext;
+        er._buffersForInstances[VB.PositionKind] = bufLine;
+        er._buffersForInstances[VB.NormalKind] = bufNext;
+        this._bufLine = bufLine;
+        this._bufNext = bufNext;
+    }
+
+    // Pose the lines. Called before the mesh is drawn, when the skeleton's matrices for the
+    // frame are ready; the shadow map and the outline mask draw the same mesh again — hence
+    // the render id guard.
+    update() {
+        if (!this._bufLine) return;
+        const mesh = this.mesh, scene = mesh.getScene();
+        const frame = scene.getRenderId();
+        if (frame === this._frame) return;
+        this._frame = frame;
+        // The same sum the vertex shader does (bonesVertex): the skeleton's matrices are in
+        // the mesh's space, the mesh's world matrix is applied by the line shader afterwards.
+        const m = mesh.skeleton.getTransformMatrices(mesh);
+        const rest = this._rest, out = this._posed;
+        for (const v of this._used) {
+            const x = rest[3 * v], y = rest[3 * v + 1], z = rest[3 * v + 2];
+            let px = 0, py = 0, pz = 0;
+            for (let k = 0; k < 8; k++) {
+                const extra = k > 3;
+                if (extra && !this._bonesExtra) break;
+                const idx = extra ? this._bonesExtra : this._bones;
+                const wts = extra ? this._weightsExtra : this._weights;
+                const at = 4 * v + (k & 3);
+                const w = wts[at];
+                if (!w) continue;
+                const o = (idx[at] | 0) * 16;
+                px += w * (m[o] * x + m[o + 4] * y + m[o + 8] * z + m[o + 12]);
+                py += w * (m[o + 1] * x + m[o + 5] * y + m[o + 9] * z + m[o + 13]);
+                pz += w * (m[o + 2] * x + m[o + 6] * y + m[o + 10] * z + m[o + 14]);
+            }
+            out[3 * v] = px; out[3 * v + 1] = py; out[3 * v + 2] = pz;
+        }
+        const line = this._line, next = this._next, from = this._from, to = this._to;
+        for (let i = 0; i < from.length; i++) {
+            const a = 3 * from[i], b = 3 * to[i];
+            line[3 * i] = out[a]; line[3 * i + 1] = out[a + 1]; line[3 * i + 2] = out[a + 2];
+            next[4 * i] = out[b]; next[4 * i + 1] = out[b + 1]; next[4 * i + 2] = out[b + 2];
+            // next[4 * i + 3] is the side of the line quad — it does not move.
+        }
+        this._bufLine.updateDirectly(line, 0);
+        this._bufNext.updateDirectly(next, 0);
+    }
+
+    dispose() {
+        if (this._observer) this.mesh.onBeforeRenderObservable.remove(this._observer);
+        this._observer = null;
+        this._bufLine = null;
+        this._bufNext = null;
+        this.ok = false;
+    }
+}
 
 // --- Toon material plugin -------------------------------------------------------
 
@@ -858,9 +1034,19 @@ class View3D {
         this.shadow.normalBias = (this._normalBiasTexels || 0) * texel;
     }
 
-    // The sun's ortho frustum fitted to the SHADOW CASTERS within maxR of the point of interest:
+    // The sun's ortho frustum fitted to the SHADOW CASTERS the camera has in front of it:
     // the smaller the frustum, the more map texels per world px and the crisper the shadow (a
     // 720 px frustum with a 1024 map gave 0.7 texels per px — the shadow blurred into a blob).
+    //   • cam — { x, y, h, dx, dy }: the ground point under the EYE and the unit direction the
+    //     camera looks on the map. The box sits three quarters of itself ahead of the camera, so
+    //     it covers the ground from just behind the eye out into the frame. It follows the EYE and
+    //     not the ground at the frame center, because it is capped by _shadowRadius and cannot
+    //     cover the whole frame anyway — so it covers what is CLOSE, where a shadow is large on
+    //     screen. Led by the frame center the frame lost its shadows entirely: fly up to a building
+    //     and raise your head and that point is a thousand px past the building, toward the
+    //     horizon; fly forward and down and it falls BEHIND the camera; from above it sits under
+    //     the eye. Pitch is deliberately NOT in this: shortening the reach by cos(pitch) dropped
+    //     the shadows of a zoomed-out frame, where the camera is high and everything is far;
     //   • center — the middle of the BOUNDS of the shadow casters (world bounding box) that
     //     fall within maxR (the rest are beyond the screen edge, their shadow is not visible).
     //     By positions the frustum cut off a big model's shadow: a building's position is one point;
@@ -871,26 +1057,47 @@ class View3D {
     //     the shadow edge "crawls" across texels on every camera shift;
     //   • a shadow caster with thin instances sits at the origin and its bounds would lie —
     //     with it the frustum is taken by maxR.
-    fitShadowFrustum(x, y2d, h, maxR) {
+    fitShadowFrustum(cam, maxR) {
         const R0 = Math.min(maxR || this._shadowRadius, this._shadowRadius);
+        const h = cam.h || 0;
         const list = this.shadow ? this.shadow.getShadowMap().renderList : null;
-        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, top = h, bottom = h, n = 0, wide = false;
+        // The SEED: the caster nearest the eye that is not behind the camera. The box is built
+        // around it, so the shadow that is largest on screen is the one that never goes missing —
+        // whatever the pitch, the flight height or the zoom. A fixed point ahead of the camera
+        // cannot do that: it has to be near enough for a building you stand next to, and far
+        // enough for a zoomed-out frame where everything is two thousand px away.
+        let seedD = Infinity, sx = 0, sy = 0, wide = false;
         for (let i = 0; list && i < list.length; i++) {
             const m = list[i];
             if (m.hasThinInstances) { wide = true; break; }
             if (!m.isEnabled(false)) continue;
             m.computeWorldMatrix();
             const bb = m.getBoundingInfo().boundingBox, a = bb.minimumWorld, b = bb.maximumWorld;
-            if (Math.abs((a.x + b.x) / 2 - x) > R0 || Math.abs((a.z + b.z) / 2 - y2d) > R0) continue;
+            const mx = (a.x + b.x) / 2, my = (a.z + b.z) / 2;
+            if ((mx - cam.x) * cam.dx + (my - cam.y) * cam.dy < -R0) continue;   // behind the camera
+            const d = Math.hypot(mx - cam.x, my - cam.y);
+            if (d < seedD) { seedD = d; sx = mx; sy = my; }
+        }
+        // Nothing to cast (or thin instances, whose bounds would lie): a box ahead of the camera.
+        if (wide || seedD === Infinity) {
+            const reach = R0 * View3D.SHADOW_AHEAD;
+            this.updateLightFrustum(cam.x + cam.dx * reach, cam.y + cam.dy * reach, h, R0);
+            return;
+        }
+        // Everything that fits in a box around the seed. World matrices are already up to date.
+        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, top = h, bottom = h;
+        for (let i = 0; list && i < list.length; i++) {
+            const m = list[i];
+            if (!m.isEnabled(false)) continue;
+            const bb = m.getBoundingInfo().boundingBox, a = bb.minimumWorld, b = bb.maximumWorld;
+            if (Math.abs((a.x + b.x) / 2 - sx) > R0 || Math.abs((a.z + b.z) / 2 - sy) > R0) continue;
             if (a.x < x0) x0 = a.x;
             if (b.x > x1) x1 = b.x;
             if (a.z < y0) y0 = a.z;
             if (b.z > y1) y1 = b.z;
             if (b.y > top) top = b.y;
             if (a.y < bottom) bottom = a.y;
-            n++;
         }
-        if (wide || !n) { this.updateLightFrustum(x, y2d, h, R0); return; }
         const PAD = 64;   // margin: the soft shadow edge and the corners of the bounds in the sun's frustum
         const dy = this.sun.direction.y;
         const rise = Math.max(top - h, h - bottom) * Math.sqrt(Math.max(0, 1 - dy * dy));
@@ -902,9 +1109,17 @@ class View3D {
         const prev = this._fitR;
         if (prev != null && prev <= R0 && prev >= R && prev - R <= 32) R = prev;
         this._fitR = R;
+        // Casters spread wider than the box: the middle of their bounds can leave the seed out,
+        // and the nearest object would be the one without a shadow. Pull the center back to it.
+        let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+        const lim = Math.max(0, R - PAD), off = Math.hypot(cx - sx, cy - sy);
+        if (off > lim) {
+            const s = lim / off;
+            cx = sx + (cx - sx) * s;
+            cy = sy + (cy - sy) * s;
+        }
         const q = 2 * R / Math.max(64, this._mapSize);
-        const cx = Math.round((x0 + x1) / 2 / q) * q, cy = Math.round((y0 + y1) / 2 / q) * q;
-        this.updateLightFrustum(cx, cy, h, R);
+        this.updateLightFrustum(Math.round(cx / q) * q, Math.round(cy / q) * q, h, R);
     }
 
     addShadowCaster(mesh, includeDescendants) {
@@ -1015,3 +1230,6 @@ class View3D {
 View3D.LIGHT_DIST = 2200;
 // Minimum half-size of the shadow ortho frustum: one object with its shadow.
 View3D.SHADOW_MIN_RADIUS = 140;
+// How far ahead of the camera the shadow frustum sits, in its own half-sizes: the quarter left
+// behind covers the ground under and just past the eye, the rest reaches into the frame.
+View3D.SHADOW_AHEAD = 0.75;

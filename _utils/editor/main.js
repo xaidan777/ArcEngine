@@ -21,6 +21,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         const origRevert = Inspector.revertAll.bind(Inspector);
         Inspector.revertAll = () => EditHistory.batch(origRevert);
         Lab.init();
+        Onboarding.init();   // last: the tour greets a first run, and only over a working editor
     } catch (e) {
         const el = document.getElementById('boot-error');
         el.textContent = I18N.t('boot.failed') + '\n\n' + ((e && e.message) || e) + '\n\n' + I18N.t('boot.hint');

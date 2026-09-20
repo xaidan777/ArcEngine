@@ -66,3 +66,57 @@ test('js/UILayout.js набора записан редактором: форм�
   assert.equal(r.ok, true);
   assert.equal(r.src, src);
 });
+
+test('вложенность: parent пишется, корневой — нет; сам в себе, чужой id и цикл отклоняются', () => {
+  const panel = { id: 'p', kind: 'panel', ...UI.DEFAULTS.panel };
+  const button = { id: 'b', kind: 'button', ...UI.DEFAULTS.button, parent: 'p' };
+  const r = formatUI([button, panel]);   // a child may stand before its parent
+  assert.equal(r.ok, true);
+  const out = evalLayout(r.src);
+  assert.equal(out[0].parent, 'p');
+  assert.equal('parent' in out[1], false, 'на экране — поле не пишется');
+  const bad = (list, note) => {
+    const f = formatUI(list);
+    assert.equal(f.code, 'bad_element', note);
+    assert.equal(f.field, 'parent', note);
+  };
+  bad([{ ...panel, parent: 'p' }], 'сам в себе');
+  bad([{ ...button, parent: 'ghost' }], 'родителя нет в списке');
+  bad([{ ...button, parent: "p'" }, panel], 'кавычка в id родителя');
+  bad([{ ...panel, id: 'a', parent: 'b' }, { ...panel, id: 'b', parent: 'a' }], 'цикл a -> b -> a');
+});
+
+test('растяжение: stretch пишется у видов с размером, негодная ось отклоняется, у текста поля нет', () => {
+  const panel = { id: 'dim', kind: 'panel', ...UI.DEFAULTS.panel, stretch: 'both', x: 0, y: 0 };
+  assert.equal(evalLayout(formatUI([panel]).src)[0].stretch, 'both');
+  assert.equal('stretch' in evalLayout(formatUI([{ ...panel, stretch: '' }]).src)[0], false, 'свой размер — поле не пишется');
+  const f = formatUI([{ ...panel, stretch: 'diag' }]);
+  assert.equal(f.code, 'bad_element');
+  assert.equal(f.field, 'stretch');
+  const text = evalLayout(formatUI([{ id: 't', kind: 'text', ...UI.DEFAULTS.text, stretch: 'h' }]).src)[0];
+  assert.equal('stretch' in text, false);
+});
+
+test('растянутая ось: x (y) — отступ от края контейнера при любом якоре; текст не растягивается', () => {
+  const W = 800, H = 600, w = 100, h = 40;
+  const at = (def) => ({ ...UI.resolve(def, w, h, W, H) });
+  assert.deepEqual(at({ kind: 'panel', anchor: 'bottom-right', stretch: 'h', x: 30, y: 10 }), { left: 30, top: 550 });
+  assert.deepEqual(at({ kind: 'panel', anchor: 'middle-center', stretch: 'both', x: 5, y: 7 }), { left: 5, top: 7 });
+  assert.deepEqual(at({ kind: 'text', anchor: 'top-right', stretch: 'both', x: 30, y: 10 }), { left: 670, top: 10 });
+  assert.deepEqual({ ...UI.stretchOf({ kind: 'bar', stretch: 'v' }) }, { h: false, v: true });
+});
+
+test('дерево элементов: parentOf и isInside; нет родителя или цикл — элемент на экране', () => {
+  const tree = loadScripts(['js/Constants.js', 'js/UI.js']).get('UI');
+  const defs = [{ id: 'menu' }, { id: 'row', parent: 'menu' }, { id: 'ok', parent: 'row' }, { id: 'lost', parent: 'ghost' },
+    { id: 'a', parent: 'b' }, { id: 'b', parent: 'a' }];
+  for (const def of defs) tree.elements.set(def.id, { def });
+  const def = (id) => tree.elements.get(id).def;
+  assert.equal(tree.parentOf(def('ok')).def.id, 'row');
+  assert.equal(tree.parentOf(def('menu')), null);
+  assert.equal(tree.parentOf(def('lost')), null, 'родителя нет');
+  assert.equal(tree.parentOf(def('a')), null, 'цикл');
+  assert.equal(tree.isInside(def('ok'), 'menu'), true, 'через предка');
+  assert.equal(tree.isInside(def('menu'), 'ok'), false);
+  assert.equal(tree.isInside(def('row'), 'row'), false, 'сам в себе не лежит');
+});

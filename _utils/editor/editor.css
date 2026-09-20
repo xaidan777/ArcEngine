@@ -116,7 +116,20 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
     text-overflow: ellipsis;
 }
 #view-info { left: 12px; top: 12px; }
-#view-hints { left: 12px; bottom: 12px; }
+#view-hints { left: 12px; bottom: 12px; max-width: calc(100% - 260px); }   /* the speed chip keeps the right corner */
+
+/* Camera speed — the one chip you can grab (the rest are pointer-events: none labels) */
+#view-speed {
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    pointer-events: auto;
+}
+#view-speed input[type="range"] { width: 104px; accent-color: var(--accent); }
+#view-speed output { min-width: 32px; text-align: right; color: var(--text); }
 
 /* --- Inspector --- */
 
@@ -140,7 +153,8 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 
 #inspector-header,
 #objects-header,
-#ui-header {
+#ui-header,
+#sound-header {
     padding: 10px 14px;
     border-bottom: 1px solid var(--line);
     display: flex;
@@ -151,9 +165,10 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 
 #inspector-actions,
 #objects-actions,
-#ui-actions { display: flex; gap: 8px; }
+#ui-actions,
+#sound-actions { display: flex; gap: 8px; }
 
-#btn-save,
+[data-role="save-constants"],
 #btn-objects-save,
 #btn-ui-save {
     flex: 1 1 auto;
@@ -166,11 +181,11 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
     font-size: 13px;
     cursor: pointer;
 }
-#btn-save:disabled,
+[data-role="save-constants"]:disabled,
 #btn-objects-save:disabled,
 #btn-ui-save:disabled { background: var(--panel-2); color: var(--muted); cursor: default; font-weight: 500; }
 
-#btn-revert,
+[data-role="revert-constants"],
 #btn-objects-revert,
 #btn-ui-revert,
 #btn-import,
@@ -184,7 +199,7 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
     padding: 8px 12px;
     cursor: pointer;
 }
-#btn-revert:disabled,
+[data-role="revert-constants"]:disabled,
 #btn-objects-revert:disabled,
 #btn-ui-revert:disabled,
 #btn-import:disabled { color: var(--muted); cursor: default; opacity: 0.6; }
@@ -194,12 +209,29 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 /* --- Objects tab --- */
 
 #objects-list { flex: 0 1 auto; max-height: 38%; overflow-y: auto; border-bottom: 1px solid var(--line); padding: 6px 0; }
-.object-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 14px; cursor: pointer; user-select: none; }
-.object-row:hover { background: var(--panel-2); }
-.object-row.selected { background: #1d3a35; box-shadow: inset 3px 0 0 var(--accent); }
+/* A row of any list (objects, UI tree, sound files) is a control: its own card, an outline
+   on hover, the accent bar when selected. --depth indents a child of the UI tree. */
+.object-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 2px 8px;
+    padding: 6px 10px 6px calc(10px + var(--depth, 0) * 14px);
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.12s, border-color 0.12s;
+}
+.object-row:hover { background: #283039; border-color: #3d4a57; }
+.object-row:active { background: #2f3945; }
+.object-row.selected { background: #1d3a35; border-color: #2f6b5f; box-shadow: inset 3px 0 0 var(--accent); }
+.object-row.selected .object-name { color: #eaf4f1; font-weight: 600; }
 .object-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .object-file { font-family: Consolas, monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
 .object-row.broken .object-file { color: var(--danger); }
+.object-row.ghost .object-name { opacity: 0.5; }
 
 #object-props { flex: 1 1 auto; overflow-y: auto; padding: 8px 14px 16px; }
 .objects-empty { color: var(--muted); padding: 10px 14px; font-size: 12.5px; }
@@ -442,6 +474,10 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 #ui-props input.invalid { border-color: var(--danger); }
 #ui-props input[type="color"] { flex: 1 1 auto; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; }
 #ui-props input[type="color"]:disabled { opacity: 0.3; }
+#sound-groups { flex: 0 0 auto; overflow-y: auto; }
+#sound-files { flex: 1 1 auto; overflow-y: auto; padding-bottom: 10px; }
+#sound-files .object-file { font-family: inherit; color: var(--accent); }
+#sound-footer,
 #ui-footer { flex: 0 0 auto; padding: 8px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11.5px; line-height: 1.45; }
 .anchor-grid { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
 .anchor-grid button { width: 22px; height: 18px; padding: 0; border-radius: 3px; }
@@ -458,3 +494,109 @@ main { flex: 1 1 auto; display: flex; min-height: 0; }
 .ui-handle[data-handle="s"] { left: 50%; top: 100%; cursor: ns-resize; }
 .ui-handle[data-handle="sw"] { left: 0; top: 100%; cursor: nesw-resize; }
 .ui-handle[data-handle="w"] { left: 0; top: 50%; cursor: ew-resize; }
+
+/* --- Welcome tour (onboarding.js): the "?" button, the spotlight and the slide card --- */
+
+#btn-help {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    font: 700 12px/1 system-ui, sans-serif;
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+#btn-help:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Transparent catcher: nothing in the editor is clickable while the tour runs, a press
+   next to the card closes it. The dimming itself is the spotlight's shadow. */
+#onboarding { position: fixed; inset: 0; z-index: 50; }
+#onboarding[hidden] { display: none; }
+
+/* The frame around the part of the editor the slide is about; the shadow dims the rest.
+   .blank — a slide with no target (the whole window): a zero-size point, only the dimming. */
+#onb-spot {
+    position: absolute;
+    border-radius: 9px;
+    outline: 1.5px solid var(--accent);
+    box-shadow: 0 0 0 9999px rgba(9, 11, 15, 0.66);
+    pointer-events: none;
+    transition: left 0.28s ease, top 0.28s ease, width 0.28s ease, height 0.28s ease;
+}
+#onb-spot.blank { outline: none; }
+
+#onb-card {
+    position: absolute;
+    width: min(560px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.6);
+    transition: left 0.28s ease, top 0.28s ease;
+}
+
+#onb-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 11px 0 12px; }
+#onb-lang button { padding: 2px 9px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.5px; }
+#onb-close {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 19px;
+    line-height: 1;
+    padding: 0 4px;
+    cursor: pointer;
+}
+#onb-close:hover { color: var(--text); }
+
+#onb-body { padding: 4px 20px 16px; overflow-y: auto; }
+.onb-step { margin-top: 12px; color: var(--muted); font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; }
+.onb-title { margin: 3px 0 10px; font-size: 20px; font-weight: 700; }
+.onb-p { margin-bottom: 10px; line-height: 1.55; }
+.onb-p:last-child { margin-bottom: 0; }
+
+#onb-foot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 0 0 auto;
+    padding: 11px 20px 13px;
+    background: var(--panel-2);
+    border-top: 1px solid var(--line);
+    border-radius: 0 0 11px 11px;
+}
+#onb-dots { display: flex; align-items: center; gap: 6px; }
+.onb-dot { width: 7px; height: 7px; padding: 0; border: none; border-radius: 50%; background: var(--line); cursor: pointer; }
+.onb-dot:hover { background: var(--muted); }
+.onb-dot.active { width: 18px; border-radius: 4px; background: var(--accent); }
+#onb-hide { display: flex; align-items: center; gap: 6px; margin-right: auto; color: var(--muted); font-size: 12px; cursor: pointer; }
+#onb-hide input { accent-color: var(--accent); }
+#onb-nav { display: flex; gap: 8px; }
+#onb-nav button {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+}
+#onb-nav button:disabled { opacity: 0.35; cursor: default; }
+#onb-nav button.primary { background: var(--accent); border-color: var(--accent); color: #08211c; font-weight: 600; }
+
+/* Slide 1: the wordmark — the whole window is the subject, nothing to point at yet */
+.onb-hero {
+    margin-top: 6px;
+    padding: 24px 18px;
+    text-align: center;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: radial-gradient(120% 150% at 50% 0%, #243243 0%, var(--bg) 72%);
+}
+.onb-hero-mark { font-size: 26px; font-weight: 800; letter-spacing: 4px; }
+.onb-hero-arc { color: #fbcb60; }
+.onb-hero-tag { margin-top: 7px; color: var(--accent); font-size: 12.5px; letter-spacing: 1px; }

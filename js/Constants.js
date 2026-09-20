@@ -58,9 +58,19 @@ const TERRAIN_CELL = 8;                 // px: terrain grid step (mobile — no 
 const MODEL_CLIP_BLEND_SEC = 0.2;       // s: cross-fade between animation clips of a .glb model (idle -> run); 0 — instant
 const UI_REF_HEIGHT = 720;              // px: the screen height the UI layout (UILayout.js) is drawn for; the UI scales with the screen height, 0 — no scaling
 
+// --- SOUND (Sound3D.js): channel volumes; a sound with a place on the map is heard from where
+// the CAMERA is — its audible region is a sphere of AUDIO_FALLOFF_MAX around it ---
+const AUDIO_MASTER_VOLUME = 0.8;        // 0..1: everything (0 — silence)
+const AUDIO_MUSIC_VOLUME = 0.6;         // 0..1: the 'music' channel
+const AUDIO_SFX_VOLUME = 1;             // 0..1: the 'sfx' channel — effects and object sounds
+const AUDIO_FALLOFF_MIN = 150;          // px: full volume while the camera is this close to a sound (0 — it fades from the source itself)
+const AUDIO_FALLOFF_MAX = 1024;         // px: from here on it is silent (fades linearly in between); an object may set its own pair. The camera stands ~800 px from its look-at point at zoom 1
+const AUDIO_PAN = 0.7;                  // 0..1: how far a sound at the side of the screen goes into one ear (0 — mono)
+
 // --- SAMPLE GAME (Game.js): the "Run" button, the energy bar ---
 const GAME_RUN_SEC = 8;                 // s: a full energy bar lasts this long while running
 const GAME_REST_SEC = 4;                // s: an empty energy bar refills in this time while standing
+const GAME_STEP_SEC = 0.35;             // s: between footstep sounds while the character runs
 
 // --- CAMERA (CameraControl.js): target on the map, azimuth, pitch and zoom. Zoom is
 // screen px per world px at the look-at point; distance is derived from it. Flight
@@ -112,7 +122,7 @@ const WORLD3D_PROP_SPEC_POWER = 7;     // environment specular highlight size
 const WORLD3D_ACTOR_SPECULAR = 0;       // main objects specular highlight (group 'actor'); with toon — toon glint brightness
 const WORLD3D_ACTOR_SPEC_POWER = 23;    // main objects specular highlight size
 // Toon shader (ArcToonPlugin): light from all sources (sun + sky, with shadow) is quantized into bands
-const WORLD3D_TOON = 1;                 // 1 — toon shading and silhouette outline, 0 — regular smooth shading without outline
+const WORLD3D_TOON = 1;                 // 1 — toon shading with the silhouette outline and the edge lines, 0 — regular smooth shading without them
 const WORLD3D_TOON_BANDS = 4;           // number of light bands (2..6)
 const WORLD3D_TOON_SOFT = 0.02;         // band boundary softness (0 — sharp, 0.5 — almost smooth)
 const WORLD3D_TOON_LOW = 0.48;          // brightness of the darkest band (fraction of full)
@@ -121,12 +131,13 @@ const WORLD3D_TOON_SPEC = 0.25;            // toon glint highlight strength (0 �
 const WORLD3D_TOON_SPEC_SIZE = 0.075;    // highlight threshold (smaller — larger spot)
 const WORLD3D_TOON_RIM = 0.28;           // bright rim light along the objects' silhouette edge (0 — none)
 const WORLD3D_TOON_RIM_WIDTH = 0.24;    // rim light width
-// Ink edges (EdgesRenderer): edges creased more sharply than the threshold
-const WORLD3D_TOON_INK = 2;             // 0 — none, 1 — main objects, 2 — environment too
-const WORLD3D_TOON_INK_WIDTH = 25;      // line thickness (≈ world px × 100; thinner as the camera moves away)
+// Ink edges (EdgesRenderer): edges creased more sharply than the threshold — on every object of
+// the scene, a skinned character too (its lines follow the bones). Only when WORLD3D_TOON = 1
+const WORLD3D_TOON_INK = 2;             // 0 — none, 1 — main objects, 2 — environment too (only when WORLD3D_TOON = 1)
+const WORLD3D_TOON_INK_WIDTH = 20;      // line thickness (≈ world px × 100; thinner as the camera moves away)
 const WORLD3D_TOON_INK_COLOR = 0x171717; // ink color: ink edges and silhouette outline
 const WORLD3D_TOON_INK_ANGLE = 40;      // °: an edge is drawn if the faces are creased more sharply
 // Outer silhouette outline: post-effect (HighlightLayer, isStroke), thickness — in screen px
 const WORLD3D_TOON_OUTLINE = 2;         // 0 — none, 1 — main objects, 2 — environment too (only when WORLD3D_TOON = 1)
-const WORLD3D_TOON_OUTLINE_ACTOR_WIDTH = 1.5;   // screen px: main objects outline
+const WORLD3D_TOON_OUTLINE_ACTOR_WIDTH = 1;   // screen px: main objects outline
 const WORLD3D_TOON_OUTLINE_PROP_WIDTH = 1;  // screen px: environment outline (there is a lot of it in the frame — thinner)

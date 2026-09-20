@@ -182,3 +182,34 @@ test('saveObjects: файл с бэкапом, негодный список ф�
   assert.deepEqual(scan.refs, ['assets/models/mill.fbx'], 'шапка файла не даёт ложных ссылок');
   assert.deepEqual(scan.missing, []);
 });
+
+test('Objects.js: тег и скрытый объект пишутся, пустые — нет', () => {
+  const r = formatObjects([{ ...MILL, tag: "co'in", hidden: true }, { ...MILL, name: 'x', tag: '', hidden: false }]);
+  assert.equal(r.ok, true);
+  const [tagged, plain] = evalObjects(r.src);
+  assert.equal(tagged.tag, 'coin');
+  assert.equal(tagged.hidden, true);
+  assert.equal('tag' in plain, false);
+  assert.equal('hidden' in plain, false);
+});
+
+test('Objects.js: звук объекта пишется, значения по умолчанию опускаются, негодный отклоняется', () => {
+  const sound = { src: 'assets/sounds/mill.mp3', volume: 0.55, loop: false, falloffMin: 40, falloffMax: 900 };
+  const [full, lean] = evalObjects(formatObjects([{ ...MILL, sound },
+    { ...MILL, name: 'x', sound: { src: 'assets/sounds/mill.mp3', volume: 1, loop: true, falloffMin: 0, falloffMax: 0 } }]).src);
+  assert.deepEqual(full.sound, sound);
+  assert.deepEqual(lean.sound, { src: 'assets/sounds/mill.mp3' }, 'громкость 1, по кругу, общие радиусы — не пишутся');
+  const bad = (s) => formatObjects([MILL, { ...MILL, sound: s }]);
+  for (const s of [{ src: 'assets/sounds/hit.exe' }, { src: 'sounds/hit.wav' }, { src: 'assets/../hit.wav' }, { src: 'assets/Мой звук.wav' },
+    { src: 'assets/sounds/hit.wav', volume: 2 }, { src: 'assets/sounds/hit.wav', volume: 'loud' },
+    { src: 'assets/sounds/hit.wav', falloffMax: -5 }, { src: 'assets/sounds/hit.wav', falloffMin: -1 }, {}]) {
+    assert.deepEqual([bad(s).code, bad(s).index], ['bad_value', 1], JSON.stringify(s));
+  }
+});
+
+test('js/Objects.js набора записан редактором: формат воспроизводится', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'js/Objects.js'), 'utf8').replace(/\r\n/g, '\n');
+  const r = formatObjects(evalObjects(src));
+  assert.equal(r.ok, true);
+  assert.equal(r.src, src);
+});

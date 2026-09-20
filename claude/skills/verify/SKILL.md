@@ -44,6 +44,11 @@ Debug3D.release();
 
 ## Reproduce the user's state, not yours
 
+- A screenshot of the game or the editor carries the whole camera in its HUD line: zoom, azimuth,
+  pitch and target. Put those numbers into the controller (`camera.azimuth/pitch/zoom/target`,
+  then `_apply()`) and check THAT pose before theorizing — the numbers that look extreme in the
+  HUD are usually the defect. Guessing a pose that merely resembles the screenshot reproduces a
+  different bug, and the fix for it fixes nothing.
 - Use the constants from the user's `Constants.js` and the quality or mode they run. A check
   passed with a value you forced in the console proves nothing about their screen.
 - Rules that depend on tunable constants are tested on the real constants: the user moves

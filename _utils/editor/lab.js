@@ -31,7 +31,7 @@ const Lab = {
             Toast.show(I18N.t('toast.no3d'), true);
             return;
         }
-        this.location = new Location3D({ assetBase: '/', objects: ObjectsPanel.initialObjects() });
+        this.location = new Location3D({ assetBase: '/', showHidden: true, objects: ObjectsPanel.initialObjects() });
         this.camera = new CameraController(this.location.view, {
             terrain: this.location.terrain,
             bounds: { w: this.location.width, h: this.location.height },
@@ -44,6 +44,7 @@ const Lab = {
         this.bindUi();
         ObjectsPanel.init(this);
         UIPanel.init(this.canvas);
+        SoundPanel.init();
         this.setCameraMode('free');
         this.camera.home();
         window.addEventListener('constants-changed', (e) => {
@@ -64,6 +65,21 @@ const Lab = {
             Inspector.apply(Inspector.fieldByName.WORLD3D_TOON, /** @type {HTMLInputElement} */ (e.target).checked ? 1 : 0);
         });
         this.syncToonToggle();
+        // The camera speed slider over the bottom right of the view — the same
+        // CAMERA_FLY_SPEED constant as in the inspector, where the flight is felt.
+        const speed = /** @type {HTMLInputElement} */ (document.getElementById('cam-speed'));
+        const field = Inspector.fieldByName.CAMERA_FLY_SPEED;
+        if (field) {
+            speed.min = String(field.min); speed.max = String(field.max); speed.step = String(field.step);
+            speed.addEventListener('input', () => Inspector.apply(field, Number(speed.value)));
+        }
+        this.syncSpeedSlider();
+        // Sound is OFF by default (the checkbox starts unchecked): the editor is a tool, and an
+        // object droning on while you work in it is a nuisance. Turning it on also shows the
+        // falloff spheres of the selected object (ObjectsPanel.syncSpheres).
+        const sound = /** @type {HTMLInputElement} */ (document.getElementById('opt-sound'));
+        sound.addEventListener('change', () => Sound3D.setMuted(!sound.checked));
+        Sound3D.setMuted(!sound.checked);
         // Camera keys do not work while the focus is in an inspector field: a click on the view removes it.
         this.canvas.addEventListener('pointerdown', () => {
             const focused = /** @type {HTMLElement | null} */ (document.activeElement);
@@ -89,6 +105,15 @@ const Lab = {
         /** @type {HTMLInputElement} */ (document.getElementById('opt-toon')).checked = Number(/** @type {any} */ (window).WORLD3D_TOON) > 0;
     },
 
+    // The slider follows the constant: it is edited from the view, from the inspector field
+    // and by undo (Ctrl+Z) — all of them arrive as constants-changed.
+    syncSpeedSlider() {
+        const v = Number(/** @type {any} */ (window).CAMERA_FLY_SPEED);
+        if (!Number.isFinite(v)) return;
+        /** @type {HTMLInputElement} */ (document.getElementById('cam-speed')).value = String(v);
+        document.getElementById('cam-speed-value').textContent = String(Math.round(v));
+    },
+
     onConstant(name) {
         if (!this.location) return;
         if (name.indexOf('WORLD3D_') === 0) {
@@ -98,11 +123,13 @@ const Lab = {
         }
         if (name.indexOf('CAMERA_') === 0) {
             this.camera.applyConstants();
+            if (name === 'CAMERA_FLY_SPEED') this.syncSpeedSlider();
             // Orientation and the starting zoom live in home(): the game view shows them right away.
             if (this.mode === 'game' && /^CAMERA_(AZIMUTH_DEG|PITCH_DEG|ZOOM|ZOOM_MOBILE)$/.test(name)) this.camera.home();
             return;
         }
         if (name.indexOf('UI_') === 0) { UIPanel.refresh(); return; }
+        if (name.indexOf('AUDIO_') === 0) { Sound3D.applyConstants(); return; }
         if (name === 'LOCATION_GROUND') { this.location.loadGround(); return; }
         if (name === 'GROUND_TILE_SIZE') { if (this.location.terrain) this.location.terrain.applyTileSize(); return; }
         if (name.indexOf('TERRAIN_') === 0 || name.indexOf('LOCATION_') === 0) this.rebuildTerrainSoon();
@@ -124,6 +151,8 @@ const Lab = {
         this._lastT = now;
         this.location.update(dt);   // model part spin (def.anim) — as in the game
         this.camera.update(dt);
+        ObjectsPanel.syncSpheres();    // the sound spheres follow the selected object
+        Sound3D.update(this.camera);   // object sounds (def.sound) — as in the game
         World3D.renderFrame();
         if (dt > 0) this._fps += (1 / dt - this._fps) * 0.05;
         if (now - this._infoT > 500) { this._infoT = now; this.updateInfo(); }

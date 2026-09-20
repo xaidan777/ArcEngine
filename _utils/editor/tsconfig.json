@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.json",
   "include": [
     "*.js",
-    "../../js/Constants.js", "../../js/Objects.js", "../../js/UILayout.js", "../../js/UI.js", "../../js/World3D.js", "../../js/Terrain3D.js",
+    "../../js/Constants.js", "../../js/Objects.js", "../../js/UILayout.js", "../../js/Sound3D.js", "../../js/UI.js", "../../js/World3D.js", "../../js/Terrain3D.js",
     "../../js/CameraControl.js", "../../js/Model3D.js", "../../js/Gltf3D.js", "../../js/Instances3D.js", "../../js/Location3D.js", "../../js/Debug3D.js",
     "../../globals.d.ts", "../../libs/*.d.ts"
   ]

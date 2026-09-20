@@ -5,7 +5,10 @@
 // handles of the selection box resize it (a text sizes itself), arrows nudge by 1 px (Shift —
 // 10). The fields of the selected element are UI.DEFAULTS[kind] — a new field in UI.js shows up
 // here after a row in UIPanel.FIELDS. Changing the anchor keeps the element where it stands
-// (UI.toStored). "Save to UILayout.js" — POST /api/save-ui, the file is written whole.
+// (UI.toStored). Nesting (def.parent) and stretch (def.stretch) have rows of their own: the
+// geometry of a nested element counts from its container (container / rect / place), the list
+// is a tree, a parent is deleted with what is inside it and renamed together with the
+// references to it. "Save to UILayout.js" — POST /api/save-ui, the file is written whole.
 // A step of history — layout snapshots before/after, like the Objects tab.
 
 /** @satisfies {Record<string, any>} */
@@ -27,6 +30,7 @@ const UIPanel = {
         ['x', 'num'], ['y', 'num'], ['w', 'num'], ['h', 'num'], ['text', 'text'], ['fontSize', 'num'], ['value', 'unit'],
         ['color', 'color'], ['shadow', 'color'], ['fill', 'color'], ['border', 'color'], ['radius', 'num'], ['alpha', 'unit'], ['visible', 'flag'],
     ],
+    OPTIONAL: ['parent', 'stretch'],   // fields with a row of their own; empty — absent from the record
     HANDLES: ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'],
     MIN_SIZE: 8,
 
@@ -82,22 +86,34 @@ const UIPanel = {
 
     // --- Geometry ------------------------------------------------------------------
 
-    // The element's rectangle in layout px: { left, top, w, h }.
-    rect(def) {
-        const e = UI.get(def.id), s = UI.size();
-        const w = e ? e.el.offsetWidth : Number(def.w) || 0, h = e ? e.el.offsetHeight : Number(def.h) || 0;
-        const p = UI.resolve(def, w, h, s.w, s.h);
-        return { left: p.left, top: p.top, w, h };
+    // The box def is laid out in, in screen layout px: the screen, or the inside of its parent
+    // (without the border — CSS counts a child's left/right from the padding box).
+    container(def) {
+        const p = UI.parentOf(def);
+        if (!p) { const s = UI.size(); return { left: 0, top: 0, w: s.w, h: s.h }; }
+        const r = this.rect(p.def);
+        return { left: r.left + p.el.clientLeft, top: r.top + p.el.clientTop, w: p.el.clientWidth, h: p.el.clientHeight };
     },
 
-    // A rectangle -> the record's x, y (and w, h for a sized kind), whole px.
+    // The element's rectangle in screen layout px: { left, top, w, h }. By the anchor math, not
+    // by offsetLeft: that one ignores the translate(-50%) of a centered anchor.
+    rect(def) {
+        const e = UI.get(def.id), c = this.container(def);
+        const w = e ? e.el.offsetWidth : Number(def.w) || 0, h = e ? e.el.offsetHeight : Number(def.h) || 0;
+        const p = UI.resolve(def, w, h, c.w, c.h);
+        return { left: c.left + p.left, top: c.top + p.top, w, h };
+    },
+
+    // A rectangle -> the record's x, y (and w, h for a sized kind), whole px. On a stretched
+    // axis x (y) is the inset from the container's edge and the size is not stored.
     place(def, r) {
-        const s = UI.size(), p = UI.toStored(def.anchor, r.left, r.top, r.w, r.h, s.w, s.h);
-        def.x = Math.round(p.x);
-        def.y = Math.round(p.y);
+        const c = this.container(def), st = UI.stretchOf(def);
+        const p = UI.toStored(def.anchor, r.left - c.left, r.top - c.top, r.w, r.h, c.w, c.h);
+        def.x = Math.round(st.h ? r.left - c.left : p.x);
+        def.y = Math.round(st.v ? r.top - c.top : p.y);
         if (def.kind !== 'text') {
-            def.w = Math.round(r.w);
-            def.h = Math.round(r.h);
+            if (!st.h) def.w = Math.round(r.w);
+            if (!st.v) def.h = Math.round(r.h);
         }
     },
 
@@ -203,6 +219,7 @@ const UIPanel = {
         const def = Object.assign({ id: this.uniqueId(kind), kind }, UI.DEFAULTS[kind]);
         // A new element lands in the middle of the view, then it is dragged into place.
         Object.assign(def, { anchor: 'middle-center', x: 0, y: 0 });
+        for (const key of this.OPTIONAL) delete def[key];   // on the screen, a fixed size
         this.layout.push(def);
         this.selected = def;
         this.afterEdit(null, before);
@@ -219,11 +236,13 @@ const UIPanel = {
         this.afterEdit(null, before);
     },
 
+    // The element goes together with everything nested in it (Ctrl+Z brings it all back).
     removeSelected() {
-        const i = this.layout.indexOf(this.selected);
-        if (i < 0) return;
+        const d = this.selected;
+        if (!d || this.layout.indexOf(d) < 0) return;
         const before = this.snapshot();
-        this.layout.splice(i, 1);
+        const gone = this.layout.filter(o => o === d || UI.isInside(o, d.id));
+        for (const o of gone) this.layout.splice(this.layout.indexOf(o), 1);
         this.selected = null;
         this.afterEdit(null, before);
     },
@@ -253,6 +272,7 @@ const UIPanel = {
         const d = this.selected;
         if (!d || !/^[A-Za-z_][A-Za-z0-9_-]{0,47}$/.test(id) || this.layout.some(o => o !== d && o.id === id)) return false;
         const before = this.snapshot();
+        for (const o of this.layout) if (o.parent === d.id) o.parent = id;   // the children follow the new name
         d.id = id;
         this.commit('ui:id', before);
         this.refresh();
@@ -267,6 +287,32 @@ const UIPanel = {
         const before = this.snapshot(), r = this.rect(d);
         d.anchor = anchor;
         this.place(d, r);
+        this.afterEdit(null, before);
+    },
+
+    // Nest the selected element into another one ('' — back onto the screen). It stays where it
+    // stands: x and y are recomputed for the new container.
+    setParent(id) {
+        const d = this.selected;
+        if (!d || (d.parent || '') === id) return;
+        const before = this.snapshot(), r = this.rect(d);
+        if (id) d.parent = id;
+        else delete d.parent;
+        this.place(d, r);
+        this.afterEdit(null, before);
+    },
+
+    // An axis that becomes stretched fills the container (inset 0); a released one keeps the size it had.
+    setStretch(value) {
+        const d = this.selected;
+        if (!d || (d.stretch || '') === value) return;
+        const before = this.snapshot(), r = this.rect(d), was = UI.stretchOf(d);
+        if (value) d.stretch = value;
+        else delete d.stretch;
+        const now = UI.stretchOf(d);
+        this.place(d, r);
+        if (now.h && !was.h) d.x = 0;
+        if (now.v && !was.v) d.y = 0;
         this.afterEdit(null, before);
     },
 
@@ -350,12 +396,17 @@ const UIPanel = {
             host.appendChild(P.el('div', 'objects-empty', I18N.t('ui.empty')));
             return;
         }
-        for (const def of this.layout) {
+        // A tree: an element, then what is nested in it; within one container — drawing order.
+        const inside = (id) => this.layout.filter(d => { const p = UI.parentOf(d); return (p ? p.def.id : '') === id; });
+        const add = (def, depth) => {
             const row = P.el('div', 'object-row' + (def === this.selected ? ' selected' : ''));
+            row.style.setProperty('--depth', String(depth));
             row.append(P.el('span', 'object-name', def.id), P.el('span', 'object-file', I18N.t('ui.kind.' + def.kind)));
             row.addEventListener('click', () => this.select(def));
             host.appendChild(row);
-        }
+            for (const child of inside(def.id)) add(child, depth + 1);
+        };
+        for (const def of inside('')) add(def, 0);
     },
 
     renderProps() {
@@ -383,6 +434,19 @@ const UIPanel = {
             grid.appendChild(cell);
         }
         host.appendChild(P.row('ui.anchor', 'ui.anchorHint', grid));
+
+        // Anything but the element itself and what is nested in it: a cycle has no container.
+        const hosts = this.layout.filter(o => o !== d && !UI.isInside(o, d.id));
+        const parent = P.choice([['', I18N.t('ui.parentNone')]].concat(hosts.map(o => [o.id, o.id])), d.parent || '');
+        parent.addEventListener('change', () => this.setParent(parent.value));
+        host.appendChild(P.row('ui.parent', 'ui.parentHint', parent));
+
+        if ('stretch' in UI.DEFAULTS[d.kind]) {
+            const stretch = P.choice([['', I18N.t('ui.stretchNone')], ['h', I18N.t('ui.stretchH')], ['v', I18N.t('ui.stretchV')],
+                ['both', I18N.t('ui.stretchBoth')]], d.stretch || '');
+            stretch.addEventListener('change', () => this.setStretch(stretch.value));
+            host.appendChild(P.row('ui.stretch', 'ui.stretchHint', stretch));
+        }
 
         for (const [key, type] of this.FIELDS) {
             if (!(key in UI.DEFAULTS[d.kind])) continue;

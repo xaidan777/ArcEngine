@@ -13,6 +13,9 @@
 // an object selects it. A move along X/Z keeps the height above the ground (the object
 // follows the terrain), a move along Y changes h.
 //
+// The sound of the selected object draws two faint yellow spheres — the volume it fills
+// (§Sound spheres in the view).
+//
 // The layout is dirty when the JSON of the records differs from the saved one (saved).
 // Field precision — as the server writes: position and heading to 0.1, scale to 0.001.
 
@@ -68,6 +71,13 @@ const ObjectsPanel = {
 
         for (const rec of lab.location.objects) this.watch(rec);
         this.render();
+    },
+
+    // SoundPanel found other files in assets/sounds (it owns the list): redraw the "Sound"
+    // section — unless the user is typing in this panel right now.
+    onSoundsChanged() {
+        const host = document.getElementById('object-props');
+        if (!host || !host.contains(document.activeElement)) this.renderProps();
     },
 
     // --- Selection --------------------------------------------------------------
@@ -243,6 +253,7 @@ const ObjectsPanel = {
                 for (const k of Object.keys(rec.def)) delete rec.def[k];
                 Object.assign(rec.def, d);
                 loc.placeObject(rec);
+                loc.applyHidden(rec);
             });
         } else {
             this.gizmo.attachToMesh(null);
@@ -320,6 +331,28 @@ const ObjectsPanel = {
         if (anim) rec.def.anim = anim;
         else delete rec.def.anim;
         this.commit('field:' + before.selected + ':anim', before);
+    },
+
+    // An optional field of the selected one (tag, hidden): an empty value removes it from the record.
+    setOptional(key, value) {
+        const rec = this.selected;
+        if (!rec) return;
+        const before = this.snapshot();
+        if (value) rec.def[key] = value;
+        else delete rec.def[key];
+        if (key === 'hidden') this.lab.location.applyHidden(rec);
+        this.commit('field:' + before.selected + ':' + key, before);
+    },
+
+    // The whole sound of the selected one ({ src, volume?, loop?, falloffMin?, falloffMax? });
+    // null — remove. Location3D.updateSound picks the change up on the next frame.
+    setSound(sound) {
+        const rec = this.selected;
+        if (!rec) return;
+        const before = this.snapshot();
+        if (sound) rec.def.sound = sound;
+        else delete rec.def.sound;
+        this.commit('field:' + before.selected + ':sound', before);
     },
 
     // The looped clip of the selected .glb model; '' — remove (the rest pose).
@@ -487,13 +520,17 @@ const ObjectsPanel = {
             return;
         }
         for (const rec of list) {
-            const row = this.el('div', 'object-row' + (rec === this.selected ? ' selected' : '') + (rec.error ? ' broken' : ''));
+            const row = this.el('div', 'object-row' + (rec === this.selected ? ' selected' : '') + (rec.error ? ' broken' : '') +
+                (rec.def.hidden ? ' ghost' : ''));
             row.append(
                 this.el('span', 'object-name', rec.def.name || '—'),
                 this.el('span', 'object-file', rec.error ? '⚠ ' + I18N.t('obj.missing') : rec.def.model.split('/').pop()));
             row.title = rec.error ? rec.def.model + ' — ' + rec.error : rec.def.model;
-            row.addEventListener('click', () => this.select(rec));
-            row.addEventListener('dblclick', () => this.focusSelected());
+            // Clicking the selected row again clears the selection: the property list below
+            // folds away and the gizmo leaves the view.
+            row.addEventListener('click', () => this.select(this.selected === rec ? null : rec));
+            // The two clicks of a double click have just toggled it off — select it again.
+            row.addEventListener('dblclick', () => { this.select(rec); this.focusSelected(); });
             host.appendChild(row);
         }
     },
@@ -507,7 +544,7 @@ const ObjectsPanel = {
             if (this.lab.location.objects.length) host.appendChild(this.el('div', 'objects-empty', I18N.t('obj.noSelection')));
             return;
         }
-        const d = rec.def, els = this.propEls = { pos: null, rot: null, scale: null };
+        const d = rec.def, els = this.propEls = { pos: null, rot: null, scale: null, sound: null };
 
         const name = this.input('text', d.name);
         name.maxLength = 64;
@@ -519,6 +556,16 @@ const ObjectsPanel = {
         const kind = this.choice([['prop', I18N.t('obj.kindProp')], ['actor', I18N.t('obj.kindActor')]], d.kind === 'actor' ? 'actor' : 'prop');
         kind.addEventListener('change', () => this.setKind(kind.value));
         host.appendChild(this.row('obj.kind', 'obj.kindHint', kind));
+
+        const tag = this.input('text', d.tag || '');
+        tag.maxLength = 64;
+        tag.addEventListener('input', () => this.setOptional('tag', tag.value.trim()));
+        host.appendChild(this.row('obj.tag', 'obj.tagHint', tag));
+
+        const hidden = this.input('checkbox', '');
+        hidden.checked = !!d.hidden;
+        hidden.addEventListener('change', () => { this.setOptional('hidden', hidden.checked); this.renderList(); });
+        host.appendChild(this.row('obj.hidden', 'obj.hiddenHint', hidden));
 
         const posKeys = ['x', 'y', 'h'];
         els.pos = this.vector(['X', 'Y', 'H'], 10, (i) => d[posKeys[i]], (i, v) => this.setField(posKeys[i], this.round(v, 1)));
@@ -532,6 +579,7 @@ const ObjectsPanel = {
         host.appendChild(this.row('obj.scale', 'obj.scaleHint', ...els.scale.parts));
 
         this.renderAnim(host, rec);
+        this.renderSound(host, rec);
 
         const actions = this.el('div', 'object-actions');
         for (const [key, fn, cls] of [['obj.focus', () => this.focusSelected()], ['obj.duplicate', () => this.duplicateSelected()],
@@ -590,6 +638,136 @@ const ObjectsPanel = {
         host.appendChild(this.row('obj.animDir', 'obj.animDirHint', dir));
     },
 
+    // The "Sound" section: a file of assets/sounds playing at the object. Location3D.updateSound
+    // reads def.sound every frame — an edit is heard at once (the toolbar's "sound" checkbox).
+    // The file list is SoundPanel's, already fetched: nothing here waits, so rows never land in
+    // a stale panel.
+    renderSound(host, rec) {
+        const s = rec.def.sound;
+        host.appendChild(this.el('div', 'props-section', I18N.t('obj.sound')));
+        const files = SoundPanel.files.slice();
+        if (s && !files.includes(s.src)) files.push(s.src);
+        if (!files.length) {
+            host.appendChild(this.el('div', 'objects-empty', I18N.t('obj.soundEmpty')));
+            return;
+        }
+        const file = this.choice([['', I18N.t('obj.soundNone')]].concat(files.map(p => [p, p.split('/').pop()])), s ? s.src : '');
+        file.addEventListener('change', () => {
+            this.setSound(file.value ? Object.assign({}, rec.def.sound, { src: file.value }) : null);
+            this.renderProps();
+        });
+        host.appendChild(this.row('obj.soundFile', 'obj.soundFileHint', file));
+        if (!s) return;
+
+        // A default (volume 1, looped, the common radii) is not kept in the record.
+        const edit = (key, value, isDefault) => {
+            const next = Object.assign({}, rec.def.sound);
+            if (isDefault) delete next[key];
+            else next[key] = value;
+            this.setSound(next);
+        };
+        const number = (key, fallback, min, max, step, digits) => {
+            const num = this.input('number', this.fmt(s[key] == null ? fallback : s[key]));
+            Object.assign(num, { min: String(min), max: String(max), step: String(step) });
+            num.addEventListener('input', () => {
+                const v = Number(num.value);
+                if (num.value === '' || !Number.isFinite(v)) return;
+                const value = Math.max(min, Math.min(max, this.round(v, digits)));
+                edit(key, value, value === fallback);
+            });
+            num.addEventListener('blur', () => { const cur = rec.def.sound; if (cur) num.value = this.fmt(cur[key] == null ? fallback : cur[key]); });
+            return num;
+        };
+        host.appendChild(this.row('obj.soundVolume', null, number('volume', 1, 0, 1, 0.05, 2)));
+        // The two radii the spheres in the view show; els keeps them in sync.
+        const els = this.propEls.sound = {};
+        for (const key of ['falloffMin', 'falloffMax']) {
+            els[key] = number(key, 0, 0, 20000, 10, 0);
+            host.appendChild(this.row('obj.' + key, 'obj.' + key + 'Hint', els[key]));
+        }
+        const loop = this.choice([['1', I18N.t('obj.soundLooped')], ['0', I18N.t('obj.soundOnce')]], s.loop === false ? '0' : '1');
+        loop.addEventListener('change', () => edit('loop', false, loop.value === '1'));
+        host.appendChild(this.row('obj.soundLoop', 'obj.soundLoopHint', loop));
+    },
+
+    // --- Sound spheres in the view --------------------------------------------------
+    //
+    // Two barely visible yellow SPHERES around the selected object — the volume its sound fills:
+    // falloffMin (full volume) and falloffMax (silence beyond). Sound3D measures the straight 3D
+    // distance from the camera, so a sphere is exactly the audible region: inside it is heard,
+    // outside it is not. The radii drawn are the EFFECTIVE ones — the object's own value, or the
+    // AUDIO_FALLOFF_* constant when it is 0; the numbers are edited in the panel.
+    //
+    // Each sphere is drawn the way a gizmo is — as LINES: three great circles (one flat on the
+    // map, two upright), so the shape reads as a volume and hides nothing behind it. A line mesh
+    // keeps its 1 px width at any scale, so one unit wireframe scaled to the radius is enough —
+    // no geometry is rebuilt while a radius changes.
+    //
+    // They live in the gizmo's utility layer (the toon plugin does not quantize them and they
+    // draw over the world) and are NOT pickable: a sphere covers most of the screen, and a
+    // pickable one would swallow every camera drag through it.
+
+    SPHERE: { color: '#ffd24a', minAlpha: 0.55, maxAlpha: 0.32, segments: 64 },
+
+    // The pair actually heard, in px (never min > max — that is not a ring, it is a knot).
+    soundRadii(sound) {
+        const global = (name, dflt) => {
+            const v = Number(/** @type {any} */ (window)[name]);
+            return Number.isFinite(v) ? v : dflt;
+        };
+        const min = Number(sound.falloffMin) > 0 ? Number(sound.falloffMin) : global('AUDIO_FALLOFF_MIN', 150);
+        const max = Number(sound.falloffMax) > 0 ? Number(sound.falloffMax) : global('AUDIO_FALLOFF_MAX', 1024);
+        return { min: Math.max(0, Math.min(min, max)), max: Math.max(0, max) };
+    },
+
+    // A unit wireframe sphere: three closed great circles of radius 1.
+    sphereLines() {
+        const n = this.SPHERE.segments, flat = [], upX = [], upZ = [];
+        for (let i = 0; i <= n; i++) {
+            const t = (i / n) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t);
+            flat.push(new BABYLON.Vector3(c, 0, s));   // on the map
+            upX.push(new BABYLON.Vector3(c, s, 0));    // upright, along x
+            upZ.push(new BABYLON.Vector3(0, s, c));    // upright, along y of the map
+        }
+        return [flat, upX, upZ];
+    },
+
+    spheres() {
+        if (this._spheres) return this._spheres;
+        const scene = this.gizmo.utilityLayer.utilityLayerScene;
+        const lines = this.sphereLines();
+        const make = (key, alpha) => {
+            const mesh = BABYLON.MeshBuilder.CreateLineSystem('sound-' + key, { lines }, scene);
+            mesh.color = BABYLON.Color3.FromHexString(this.SPHERE.color);
+            mesh.alpha = alpha;
+            mesh.isPickable = false;      // never swallow a camera drag or a click on the object
+            return mesh;
+        };
+        this._spheres = { falloffMin: make('falloffMin', this.SPHERE.minAlpha), falloffMax: make('falloffMax', this.SPHERE.maxAlpha) };
+        return this._spheres;
+    },
+
+    // Every frame (Lab.tick): the object may have been moved by the gizmo, the terrain rebuilt,
+    // the radii changed in a field or on the Sound tab. The spheres sit on the SAME world point
+    // Sound3D measures from — the model's own position, so what is drawn is what is heard.
+    syncSpheres() {
+        const rec = this.selected, s = rec && rec.def.sound;
+        // Sound off on the view toolbar — no sound, so nothing to show either.
+        const on = !!s && PaneTabs.current === 'objects' && !Sound3D.muted;
+        if (!on && !this._spheres) return;
+        const spheres = this.spheres();
+        for (const key of ['falloffMin', 'falloffMax']) spheres[key].setEnabled(on);
+        if (!on) return;
+        const x = Number(rec.def.x) || 0, y = Number(rec.def.y) || 0;
+        const t = this.lab.location.terrain;
+        const at = rec.mesh ? rec.mesh.position : new BABYLON.Vector3(x, (t ? t.heightAt(x, y) : 0) + (Number(rec.def.h) || 0), y);
+        const eff = this.soundRadii(s);
+        for (const key of ['falloffMin', 'falloffMax']) {
+            spheres[key].position.copyFrom(at);
+            spheres[key].scaling.setAll(Math.max(1, eff[key === 'falloffMin' ? 'min' : 'max']));
+        }
+    },
+
     // Fields of the selected one catch up with def (the gizmo moves the object); the focused field is left alone.
     syncProps() {
         const els = this.propEls, rec = this.selected;
@@ -597,6 +775,11 @@ const ObjectsPanel = {
         const d = rec.def, values = { pos: [d.x, d.y, d.h], rot: d.rot, scale: d.scale };
         for (const key of ['pos', 'rot', 'scale']) {
             els[key].inputs.forEach((num, i) => { if (document.activeElement !== num) num.value = this.fmt(values[key][i]); });
+        }
+        // The sound radii follow the spheres in the view.
+        for (const key of Object.keys(els.sound || {})) {
+            const num = els.sound[key];
+            if (document.activeElement !== num) num.value = this.fmt(d.sound && d.sound[key] != null ? d.sound[key] : 0);
         }
     },
 
@@ -665,12 +848,12 @@ const ObjectsPanel = {
     },
 };
 
-// Right pane tabs: Global Settings (Constants.js), Objects (Objects.js) and UI (UILayout.js).
+// Right pane tabs: Global Settings and Sound (Constants.js), Objects (Objects.js), UI (UILayout.js).
 // The open tab is remembered in localStorage; a switch — the window 'pane-tab' event.
 /** @satisfies {Record<string, any>} */
 const PaneTabs = {
     KEY: 'arcengine.editor.tab',
-    TABS: ['settings', 'objects', 'ui'],
+    TABS: ['settings', 'objects', 'ui', 'sound'],
     current: 'settings',
 
     init() {

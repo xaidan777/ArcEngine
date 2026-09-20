@@ -554,11 +554,19 @@ class CameraController {
 
     _apply() {
         this._syncCamera();
-        // Shadow frustum — fit to objects within the visible area: the tighter, the sharper the shadow.
-        // The area is around the ground point at the frame center (in flight it is ahead of the target).
-        const cv = this.view.world.canvas, g = this.groundFocus();
+        // Shadow frustum — fitted to the objects in front of the camera: the tighter, the sharper
+        // the shadow. The camera hands over where it STANDS and which way it looks on the map; how
+        // far ahead to put the box is View3D's call, it knows its own size. Not groundFocus(): that
+        // point is the ground at the frame center, and it is useless as a shadow center — next to a
+        // building with the head raised it lands a thousand px past the building, in flight forward
+        // and down it falls behind the camera, and from above it sits under the eye.
+        // maxR is the frame's own footprint, a request: the box is tightened by the caster bounds.
+        const cv = this.view.world.canvas, e = this._eye();
         const halfDiag = 0.5 * Math.hypot((cv && cv.clientWidth) || 800, (cv && cv.clientHeight) || 600) * this.worldPerScreenPx();
-        this.view.fitShadowFrustum(g.x, g.y, g.h, halfDiag * g.k + 80);
+        this.view.fitShadowFrustum({
+            x: e.x, y: e.y, h: this._groundH(e.x, e.y),
+            dx: Math.cos(this.azimuth), dy: Math.sin(this.azimuth),
+        }, halfDiag + 80);
         const p = this.cam.position, t = this.target, lc = this._lastCam;
         if (!lc || Math.abs(lc[0] - p.x) > 0.02 || Math.abs(lc[1] - p.y) > 0.02 || Math.abs(lc[2] - p.z) > 0.02 ||
             Math.abs(lc[3] - t.x) > 0.02 || Math.abs(lc[4] - t.y) > 0.02 || Math.abs(lc[5] - t.h) > 0.02) {

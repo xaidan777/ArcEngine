@@ -15,6 +15,7 @@
             <span id="server-dot"></span>
             <span id="server-label" data-i18n="server.checking">checking server…</span>
         </div>
+        <button id="btn-help" data-i18n-title="onb.help" title="How the editor works">?</button>
         <div id="lang-switch" class="mode-tabs" role="group" data-i18n-title="lang.title" title="Interface language">
             <button data-lang="en">EN</button>
             <button data-lang="ru">RU</button>
@@ -50,12 +51,20 @@
                 <div class="toolbar-group">
                     <label data-i18n-title="opt.toonTitle"><input type="checkbox" id="opt-toon"> <span data-i18n="opt.toon">toon shader</span></label>
                     <label data-i18n-title="opt.uiTitle"><input type="checkbox" id="opt-ui" checked> <span data-i18n="opt.ui">UI</span></label>
+                    <label data-i18n-title="opt.soundTitle"><input type="checkbox" id="opt-sound"> <span data-i18n="opt.sound">sound</span></label>
                 </div>
             </div>
             <div id="view-wrap">
                 <canvas id="view-canvas"></canvas>
                 <div id="view-info" class="float-chip"></div>
                 <div id="view-hints" class="float-chip"></div>
+                <!-- Flight speed right where it is felt: the same CAMERA_FLY_SPEED constant as
+                     in Global Settings (range and step come from the schema, lab.js) -->
+                <div id="view-speed" class="float-chip" data-i18n-title="cam.speedTitle">
+                    <span data-i18n="cam.speed">camera speed</span>
+                    <input type="range" id="cam-speed">
+                    <output id="cam-speed-value"></output>
+                </div>
                 <div id="lint-panel" hidden></div>
             </div>
         </section>
@@ -66,13 +75,14 @@
                 <button data-tab="settings" data-i18n="tab.settings">Global Settings</button>
                 <button data-tab="objects" data-i18n="tab.objects">Objects</button>
                 <button data-tab="ui" data-i18n="tab.ui">UI</button>
+                <button data-tab="sound" data-i18n="tab.sound">Sound</button>
             </div>
 
             <section class="pane-panel" data-tab="settings">
                 <div id="inspector-header">
                     <div id="inspector-actions">
-                        <button id="btn-save" disabled>Save to Constants.js</button>
-                        <button id="btn-revert" disabled data-i18n="insp.revert" data-i18n-title="insp.revertTitle">↺ Revert</button>
+                        <button data-role="save-constants" disabled>Save to Constants.js</button>
+                        <button data-role="revert-constants" disabled data-i18n="insp.revert" data-i18n-title="insp.revertTitle">↺ Revert</button>
                     </div>
                     <input id="inspector-search" type="search" data-i18n-placeholder="insp.search" placeholder="search: toon, shadow, FOV, CAMERA…">
                 </div>
@@ -108,11 +118,49 @@
                 <div id="ui-props"></div>
                 <div id="ui-footer" data-i18n="ui.footer">Drag an element in the view, resize it by the handles. Arrows nudge by 1 px, Shift — by 10.</div>
             </section>
+
+            <section class="pane-panel" data-tab="sound" hidden>
+                <div id="sound-header">
+                    <div id="sound-actions">
+                        <button data-role="save-constants" disabled>Save to Constants.js</button>
+                        <button data-role="revert-constants" disabled data-i18n="insp.revert" data-i18n-title="insp.revertTitle">↺ Revert</button>
+                    </div>
+                </div>
+                <div id="sound-groups"></div>
+                <div id="sound-files"></div>
+                <div id="sound-footer" data-i18n="snd.footer">A sound of an object is set in the Objects tab; game code plays effects with Sound3D.play. Click a file to hear it.</div>
+            </section>
         </aside>
     </main>
 
     <div id="toasts"></div>
     <div id="boot-error"></div>
+
+    <!-- Welcome tour (onboarding.js): #onb-spot frames the part of the editor a slide is about
+         and dims the rest, the card moves to the free space next to it -->
+    <div id="onboarding" hidden>
+        <div id="onb-spot"></div>
+        <div id="onb-card" role="dialog" aria-modal="true">
+            <div id="onb-head">
+                <div id="onb-lang" class="mode-tabs" role="group" data-i18n-title="lang.title" title="Interface language">
+                    <button data-lang="en">EN</button>
+                    <button data-lang="ru">RU</button>
+                </div>
+                <button id="onb-close" data-i18n-title="onb.close" title="Close (Esc)">×</button>
+            </div>
+            <div id="onb-body"></div>
+            <div id="onb-foot">
+                <div id="onb-dots"></div>
+                <label id="onb-hide" data-i18n-title="onb.hideTitle">
+                    <input type="checkbox" id="onb-hide-box"> <span data-i18n="onb.hide">Don't show again</span>
+                </label>
+                <div id="onb-nav">
+                    <button id="onb-prev">← Back</button>
+                    <button id="onb-next" class="primary">Next →</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- The order matters: language, schema and loader -> kit modules from the project root -> editor UI -->
     <script src="./i18n.js"></script>
@@ -123,6 +171,7 @@
     <script src="/libs/babylonjs.loaders.min.js"></script>
     <script src="/js/Objects.js"></script>
     <script src="/js/UILayout.js"></script>
+    <script src="/js/Sound3D.js"></script>
     <script src="/js/World3D.js"></script>
     <script src="/js/Terrain3D.js"></script>
     <script src="/js/CameraControl.js"></script>
@@ -135,9 +184,11 @@
     <script src="./history.js"></script>
     <script src="./inspector.js"></script>
     <script src="./objects-panel.js"></script>
+    <script src="./sound-panel.js"></script>
     <script src="./ui-panel.js"></script>
     <script src="./lab.js"></script>
     <script src="./debug-tools.js"></script>
+    <script src="./onboarding.js"></script>
     <script src="./main.js"></script>
 </body>
 </html>

@@ -5,7 +5,11 @@ import { test } from 'node:test';
 import { loadScripts, stub } from './browser-scripts.mjs';
 
 const EPS = 1e-6;
-const STEP = 90;   // CAMERA_FLY_SPEED 900 screen px/s at zoom 1 over the longest frame, 0.1 s
+// Flight over the longest frame (0.1 s) at zoom 1. The speed is read from Constants.js, not
+// written here as a number: the user tunes CAMERA_FLY_SPEED with the editor's slider.
+const STEP = loadScripts(['js/Constants.js']).get('CAMERA_FLY_SPEED') * 0.1;
+// Frames of diagonal flight (up + sideways, the step is split between them) to cover 4000 px.
+const FAR = Math.ceil(4000 * Math.SQRT2 / STEP);
 
 function makeCamera(opts = {}) {
   const page = loadScripts(['js/Constants.js', 'js/CameraControl.js'], { BABYLON: stub(), performance });
@@ -93,7 +97,7 @@ test('CAMERA_LIMITS = 1: потолок полёта, цель внутри ло
   const { cam, liftMax, pitchMin } = makeCamera({ limits: true });
   key(cam, 'KeyE');
   key(cam, 'KeyD');
-  for (let i = 0; i < 100; i++) cam.update(0.1);
+  for (let i = 0; i < FAR; i++) cam.update(0.1);
   assert.equal(cam.lift, liftMax);
   assert.equal(cam.target.x, 2048);
   cam._look(0, -3);
@@ -104,7 +108,7 @@ test('CAMERA_LIMITS = 0: игровая камера летает без пот�
   const { cam, liftMax } = makeCamera();
   key(cam, 'KeyE');
   key(cam, 'KeyD');
-  for (let i = 0; i < 100; i++) cam.update(0.1);
+  for (let i = 0; i < FAR; i++) cam.update(0.1);
   assert.ok(cam.lift > liftMax * 5);
   assert.ok(cam.target.x > 2048 * 2);
   cam._look(0, -3);
@@ -122,6 +126,43 @@ test('осмотр (ПКМ): камера на месте, цель повора
   assert.ok(cam.pitch < 0, 'взгляд выше горизонта');
   const up = cam._eye();
   assert.ok(Math.hypot(up.x - eye.x, up.y - eye.y, up.h - eye.h) < EPS);
+});
+
+// The shadow box is capped by WORLD3D_SHADOW_RADIUS and cannot cover a whole frame, so it is led
+// by where the camera STANDS, not by the ground at the frame center: raise the head next to a
+// building and that point is a thousand px past it (tests/shadow.test.mjs picks up from here).
+test('теневому фрустуму уходит место камеры и её курс, а не точка взгляда', () => {
+  const { cam } = makeCamera({ free: true });
+  let got = null;
+  cam.view.fitShadowFrustum = (c, maxR) => { got = { c, maxR }; };
+  cam.pitch = -2 * Math.PI / 180;   // чуть выше горизонта — как на скриншоте пользователя
+  cam._apply();
+  const e = cam._eye();
+  assert.ok(Math.hypot(cam.target.x - e.x, cam.target.y - e.y) > 500, 'точка взгляда далеко от камеры');
+  assert.ok(Math.abs(got.c.x - e.x) < EPS && Math.abs(got.c.y - e.y) < EPS, 'точка — под камерой');
+  assert.equal(got.c.h, 0, 'высота — земля под камерой');
+  assert.ok(Math.hypot(got.c.dx - Math.cos(cam.azimuth), got.c.dy - Math.sin(cam.azimuth)) < EPS, 'курс — единичный');
+});
+
+// Flying forward and down takes the target under the ground (lift < 0) and toward the horizon the
+// frame center runs off: both used to go into the size of the box through groundFocus().k, and the
+// box either shrank to a fraction of the frame or chased a point a thousand px away.
+test('запрошенный размер коробки теней — след кадра, от подъёма и наклона не зависит', () => {
+  const { cam } = makeCamera({ free: true });
+  let maxR = null;
+  cam.view.fitShadowFrustum = (c, r) => { maxR = r; };
+  cam._apply();
+  const base = maxR;
+  assert.ok(base > 900, 'след кадра при zoom 1');
+  for (const lift of [-250, 900]) {
+    cam.lift = lift;
+    cam.target.h = lift;
+    cam._apply();
+    assert.equal(maxR, base, 'подъём ' + lift);
+  }
+  cam.pitch = -2 * Math.PI / 180;
+  cam._apply();
+  assert.equal(maxR, base, 'взгляд к горизонту');
 });
 
 test('home и lookAt возвращают цель на землю, слежение гасит высоту полёта', () => {

@@ -47,8 +47,10 @@ for (let i = 0; i < 5; i++) UI.add(Object.assign({}, t, { id: 'slot' + i, x: t.x
 | `bar` | `w, h, value, color` (the filled part), `fill, border, radius` |
 | `button` | `w, h, text, fontSize, color, fill, border, radius` — the only kind that catches the pointer |
 
+Every kind also takes `parent` and, except `text`, `stretch` — see §Nesting.
+
 - `id` — `[A-Za-z_][A-Za-z0-9_-]*`, unique: game code finds the element by it.
-- `anchor` — one of 9 screen points (`top-left` … `bottom-right`): `x, y` go from that screen
+- `anchor` — one of 9 points of the CONTAINER (`top-left` … `bottom-right`): `x, y` go from that
   point to THE SAME point of the element — inward from an edge, signed from the center. A
   `bottom-right` element with `x: 20, y: 20` keeps its bottom right corner 20 px from the
   screen corner on any screen. Math without DOM: `UI.resolve(def, w, h, W, H)` and the inverse
@@ -59,6 +61,50 @@ for (let i = 0; i < 5; i++) UI.add(Object.assign({}, t, { id: 'slot' + i, x: t.x
   `canvas height / UI_REF_HEIGHT`, so the interface keeps its proportions from a phone to 4K.
   `UI.size()` — the screen in layout px (the width depends on the aspect ratio — anchor wide
   things to an edge or the center, do not assume 1280). `UI_REF_HEIGHT = 0` — plain CSS px.
+
+## Nesting (`parent`) and stretch (`stretch`)
+
+**A menu, a dialog, a pause screen is a `panel` plus elements with `parent` pointing at it.**
+Not a set of elements positioned side by side with matching coordinates.
+
+```js
+{ id: 'dim',    kind: 'panel',  anchor: 'top-left',      stretch: 'both', x: 0, y: 0, fill: '#000000', alpha: 0.5, visible: 0 },
+{ id: 'menu',   kind: 'panel',  anchor: 'middle-center', parent: 'dim',  x: 0, y: 0, w: 300, h: 180, … },
+{ id: 'title',  kind: 'text',   anchor: 'top-center',    parent: 'menu', x: 0, y: 18, text: 'Pause', … },
+{ id: 'resume', kind: 'button', anchor: 'bottom-center', parent: 'menu', x: 0, y: 20, … },
+```
+
+```js
+UI.get('dim').show(true);      // ONE call shows the dim, the panel and everything on it
+```
+
+What nesting gives, and what each of these costs without it:
+
+- **One switch.** Hiding a container hides what is inside it — the game does not list its parts.
+- **One move.** Dragging the panel in the editor moves its contents with it.
+- **Clipping.** A sized element has `overflow: hidden`: a long name inside a slot is cut by the
+  slot, not by the screen.
+- **Geometry that means something.** A child's `x, y` are measured from ITS PANEL, so
+  `anchor: 'bottom-center', y: 20` is "20 px above the bottom of the panel" at any panel size.
+
+`stretch` — `'h'`, `'v'` or `'both'` (not for `text`, which sizes itself): the element fills the
+container on that axis, `x` (`y`) becomes the inset from BOTH edges and `w` (`h`) is ignored.
+`stretch: 'both', x: 0, y: 0` on the root is a full-screen dim at any aspect ratio; `stretch: 'h',
+x: 16` inside a panel is a row 16 px from each of its sides. Without it a full-width element has
+to be resized from code, and `UI.size()` gives the width only after the canvas exists.
+
+Rules of the tree:
+- `parent` is the id of another element; missing or `''` — the screen (the root).
+- A parent that does not exist, an element inside itself, or a cycle is REJECTED on save
+  (`bad_element`, field `parent`). At run time such a record falls back to the root instead of
+  breaking the tree, so a hand-written layout never blanks the HUD.
+- The record order is still the drawing order WITHIN a container; a child may stand before its
+  parent in the file.
+- `UI.parentOf(def)` — the element it sits in (null — the root), `UI.isInside(def, id)` — is it
+  in that one, directly or deeper. `UI.remove(id)` removes the whole subtree.
+- In the editor the UI tab's list is a tree (indent by depth); the "Inside" row lists every
+  element but the subtree of the selected one. Renaming a container renames it in its children;
+  deleting one deletes them with it (Ctrl+Z brings them back).
 
 ## Runtime (`js/UI.js`)
 
@@ -77,6 +123,10 @@ its record like the rest — not DOM positioned by hand in game code.
 
 - `UIPanel.init(canvas)` (from `Lab.init`) — a COPY of `UI_LAYOUT` drawn by the game's own
   `UI.js` over the editor's view; the toolbar checkbox `#opt-ui` hides the HUD on other tabs.
+- Geometry of a NESTED element counts from its container: `UIPanel.container(def)` — the screen
+  or the inside of the parent, `rect(def)` -> screen layout px, `place(def, rect)` -> back into
+  the record. Both go through the anchor math, not `offsetLeft`: that one ignores the
+  `translate(-50%)` of a centered anchor.
 - With the tab open: click selects, drag moves, the 8 handles of the selection box resize
   (`panel`, `bar`, `button`; a `text` has none), arrows nudge by 1 px (Shift — 10), Del
   deletes, Ctrl+D duplicates, Esc deselects. The key listener is in the CAPTURE phase and
@@ -117,7 +167,9 @@ its record like the rest — not DOM positioned by hand in game code.
 ## Checklist
 
 1. No HUD DOM, coordinates or colors in game code — only `UI.get(id)` and setters.
-2. The new element is visible and draggable in the UI tab; "Save to UILayout.js" writes a file
+2. A menu, a dialog, a pause screen — a panel plus children with `parent`, shown by one
+   `show()` on the container; a full-screen backdrop — `stretch: 'both'`.
+3. The new element is visible and draggable in the UI tab; "Save to UILayout.js" writes a file
    that `node tools/check.mjs` accepts (`tests/ui.test.mjs`).
 3. Looked at in the game on a wide and a narrow (portrait) window: nothing overlaps — anchors
    chosen by the edge the element belongs to.

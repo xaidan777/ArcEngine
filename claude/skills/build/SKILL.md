@@ -18,6 +18,8 @@ build.bat --keep-unused      # keep assets without references
 build.bat --force            # build despite failed checks
 node tools/make-character.mjs          # regenerate assets/models/character.glb (the sample character)
 node tools/make-character.mjs --check  # exit 1 if the file differs from the generator
+node tools/make-sounds.mjs             # regenerate assets/sounds/*.wav (the sample sounds, skill sound)
+node tools/make-sounds.mjs --check     # exit 1 if a file differs from the generator
 ```
 
 Git: what stays out of the repository — `.gitignore`; `.gitattributes` (`* -text`) — files go
@@ -85,12 +87,19 @@ Pitfalls:
 Logic without 3D: `store` (Store with storage open and blocked), `terrain` (`heightAt` — nodes,
 cell diagonal same as the mesh, continuity, edge, seed, mobile cell), `camera` (`CameraController`
 on a stub view: flight along the view, Q/E, look-around keeps the camera in place, ground floor,
-`CAMERA_LIMITS` on and off), `asset-scan`
+`CAMERA_LIMITS` on and off, what goes to the shadow frustum — the flight speed is read from
+`Constants.js`, not written as a number: the user tunes it), `shadow`
+(`View3D.fitShadowFrustum` on a fake view: the box takes the caster nearest the camera — next to a
+building, zoomed out, nothing behind the camera, empty scene — and still hugs the bounds), `asset-scan`
 (`collectRefs`, the project has no missing assets), `editor-save` (`_utils/editor/save.mjs`:
 number patching, BOM, backups, every number of `Constants.js` is rewritten losslessly,
 `Objects.js` is readable by the game and the scanner, `.glb` and `clip`, invalid records are rejected),
-`ui` (anchor math of `js/UI.js`, `UI_FIELDS` of `save.mjs` = `UI.DEFAULTS`, `formatUI`, the kit's
-`UILayout.js` round-trips through the editor format), `gltf` (`character.glb` on disk equals the
+`ui` (anchor math of `js/UI.js` including a stretched axis, `UI_FIELDS` of `save.mjs` =
+`UI.DEFAULTS`, `formatUI`, nesting — `parent` written, self-parent, a missing parent and a cycle
+rejected, `UI.parentOf`/`isInside`, the kit's `UILayout.js` round-trips through the editor format),
+`sound` (`Sound3D.spatial` — the audible sphere and the pan by the camera heading;
+`Location3D.updateSound` — no copies piling up frame after frame, restart only on a file or mode
+change, a hidden object silent; `removeObject` stops the sound; `findByTag`), `gltf` (`character.glb` on disk equals the
 generator — after editing `tools/make-character.mjs` run it; the file's skeleton and seamless
 clips; `Clips3D` cross-fade on fake animation groups), `instances` (`Instances3D.fill` — the
 matrix of a copy as Babylon applies it: position, heading, scale; `Debug3D.copyGroups`), `debug3d`
@@ -108,7 +117,8 @@ Files go into temp folders, `after()` removes them.
 
 ## Checklist
 
-1. New script — file in `js/`, `<script>` in `index.html` and a line in `CODE_FILES`; new asset — a literal `'assets/…'` in code.
+1. New script — file in `js/`, `<script>` in `index.html` (and in the editor's `index.html` if the
+   editor needs it) and a line in `CODE_FILES`; new asset — a literal `'assets/…'` in code.
 2. `node tools/check.mjs` passes; new non-3D logic — a test next to similar ones.
 3. `build.bat` passes without `--force`.
 4. The game starts on the dev server — console without errors.

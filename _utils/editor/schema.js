@@ -4,7 +4,9 @@
 //   kind: 'color'  — a 0xRRGGBB color (color picker + hex);
 //   kind: 'select' + options: [{ value, label }] — a MODE (0/1/2…). Do not make a mode
 //         a slider: it has no intermediate values. It stays a number in the file.
-// Group: { id, label, fields }. At startup all groups are collapsed.
+// Group: { id, label, fields, tab? }. At startup all groups are collapsed.
+//   tab: '<name>' — the group is built into the pane tab <name> (#<name>-groups) instead of
+//   Global Settings; it is still the same set of constants (one dirty state, one Save).
 // Texts (label, hint, option label) — in two languages: { en, ru } (i18n.js).
 //
 // Ranges are the slider bounds; a value beyond them can still be typed into the numeric field.
@@ -13,7 +15,7 @@
 // The server contract version this client expects. Must match
 // EDITOR_API_VERSION in server.mjs — otherwise the editor warns that editor.bat
 // is running old code (Node reads server files only at process start).
-const EDITOR_API_VERSION = 19;
+const EDITOR_API_VERSION = 20;
 
 // Ink edges and outline levels: 0 — off, 1 — main objects (actor), 2 — and environment (prop).
 const SCHEMA_LEVELS = [
@@ -107,8 +109,8 @@ const KIT_SCHEMA = [
                   { value: 0, label: { en: 'smooth', ru: 'плавное' } },
                   { value: 1, label: { en: 'toon (bands)', ru: 'toon (ступени)' } },
               ],
-              hint: { en: 'Light from all sources (sun + sky, with shadow) is quantized into bands. 0 is regular smooth shading without the silhouette outline',
-                      ru: 'Свет всех источников (солнце + небо, с тенью) квантуется в ступени. 0 — обычное плавное затенение без обводки силуэта' } },
+              hint: { en: 'Light from all sources (sun + sky, with shadow) is quantized into bands. 0 is regular smooth shading, without the silhouette outline and the edge lines',
+                      ru: 'Свет всех источников (солнце + небо, с тенью) квантуется в ступени. 0 — обычное плавное затенение, без обводки силуэта и контура рёбер' } },
             { name: 'WORLD3D_TOON_BANDS', min: 2, max: 6, step: 1,
               label: { en: 'Light bands', ru: 'Ступеней света' },
               hint: { en: '2 is light/shadow, 3 is light/half-tone/shadow…', ru: '2 — свет/тень, 3 — свет/полутень/тень…' } },
@@ -155,8 +157,8 @@ const KIT_SCHEMA = [
                       ru: 'Окружение — группа prop. Его в кадре много, поэтому линия обычно тоньше; 0 — без обводки' } },
             { name: 'WORLD3D_TOON_INK', kind: 'select', options: SCHEMA_LEVELS,
               label: { en: 'Edge lines', ru: 'Контур рёбер' },
-              hint: { en: 'Edges of lowpoly models sharper than the threshold get a line (EdgesRenderer). These are ALL such edges, inner ones included',
-                      ru: 'Рёбра lowpoly-моделей, изломанные круче порога, обводятся линией (EdgesRenderer). Это ВСЕ такие рёбра, включая внутренние' } },
+              hint: { en: 'Edges of lowpoly models sharper than the threshold get a line (EdgesRenderer). These are ALL such edges, inner ones included, on every object of the scene — an animated character too. Part of the toon look: with smooth shading there are no lines',
+                      ru: 'Рёбра lowpoly-моделей, изломанные круче порога, обводятся линией (EdgesRenderer). Это ВСЕ такие рёбра, включая внутренние, у всех объектов сцены — и у анимированного персонажа. Часть toon-вида: при плавном затенении линий нет' } },
             { name: 'WORLD3D_TOON_INK_WIDTH', min: 5, max: 400, step: 5,
               label: { en: 'Edge line width', ru: 'Толщина линии рёбер' },
               hint: { en: '≈ world px × 100: the line thins as the camera moves away, like ink on the model',
@@ -331,6 +333,48 @@ const KIT_SCHEMA = [
               label: { en: 'Sample game: rest time (s)', ru: 'Пример игры: время отдыха (с)' },
               hint: { en: 'Game.js: how long an empty energy bar takes to refill while the character stands',
                       ru: 'Game.js: за сколько пустая шкала энергии восполняется, пока персонаж стоит' } },
+            { name: 'GAME_STEP_SEC', min: 0.1, max: 2, step: 0.05,
+              label: { en: 'Sample game: step interval (s)', ru: 'Пример игры: шаг за (с)' },
+              hint: { en: 'Game.js: time between footstep sounds while the character runs',
+                      ru: 'Game.js: время между звуками шагов, пока персонаж бежит' } },
+        ],
+    },
+    // tab: 'sound' — the group is built into the Sound tab (#sound-groups), not into Global
+    // Settings. It is the same set of constants: one dirty state, one save. Skill `sound`.
+    {
+        id: 'audio-mixer',
+        tab: 'sound',
+        label: { en: 'Mixer', ru: 'Микшер' },
+        fields: [
+            { name: 'AUDIO_MASTER_VOLUME', min: 0, max: 1, step: 0.05,
+              label: { en: 'Master volume', ru: 'Общая громкость' },
+              hint: { en: 'Everything Sound3D plays. 0 — silence', ru: 'Всё, что играет Sound3D. 0 — тишина' } },
+            { name: 'AUDIO_MUSIC_VOLUME', min: 0, max: 1, step: 0.05,
+              label: { en: 'Music', ru: 'Музыка' },
+              hint: { en: "The 'music' channel: Sound3D.music(…)", ru: 'Канал music: Sound3D.music(…)' } },
+            { name: 'AUDIO_SFX_VOLUME', min: 0, max: 1, step: 0.05,
+              label: { en: 'Effects', ru: 'Эффекты' },
+              hint: { en: "The 'sfx' channel: Sound3D.play(…) and the sounds of location objects",
+                      ru: 'Канал sfx: Sound3D.play(…) и звуки объектов локации' } },
+        ],
+    },
+    {
+        id: 'audio-space',
+        tab: 'sound',
+        label: { en: 'Sound on the map', ru: 'Звук на карте' },
+        fields: [
+            { name: 'AUDIO_FALLOFF_MIN', min: 0, max: 2000, step: 10,
+              label: { en: 'Falloff Min (px)', ru: 'Falloff Min (px)' },
+              hint: { en: 'A sound is at full volume while the camera is this close to it',
+                      ru: 'Пока камера ближе этого расстояния, звук на полной громкости' } },
+            { name: 'AUDIO_FALLOFF_MAX', min: 100, max: 8000, step: 50,
+              label: { en: 'Falloff Max (px)', ru: 'Falloff Max (px)' },
+              hint: { en: 'From here on it is silent; in between the volume falls linearly. An object may set its own pair',
+                      ru: 'С этого расстояния не слышно, между радиусами громкость падает линейно. У объекта может быть своя пара' } },
+            { name: 'AUDIO_PAN', min: 0, max: 1, step: 0.05,
+              label: { en: 'Stereo width', ru: 'Ширина стерео' },
+              hint: { en: 'How far a sound at the side of the screen goes into one ear. 0 — mono',
+                      ru: 'Насколько звук сбоку экрана уходит в одно ухо. 0 — моно' } },
         ],
     },
 ];

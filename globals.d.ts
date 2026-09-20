@@ -19,12 +19,16 @@ interface UIRecord {
     id: string;
     /** 'text' | 'panel' | 'bar' | 'button' */
     kind: string;
-    /** One of 9 screen points: 'top-left' … 'bottom-right' */
+    /** One of 9 points of the container (the screen or the parent): 'top-left' … 'bottom-right' */
     anchor: string;
+    /** Id of the element this one sits in; none — the screen. */
+    parent?: string;
     x: number;
     y: number;
     w?: number;
     h?: number;
+    /** 'h' | 'v' | 'both' — fills the container on that axis: x (y) — the inset, w (h) ignored. */
+    stretch?: string;
     text?: string;
     fontSize?: number;
     /** Text color; bar — the filled part. '#rrggbb' */
@@ -57,6 +61,12 @@ interface LocationObjectDef {
     anim?: { part: string; axis: string; speed: number; dir: string };
     /** Looped animation clip of a glTF model ('idle'); none — the rest pose. */
     clip?: string;
+    /** A group name for game code: location.findByTag('coin'). */
+    tag?: string;
+    /** Placed but not in the scene until location.setHidden(rec, false). */
+    hidden?: boolean;
+    /** A sound standing at the object (Sound3D): src — assets/sounds/…, looped unless loop is false. */
+    sound?: { src: string; volume?: number; loop?: boolean; falloffMin?: number; falloffMax?: number };
 }
 
 /** Location object: Location3D.objects. */
@@ -78,4 +88,7 @@ interface LocationObject {
     /** The clip Location3D.playClip last asked for and the model root it asked. */
     clip?: string;
     clipRoot?: BABYLON.Mesh | null;
+    /** The playing def.sound and what it was started from (Location3D.updateSound). */
+    sound?: SoundHandle | null;
+    soundKey?: string;
 }
