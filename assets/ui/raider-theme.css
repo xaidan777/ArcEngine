@@ -1,0 +1,1376 @@
+/* Lobby art: 'assets/ui/raider-hangar.png'. Shared extraction UI art direction. */
+.arc-ui[data-mode=menu]{--paper:#eeeade;--ink:#242826;--signal:#e65036;--line:#f0eadb36;color:var(--paper);background:linear-gradient(90deg,#181c1beb,#222620d9),url('./raider-hangar.png') center/cover!important;font-family:'Arial',sans-serif!important}
+.arc-ui[data-mode=menu]::before{inset:0;pointer-events:none;background:linear-gradient(90deg,#55b9c0 0 25%,#efcd65 25% 50%,#e88242 50% 75%,#c94738 75%) 34px 76px/86px 4px no-repeat!important}
+.arc-ui[data-mode=menu] button{border-radius:1px!important;letter-spacing:.6px;transition:background .16s,box-shadow .16s,filter .16s,translate .16s}
+.arc-ui[data-mode=menu] button:hover:not(:disabled){filter:brightness(1.12);box-shadow:inset 0 0 0 1px #f8f1db!important;translate:0 -1px}
+.arc-ui[data-mode=menu] button:focus-visible{outline:2px solid #f4cb69!important;outline-offset:4px}
+.arc-ui[data-mode=menu] [data-ui=topNavPanel]{background:#eeeade!important;border:0!important;box-shadow:0 1px 0 #fff6;height:66px!important}
+.arc-ui[data-mode=menu] [data-ui=menuBrand]>div{color:#252b28!important;font-size:22px!important;font-weight:900!important;letter-spacing:-2px}
+.arc-ui[data-mode=menu] [data-ui^=nav]{top:0!important;height:66px!important;color:#51534b!important}
+.arc-ui[data-mode=menu] [data-ui^=nav]>div{color:#51534b!important;font-size:10px!important;font-weight:800!important;letter-spacing:.65px}
+.arc-ui[data-mode=menu] [data-ui^=nav][aria-pressed=true]{background:#dbd8cb!important;box-shadow:inset 0 -4px #d94e35!important}
+.arc-ui[data-mode=menu] [data-ui^=nav][aria-pressed=true]>div{color:#202722!important}
+.arc-ui[data-mode=menu] [data-ui=profileTag]>div{color:#626557!important;font-size:8px!important}
+.arc-ui[data-mode=menu] [data-ui=currencyTag]>div{color:#2f352c!important;font-weight:800!important;font-size:12px!important}
+.arc-ui[data-mode=menu] [data-ui=menuBottomBar]{background:#191e1aeb!important;border-color:#f1eadc29!important}
+.arc-ui[data-mode=menu] [data-ui=menuHint]>div{color:#b9b9a8!important;letter-spacing:1px}
+.arc-ui[data-screen=HUB]{background:linear-gradient(90deg,#121816c9,transparent 53%),linear-gradient(0deg,#131a18b3,transparent 30%),url('./raider-hangar.png') 58% 65px / cover no-repeat!important}
+.arc-ui[data-screen=HUB] [data-ui=hubTitle]>div{font-weight:900!important;letter-spacing:-2px;line-height:.95!important;color:#f2eee2!important}
+.arc-ui[data-screen=HUB] [data-ui=hubTitle]::after{content:'P R O T O C O L';display:block;margin-top:8px;font-size:13px;font-weight:500;letter-spacing:5px;color:#f0e8d7}
+.arc-ui[data-screen=HUB] [data-ui=hubSector]>div{color:#e6ca83!important;letter-spacing:1.5px}
+.arc-ui[data-screen=HUB] [data-ui=hubSubtitle]>div{color:#d1d0bf!important;font-size:11px!important}
+.arc-ui[data-screen=HUB] [data-ui=liveEventCard]{background:#ece8dceF!important;border:0!important;border-left:3px solid #e3583b!important;border-radius:0!important}
+.arc-ui[data-screen=HUB] [data-ui=hubEventTitle]>div{color:#726d5b!important;letter-spacing:1.2px}
+.arc-ui[data-screen=HUB] [data-ui=hubEventBody]>div{color:#30352d!important;font-weight:700!important;line-height:1.4!important;letter-spacing:-.3px}
+.arc-ui[data-screen=HUB] [data-ui=hubMap]{width:306px!important;background:linear-gradient(180deg,#12252255,#10222244),url('./sector-map.svg') center/cover!important;border:1px solid #e8e6cc66!important;border-radius:0!important;box-shadow:none}
+.arc-ui[data-screen=HUB] [data-ui=hubMapCaption]>div{color:#f1e8cf!important;letter-spacing:1px}
+.arc-ui[data-screen=HUB] [data-ui=featsCard]{width:430px!important;background:#1b241dd6!important;border:1px solid #f0eadb22!important;border-radius:0!important;backdrop-filter:blur(12px)}
+.arc-ui[data-screen=HUB] [data-ui=hubCareerTitle]>div{color:#c9c1a6!important;font-size:8px!important;letter-spacing:1.4px}
+.arc-ui[data-screen=HUB] [data-ui=hubCareerBody]>div{color:#f0e8d7!important}
+.arc-ui[data-screen=HUB] [data-ui=hubLoadoutBtn]{background:#e9e5d8!important;border:0!important}
+.arc-ui[data-screen=HUB] [data-ui=hubLoadoutBtn]>div{color:#30372f!important;font-size:10px!important;font-weight:800!important}
+.arc-ui[data-screen=HUB] [data-ui=squadPanel]{background:#19231cdd!important;border:1px solid #e9e6ce3d!important;border-radius:0!important}
+.arc-ui[data-screen=HUB] [data-ui=hubSolo]>div{color:#e4e7d3!important;font-size:10px!important;letter-spacing:1px}
+.arc-ui[data-mode=menu] [data-ui=mainPlayBtn],.arc-ui[data-mode=menu] [data-ui=deployLaunchBtn]{background:#e8553b!important;color:#fff1df!important;border:0!important;box-shadow:0 5px 24px #0004}
+.arc-ui[data-mode=menu] [data-ui=mainPlayBtn]>div,.arc-ui[data-mode=menu] [data-ui=deployLaunchBtn]>div{color:#fff1df!important;font-weight:900!important;letter-spacing:1px}
+.arc-ui[data-mode=menu] :is([data-ui=stashPanel],[data-ui=loadoutPanel],[data-ui=workshopPanel],[data-ui=raiderPanel],[data-ui=tradersPanel],[data-ui=dispatcherCard]){background:#282d28e8!important;border:1px solid #e4deca36!important;border-radius:0!important}
+.arc-ui[data-mode=menu] :is([data-ui=operatorCardLeft],[data-ui=operatorCardRight]){background:#1b231ee8!important;border:1px solid #e4deca2f!important;border-radius:0!important}
+.arc-ui[data-screen=RAIDER] :is([data-ui=careerDetails],[data-ui=operatorLoadoutDetails])>div,
+.arc-ui[data-screen=DECKS] :is([data-ui=careerDetails],[data-ui=operatorLoadoutDetails])>div{line-height:1.5!important;font-weight:650!important;text-align:left!important;color:#e8e3d7!important}
+.arc-ui[data-screen=RAIDER] [data-ui=operatorStatus]>div,
+.arc-ui[data-screen=DECKS] [data-ui=operatorStatus]>div{color:#d9c978!important;letter-spacing:.8px;font-weight:800!important}
+.arc-ui[data-mode=menu] :is([data-ui^=upgrade],[data-ui^=system],[data-ui^=traderItem],[data-ui^=traderNav],[data-ui=loadoutWeapon]){background:#474b40!important;border:1px solid #dedac132!important;border-radius:0!important}
+.arc-ui[data-mode=menu] :is([data-ui=stashTitle],[data-ui=workshopTitle],[data-ui=raiderTitle],[data-ui=mapTitle])>div{color:#eee9dc!important;font-weight:800!important;letter-spacing:.2px}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_]{background:#454b41!important;border-radius:0!important;border:1px solid #e2dec62b!important}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][aria-pressed=true]{background:#68705b!important;outline-color:#f2dc96!important}
+.arc-ui[data-screen=INVENTORY] [data-ui=itemInspectCard]{background:#e8e3d3!important;border-radius:0!important}
+.arc-ui[data-screen=INVENTORY] :is([data-ui=itemInspectTitle],[data-ui=itemInspectDesc])>div{color:#31382d!important}
+.arc-ui[data-screen=INVENTORY] [data-ui=itemEquipBtn]{background:#d85237!important}
+.arc-ui[data-screen=INVENTORY] [data-ui=itemEquipBtn]>div{color:#fff2df!important}
+#loading-screen{background:#202820!important}
+#loading-screen .game-logo{color:#eee9db;letter-spacing:.1em;text-shadow:none;font-weight:900;font-size:clamp(18px,4vw,34px)}
+#loading-screen .loading-bar{height:3px;border-radius:0;background:#5f6555}
+#loading-screen .loading-progress{background:linear-gradient(90deg,#62b6bf 0 25%,#e3cb73 25% 50%,#de8d4d 50% 75%,#e35b3d 75%)}
+@media(max-width:1000px){
+ .arc-ui[data-mode=menu]{background:linear-gradient(#20281ff0,#20281ff5),url('./raider-hangar.png') center/cover fixed!important}
+ .arc-ui[data-screen=HUB]{background:linear-gradient(0deg,#182219 15%,#18221966),url('./raider-hangar.png') 59% 85px/auto 570px no-repeat,#182219!important}
+ .arc-ui[data-mode=menu]::before{display:none}
+ .arc-ui[data-mode=menu] [data-ui=menuBrand]>div,.arc-ui[data-mode=menu] [data-ui=currencyTag]>div,.arc-ui[data-mode=menu] [data-ui^=nav]>div{color:#eee9dc!important}
+ .arc-ui[data-mode=menu] [data-ui^=nav]{height:39px!important;top:auto!important;border-bottom:1px solid #eee9dc35!important}
+ .arc-ui[data-mode=menu] [data-ui^=nav][aria-pressed=true]{background:#eee9dc!important}
+ .arc-ui[data-mode=menu] [data-ui^=nav][aria-pressed=true]>div{color:#252d25!important}
+ .arc-ui[data-screen=HUB] [data-ui=hubTitle]::after{font-size:10px;letter-spacing:4px}
+ .arc-ui[data-screen=HUB] [data-ui=hubSubtitle]{margin-top:22px;margin-bottom:230px}
+ .arc-ui[data-screen=HUB] [data-ui=hubMap]{width:100%!important;height:165px!important;order:8!important}
+ .arc-ui[data-screen=HUB] [data-ui=hubEventTitle]{order:6!important}
+ .arc-ui[data-screen=HUB] [data-ui=hubEventBody]{order:7!important}
+ .arc-ui[data-screen=HUB] [data-ui=hubEventTitle]>div{color:#dfc785!important}
+ .arc-ui[data-screen=HUB] [data-ui=hubEventBody]>div{color:#f0ecdf!important}
+ .arc-ui[data-screen=INVENTORY] :is([data-ui=itemInspectTitle],[data-ui=itemInspectDesc]){background:#e8e3d3!important}
+}
+@media(prefers-reduced-motion:reduce){.arc-ui[data-mode=menu] button{transition:none!important;translate:none!important}}
+@media(min-width:1001px){
+ .arc-ui[data-screen=HUB]{background-size:auto,auto,cover!important;background-origin:padding-box,padding-box,content-box!important;box-sizing:border-box;padding-top:66px;padding-bottom:45px;background-repeat:no-repeat!important;background-color:#252b24!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=mapPanel]{width:calc(100% - 540px)!important;border:1px solid #e6dfc74d!important;border-radius:0!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=mapLegend],.arc-ui[data-screen=MAP_SELECT] [data-ui=mapSectorInfo],.arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherTitle],.arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherChecks],.arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherStatus]{width:400px!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=mapLegend]>div,.arc-ui[data-screen=MAP_SELECT] [data-ui=mapSectorInfo]>div,.arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherTitle]>div,.arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherChecks]>div,.arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherStatus]>div{text-align:left!important;text-shadow:none!important;font-weight:500!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=mapSectorInfo]{top:175px!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=mapSectorInfo]>div{font-size:11px!important;line-height:1.4!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherCard]{top:350px!important;height:220px!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherTitle]{top:365px!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherTitle]>div{color:#e9d59d!important;font-size:10px!important;letter-spacing:1px}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherChecks]{top:392px!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherChecks]>div{font-size:10px!important;line-height:1.4!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherStatus]{top:546px!important}
+ .arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherStatus]>div{font-size:9px!important}
+}
+.arc-ui[data-mode=menu] [data-ui]>div{text-shadow:none!important}
+@media(min-width:1001px){
+ .arc-ui[data-screen=HUB]{background-size:auto,auto,100% 100%!important}
+}
+.arc-ui[data-screen=MAP_SELECT] [data-ui=dispatcherTitle]{z-index:1}
+
+/* ==========================================================================
+   Tactical Sector Map Overlay (ARC Raiders style)
+   ========================================================================== */
+.arc-tactical-map-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(6, 10, 14, 0.88);
+    backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #e2e8f0;
+}
+.arc-tactical-map-window {
+    width: min(1080px, 94vw);
+    height: min(780px, 92vh);
+    background: #0d131a;
+    border: 1px solid #1e293b;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.arc-map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 18px 24px;
+    background: #111822;
+    border-bottom: 1px solid #1e2d3d;
+}
+.arc-map-tag {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #00e5ff;
+    font-weight: 700;
+}
+.arc-map-title {
+    margin: 2px 0 0 0;
+    font-size: 20px;
+    letter-spacing: 0.5px;
+    color: #f8fafc;
+    font-weight: 800;
+}
+.arc-map-sub {
+    font-size: 11px;
+    color: #64748b;
+    font-family: monospace;
+}
+.arc-map-status-block {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+.arc-map-timer-box {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+.arc-map-timer-label {
+    font-size: 9px;
+    color: #94a3b8;
+    letter-spacing: 1px;
+}
+.arc-map-timer-val {
+    font-size: 18px;
+    font-weight: 800;
+    color: #f59e0b;
+    font-family: monospace;
+}
+.arc-map-close-btn, .arc-inv-close-btn {
+    background: #1e293b;
+    color: #cbd5e1;
+    border: 1px solid #334155;
+    padding: 8px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+}
+.arc-map-close-btn:hover, .arc-inv-close-btn:hover {
+    background: #334155;
+    color: #ffffff;
+    border-color: #00e5ff;
+}
+.arc-map-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+.arc-map-canvas-wrap {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #080c10;
+    padding: 16px;
+}
+#arc-map-canvas {
+    border: 1px solid #1e293b;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+    max-width: 100%;
+    max-height: 100%;
+}
+.arc-map-sidebar {
+    width: 340px;
+    background: #0f1620;
+    border-left: 1px solid #1e2d3d;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+}
+.arc-sidebar-heading {
+    margin: 0 0 10px 0;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: #94a3b8;
+    font-weight: 700;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 6px;
+}
+.arc-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+.arc-legend-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    border-radius: 3px;
+}
+.arc-ico-player { background: #f59e0b; color: #000; }
+.arc-ico-extract { background: #10b981; color: #fff; }
+.arc-ico-metro { background: #06b6d4; color: #fff; }
+.arc-ico-hatch { background: #eab308; color: #000; font-size: 10px; }
+.arc-ico-data { background: #00e5ff; color: #000; }
+.arc-ico-cache { background: #64748b; color: #fff; font-size: 10px; }
+.arc-legend-text { display: flex; flex-direction: column; }
+.arc-legend-text strong { font-size: 11px; color: #f1f5f9; }
+.arc-legend-text span { font-size: 10px; color: #64748b; }
+.arc-intel-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    padding: 6px 0;
+    border-bottom: 1px solid #141f2c;
+    font-family: monospace;
+}
+.arc-text-avail { color: #10b981; font-weight: 700; }
+.arc-text-gold { color: #f59e0b; font-weight: 700; }
+.arc-text-danger { color: #ef4444; font-weight: 700; }
+.arc-text-cyan { color: #00e5ff; font-weight: 700; }
+.arc-map-hint-card {
+    background: #141c26;
+    border-left: 3px solid #f59e0b;
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #94a3b8;
+    margin-top: auto;
+}
+
+/* ==========================================================================
+   In-Raid Tactical Inventory (ARC Raiders style)
+   ========================================================================== */
+.arc-raid-inventory-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(6, 10, 14, 0.88);
+    backdrop-filter: blur(12px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: auto;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #e2e8f0;
+}
+.arc-raid-inv-window {
+    width: min(1180px, 96vw);
+    height: min(820px, 94vh);
+    background: #0c1219;
+    border: 1px solid #1e2d3d;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+.arc-inv-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px;
+    background: #111a24;
+    border-bottom: 1px solid #1e2d3d;
+}
+.arc-inv-nav-tabs {
+    display: flex;
+    gap: 8px;
+}
+.arc-inv-tab {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    padding: 8px 18px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1.2px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+}
+.arc-inv-tab.active {
+    color: #f8fafc;
+    border-bottom-color: #00e5ff;
+    background: rgba(0, 229, 255, 0.05);
+}
+.arc-inv-currencies {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+}
+.arc-curr-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+.arc-curr-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #64748b;
+}
+.arc-curr-val {
+    font-size: 13px;
+    font-weight: 700;
+    font-family: monospace;
+}
+.arc-inv-main-layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+.arc-inv-left-pane {
+    width: 360px;
+    background: #0f1722;
+    border-right: 1px solid #1e2d3d;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+}
+.arc-inv-right-pane {
+    flex: 1;
+    padding: 24px 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    background: #0a0f16;
+}
+.arc-pane-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 8px;
+}
+.arc-pane-title {
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    font-weight: 800;
+    color: #f1f5f9;
+}
+.arc-pane-sub {
+    font-size: 11px;
+    color: #64748b;
+    font-family: monospace;
+}
+.arc-section-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: #94a3b8;
+    font-weight: 700;
+    margin-top: 4px;
+}
+.arc-equipment-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 14px;
+}
+.arc-equip-slot {
+    background: #111a26;
+    border: 1px solid #233446;
+    border-radius: 3px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.arc-slot-label {
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #64748b;
+    font-weight: 700;
+}
+.arc-item-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #f8fafc;
+}
+.arc-item-meta {
+    font-size: 10px;
+    color: #94a3b8;
+    font-family: monospace;
+}
+.arc-backpack-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+}
+.arc-grid-slot {
+    aspect-ratio: 1;
+    background: #111923;
+    border: 1px solid #223244;
+    border-radius: 4px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.15s;
+}
+.arc-grid-slot.empty {
+    border-style: dashed;
+    border-color: #1a2736;
+    opacity: 0.6;
+    align-items: center;
+    justify-content: center;
+}
+.arc-empty-num {
+    font-size: 12px;
+    color: #334155;
+    font-family: monospace;
+}
+.arc-grid-slot.filled:hover {
+    border-color: #00e5ff;
+    background: #172432;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 229, 255, 0.15);
+}
+.arc-grid-slot.rarity-common { border-left: 3px solid #94a3b8; }
+.arc-grid-slot.rarity-uncommon { border-left: 3px solid #22c55e; }
+.arc-grid-slot.rarity-rare { border-left: 3px solid #00e5ff; }
+.arc-grid-slot.rarity-epic { border-left: 3px solid #a855f7; }
+.arc-slot-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+}
+.arc-slot-name {
+    font-size: 9px;
+    font-weight: 700;
+    color: #e2e8f0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.arc-slot-badge {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #f59e0b;
+    font-family: monospace;
+}
+.arc-slot-weight {
+    font-size: 8px;
+    color: #64748b;
+    font-family: monospace;
+}
+.arc-bottom-utility-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-top: auto;
+}
+.arc-quick-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 6px;
+}
+.arc-quick-slot {
+    background: #111a24;
+    border: 1px solid #202e3d;
+    border-radius: 3px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+}
+.arc-quick-key {
+    font-size: 9px;
+    font-weight: 800;
+    color: #f59e0b;
+    font-family: monospace;
+}
+.arc-quick-name {
+    font-size: 8px;
+    color: #94a3b8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.arc-safe-grid {
+    margin-top: 6px;
+}
+.arc-safe-slot {
+    background: #141c24;
+    border: 1px solid #d97706;
+    box-shadow: inset 0 0 10px rgba(217, 119, 6, 0.15);
+    border-radius: 3px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.arc-safe-name {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fef08a;
+}
+.arc-safe-protect {
+    font-size: 9px;
+    font-weight: 700;
+    color: #f59e0b;
+    letter-spacing: 1px;
+}
+.arc-item-popover {
+    position: fixed;
+    width: 260px;
+    background: #ede8db;
+    color: #1a221f;
+    border: 1px solid #dcd5c4;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6);
+    padding: 16px;
+    z-index: 3000;
+    pointer-events: none;
+    border-radius: 2px;
+}
+.arc-popover-tag {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    font-weight: 800;
+    color: #726d5b;
+    margin-bottom: 4px;
+}
+.arc-popover-title {
+    font-size: 16px;
+    font-weight: 900;
+    color: #111815;
+    margin-bottom: 6px;
+}
+.arc-popover-desc {
+    font-size: 11px;
+    line-height: 1.35;
+    color: #3b4540;
+    margin-bottom: 10px;
+}
+.arc-popover-props {
+    border-top: 1px solid #d9d2c0;
+    padding-top: 8px;
+    margin-bottom: 10px;
+}
+.arc-prop-line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: #55625c;
+    padding: 2px 0;
+}
+.arc-popover-footer {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid #d9d2c0;
+    padding-top: 8px;
+    font-weight: 700;
+    font-size: 11px;
+}
+.arc-inv-footer {
+    display: flex;
+    gap: 24px;
+    padding: 10px 24px;
+    background: #0a0e14;
+    border-top: 1px solid #1e293b;
+    font-size: 10px;
+    color: #64748b;
+}
+.arc-inv-hint strong {
+    color: #cbd5e1;
+    margin-right: 4px;
+}
+.arc-container-header {
+    border-bottom: 1px solid #1e293b;
+    padding-bottom: 10px;
+}
+.arc-container-tag {
+    font-size: 9px;
+    letter-spacing: 1.5px;
+    color: #f59e0b;
+    font-weight: 800;
+}
+.arc-container-title {
+    margin: 2px 0 0 0;
+    font-size: 16px;
+    color: #f8fafc;
+    font-weight: 800;
+}
+.arc-container-sub {
+    font-size: 10px;
+    color: #64748b;
+}
+.arc-container-item-card {
+    background: #152230;
+    border: 1px solid #23374d;
+    padding: 12px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.arc-container-item-card:hover {
+    border-color: #00e5ff;
+    background: #1c2d40;
+}
+.arc-citem-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+.arc-citem-title {
+    font-size: 13px;
+    color: #f8fafc;
+}
+.arc-citem-info span {
+    font-size: 10px;
+    color: #94a3b8;
+}
+.arc-citem-take-btn, .arc-take-all-btn {
+    background: #0284c7;
+    color: #ffffff;
+    border: none;
+    padding: 8px 14px;
+    font-size: 11px;
+    font-weight: 800;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.arc-take-all-btn {
+    width: 100%;
+    padding: 12px;
+    background: #00e5ff;
+    color: #05131b;
+    font-size: 12px;
+}
+.arc-citem-take-btn:hover { background: #0369a1; }
+.arc-take-all-btn:hover { background: #38bdf8; }
+.arc-container-tip {
+    margin-top: auto;
+    font-size: 10px;
+    color: #64748b;
+    line-height: 1.4;
+}
+.arc-container-empty-msg {
+    padding: 30px;
+    text-align: center;
+    color: #475569;
+    font-size: 12px;
+    font-style: italic;
+}
+.arc-dossier-stats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.arc-stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    padding: 6px 0;
+    border-bottom: 1px solid #172230;
+    font-family: monospace;
+}
+.arc-text-health { color: #22c55e; font-weight: 700; }
+.arc-text-shield { color: #38bdf8; font-weight: 700; }
+.arc-dossier-perks {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+}
+.arc-perk-badge {
+    background: #141f2c;
+    border: 1px solid #1e3044;
+    padding: 6px 10px;
+    font-size: 10px;
+    color: #94a3b8;
+    border-radius: 2px;
+}
+
+/* ==========================================================================
+   Tactical In-Raid HUD Extensions (Compass ribbon, Vitals, Weapon, Prompt)
+   ========================================================================== */
+.arc-compass-ribbon-wrap {
+    position: fixed;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 440px;
+    height: 38px;
+    z-index: 100;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(180deg, rgba(8, 14, 20, 0.75) 0%, rgba(8, 14, 20, 0) 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.arc-compass-ribbon-canvas {
+    width: 420px;
+    height: 24px;
+}
+.arc-compass-center-notch {
+    width: 2px;
+    height: 6px;
+    background: #f59e0b;
+    margin-top: -2px;
+}
+.arc-hud-mission-banner {
+    position: fixed;
+    top: 14px;
+    right: 20px;
+    left: auto;
+    transform: none;
+    z-index: 100;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+}
+.arc-hud-status-title {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #f1f5f9;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+.arc-hud-status-sub {
+    font-size: 10px;
+    letter-spacing: 0.8px;
+    color: #38bdf8;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+    font-family: monospace;
+}
+.arc-tactical-vitals {
+    position: fixed;
+    bottom: 22px;
+    left: 24px;
+    z-index: 100;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    width: 220px;
+}
+.arc-vitals-callsign {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: #94a3b8;
+    text-shadow: 0 1px 3px #000;
+}
+.arc-shield-bar-wrap {
+    height: 7px;
+    background: rgba(10, 18, 26, 0.85);
+    border: 1px solid #1e3850;
+    border-radius: 1px;
+    overflow: hidden;
+    position: relative;
+}
+.arc-shield-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0284c7 0%, #00e5ff 100%);
+    transition: width 0.1s ease-out;
+}
+.arc-health-bar-wrap {
+    height: 5px;
+    background: rgba(10, 18, 26, 0.85);
+    border: 1px solid #334155;
+    border-radius: 1px;
+    overflow: hidden;
+}
+.arc-health-bar-fill {
+    height: 100%;
+    background: #ffffff;
+    transition: width 0.1s ease-out;
+}
+.arc-vitals-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: #cbd5e1;
+    font-family: monospace;
+    text-shadow: 0 1px 2px #000;
+}
+.arc-tactical-weapon-card {
+    position: fixed;
+    bottom: 22px;
+    right: 24px;
+    z-index: 100;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+}
+.arc-wep-title {
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #f8fafc;
+}
+.arc-wep-mode-badge {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    padding: 1px 6px;
+    border-radius: 2px;
+}
+.arc-wep-ammo-large {
+    font-size: 32px;
+    font-weight: 900;
+    color: #ffffff;
+    font-family: monospace;
+    line-height: 1;
+}
+.arc-wep-ammo-reserve {
+    font-size: 15px;
+    color: #94a3b8;
+    font-family: monospace;
+}
+.arc-wep-hotkeys-strip {
+    display: flex;
+    gap: 8px;
+    font-size: 9px;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+.arc-wep-hotkeys-strip span strong {
+    color: #cbd5e1;
+}
+.arc-interact-prompt-box {
+    position: fixed;
+    top: 60%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 100;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(11, 18, 26, 0.88);
+    border: 1px solid #00e5ff;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.25);
+    padding: 8px 16px;
+    border-radius: 2px;
+}
+.arc-prompt-key {
+    background: #00e5ff;
+    color: #0b121a;
+    font-weight: 900;
+    font-size: 12px;
+    padding: 2px 7px;
+    border-radius: 2px;
+}
+.arc-prompt-text {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #f8fafc;
+}
+
+/* ==========================================================================
+   Desktop raid UI correction pass
+   Full-screen panels use viewport coordinates; the combat HUD keeps one clear
+   information layer instead of stacking the legacy and tactical variants.
+   ========================================================================== */
+.arc-tactical-map-overlay,
+.arc-raid-inventory-overlay {
+    box-sizing: border-box;
+    padding: 20px 24px;
+    background:
+        radial-gradient(circle at 50% 18%, rgba(62, 75, 72, .2), transparent 38%),
+        rgba(8, 12, 13, .92);
+}
+
+.arc-tactical-map-window,
+.arc-raid-inv-window {
+    width: min(1760px, calc(100vw - 48px));
+    height: min(980px, calc(100vh - 40px));
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    border: 1px solid rgba(232, 226, 207, .22);
+    background: #111714;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, .72);
+}
+
+.arc-map-header,
+.arc-inv-topbar {
+    flex: 0 0 auto;
+    background: #e9e5d9;
+    border-color: #c9c2b1;
+}
+
+.arc-map-title,
+.arc-inv-tab.active,
+.arc-curr-val {
+    color: #242a25;
+}
+
+.arc-map-tag,
+.arc-map-sub,
+.arc-map-timer-label,
+.arc-curr-label,
+.arc-inv-tab {
+    color: #666b61;
+}
+
+.arc-map-tag,
+.arc-inv-tab.active {
+    color: #cf4f38;
+}
+
+.arc-map-close-btn,
+.arc-inv-close-btn {
+    background: #252b26;
+    border-color: #252b26;
+    color: #f4efe1;
+    border-radius: 0;
+}
+
+.arc-map-body,
+.arc-inv-main-layout {
+    min-width: 0;
+    min-height: 0;
+}
+
+.arc-map-canvas-wrap {
+    min-width: 0;
+    min-height: 0;
+    padding: 20px;
+    background: #0b100f;
+}
+
+#arc-map-canvas {
+    display: block;
+    width: min(76vh, 100%);
+    height: auto;
+    aspect-ratio: 1;
+    border-color: #34413e;
+}
+
+.arc-map-sidebar {
+    flex: 0 0 clamp(300px, 23vw, 390px);
+    width: auto;
+    min-height: 0;
+    box-sizing: border-box;
+    background: #151c19;
+    border-color: #34413e;
+    scrollbar-width: thin;
+    scrollbar-color: #66746d #151c19;
+}
+
+.arc-raid-inv-window {
+    background: #101512;
+}
+
+.arc-inv-left-pane {
+    flex: 0 0 clamp(340px, 31vw, 520px);
+    width: auto;
+    min-width: 0;
+    box-sizing: border-box;
+    background: #18201c;
+    border-color: #3c4841;
+}
+
+.arc-inv-right-pane {
+    min-width: 0;
+    min-height: 0;
+    box-sizing: border-box;
+    background: #0f1412;
+}
+
+.arc-equip-slot,
+.arc-grid-slot,
+.arc-quick-slot {
+    border-radius: 0;
+    background: #1a231f;
+    border-color: #3a4741;
+}
+
+.arc-equip-slot {
+    min-height: 88px;
+}
+
+.arc-backpack-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.arc-grid-slot.empty {
+    background: #151c19;
+    border-color: #2e3934;
+}
+
+.arc-inv-footer {
+    flex: 0 0 auto;
+    background: #e9e5d9;
+    border-color: #c9c2b1;
+    color: #62675e;
+}
+
+.arc-inv-hint strong {
+    color: #242a25;
+}
+
+.arc-hud-status-timer {
+    color: #e5ba63;
+    font: 800 13px/1 monospace;
+    letter-spacing: 1px;
+    margin-bottom: 3px;
+    text-shadow: 0 2px 5px #000;
+}
+
+.arc-hud-status-timer.warning { color: #f39a36; }
+.arc-hud-status-timer.critical { color: #ef5a45; }
+
+.arc-compass-ribbon-wrap {
+    top: 10px;
+    width: 460px;
+    height: 34px;
+    background: linear-gradient(180deg, rgba(14, 18, 16, .82), rgba(14, 18, 16, 0));
+}
+
+.arc-hud-mission-banner {
+    top: 14px;
+    right: 20px;
+    left: auto;
+    transform: none;
+    min-width: 240px;
+    padding: 6px 14px 8px;
+    box-sizing: border-box;
+    background: linear-gradient(135deg, rgba(16, 22, 19, 0.92) 0%, rgba(10, 14, 12, 0.92) 100%);
+}
+
+.arc-hud-status-title {
+    color: #f0eadc;
+    font-size: 11px;
+}
+
+.arc-hud-status-sub {
+    color: #7bc5ba;
+    font-size: 9px;
+}
+
+.arc-tactical-vitals {
+    left: 26px;
+    bottom: 24px;
+    width: 250px;
+    padding: 10px 12px 8px;
+    box-sizing: border-box;
+    background: linear-gradient(90deg, rgba(13, 18, 16, .8), rgba(13, 18, 16, .18));
+    border-left: 3px solid #69b9b1;
+}
+
+.arc-vitals-callsign { color: #e9e3d5; }
+.arc-shield-bar-fill { background: #6ec4bd; }
+.arc-health-bar-fill { background: #e9e4d8; }
+
+.arc-tactical-weapon-card {
+    right: 26px;
+    bottom: 24px;
+    min-width: 220px;
+    padding: 10px 12px 8px;
+    box-sizing: border-box;
+    background: linear-gradient(270deg, rgba(13, 18, 16, .82), rgba(13, 18, 16, .12));
+    border-right: 3px solid #df603f;
+}
+
+.arc-wep-title { color: #efe9db; }
+.arc-wep-mode-badge {
+    color: #e9ba60;
+    background: rgba(223, 96, 63, .12);
+    border-color: rgba(223, 96, 63, .46);
+    border-radius: 0;
+}
+
+.arc-interact-prompt-box {
+    top: 62%;
+    border: 0;
+    border-left: 3px solid #69b9b1;
+    border-radius: 0;
+    background: rgba(16, 22, 19, .9);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .32);
+}
+
+.arc-prompt-key {
+    background: #e9e4d8;
+    color: #222824;
+    border-radius: 0;
+}
+
+/* Compact mission tracker: no empty inventory boxes in the combat view. */
+.arc-ui [data-ui="topShade"] {
+    width: 278px !important;
+    height: 94px !important;
+    background: linear-gradient(90deg, rgba(14, 20, 17, .88), rgba(14, 20, 17, .3)) !important;
+    border-left: 3px solid #df603f !important;
+}
+
+.arc-ui [data-ui="objective"] { left: 18px !important; top: 15px !important; width: 244px !important; height: 28px !important; }
+.arc-ui [data-ui="objective"] > div { font-size: 10px !important; line-height: 1.25 !important; text-align: left !important; }
+.arc-ui [data-ui="loot"] { left: 18px !important; top: 49px !important; }
+.arc-ui [data-ui="lootValue"] { left: 18px !important; top: 66px !important; }
+.arc-ui [data-ui="inventory"] { left: 120px !important; top: 66px !important; }
+.arc-ui :is([data-ui="loot"], [data-ui="lootValue"], [data-ui="inventory"]) > div { font-size: 9px !important; letter-spacing: .35px !important; }
+@media (max-width: 1500px) {
+    .arc-tactical-map-overlay,
+    .arc-raid-inventory-overlay { padding: 14px 18px; }
+    .arc-tactical-map-window,
+    .arc-raid-inv-window {
+        width: calc(100vw - 36px);
+        height: calc(100vh - 28px);
+    }
+    .arc-map-header,
+    .arc-inv-topbar { padding: 11px 18px; }
+    .arc-map-sidebar { flex-basis: 310px; padding: 14px; gap: 10px; }
+    .arc-map-hint-card { margin-top: 0; }
+    .arc-inv-left-pane { flex-basis: 390px; padding: 18px; }
+    .arc-inv-right-pane { padding: 18px 22px; gap: 12px; }
+    .arc-backpack-grid { gap: 8px; }
+    .arc-bottom-utility-row { gap: 10px; }
+}
+
+/* Desktop online lobby. Kept in viewport coordinates beside the scaled game UI. */
+.arc-online-lobby {
+    position: fixed;
+    z-index: 1200;
+    top: 138px;
+    right: 48px;
+    width: 350px;
+    max-height: calc(100vh - 340px);
+    overflow: auto;
+    box-sizing: border-box;
+    padding: 18px;
+    color: #ece7da;
+    background: rgba(27, 34, 29, .94);
+    border: 1px solid rgba(236, 231, 218, .24);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, .38);
+    font: 12px/1.35 Arial, sans-serif;
+    pointer-events: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #70786b #202720;
+}
+
+.arc-online-lobby[hidden] { display: none !important; }
+.arc-online-lobby * { box-sizing: border-box; }
+body.arc-auth-locked .arc-ui { visibility: hidden !important; }
+
+.arc-online-lobby[data-mode="gate"] {
+    inset: 0;
+    width: 100vw;
+    max-height: none;
+    padding: 0;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: minmax(38px, 1fr) minmax(390px, 560px) minmax(300px, 1fr);
+    align-items: stretch;
+    background:
+        linear-gradient(90deg, rgba(13, 19, 16, .97) 0 31%, rgba(13, 19, 16, .73) 55%, rgba(13, 19, 16, .9)),
+        linear-gradient(0deg, rgba(14, 19, 16, .55), transparent 70%),
+        url('./raider-hangar.png') center / cover no-repeat;
+    border: 0;
+    box-shadow: none;
+    font-family: Arial, sans-serif;
+}
+.arc-auth-identity {
+    position: absolute;
+    top: 34px;
+    left: 44px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: #f0ecdf;
+}
+.arc-auth-identity b { font-size: 30px; letter-spacing: -1px; }
+.arc-auth-identity span { padding-left: 14px; border-left: 1px solid #e9e3d34d; font-size: 9px; line-height: 1.35; letter-spacing: 2px; }
+.arc-auth-stage {
+    grid-column: 2;
+    align-self: center;
+    padding: 42px 50px 46px;
+    background: rgba(31, 39, 32, .94);
+    border: 1px solid rgba(236, 231, 218, .24);
+    border-left: 4px solid #e4583e;
+    box-shadow: 0 26px 80px rgba(0, 0, 0, .46);
+}
+.arc-auth-kicker { color: #dfc77b; font-size: 9px; font-weight: 900; letter-spacing: 2px; }
+.arc-auth-stage h1 { margin: 14px 0 8px; color: #f0ecdf; font-size: 31px; line-height: 1; letter-spacing: -.5px; }
+.arc-auth-stage .arc-online-auth-copy { max-width: 410px; margin: 0 0 24px; }
+.arc-auth-tabs { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 19px; border-bottom: 1px solid #5e655c; }
+.arc-auth-tabs button { min-height: 39px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #8e948a; }
+.arc-auth-tabs button[aria-selected="true"] { border-bottom-color: #e2c86f; color: #f0ecdf; background: rgba(235, 228, 207, .06); }
+.arc-auth-submit { width: 100%; min-height: 47px !important; margin-top: 8px; font-size: 11px !important; }
+.arc-auth-retry { width: 100%; min-height: 38px !important; margin-top: 10px; }
+.arc-auth-server { display: grid; grid-template-columns: 9px 1fr; gap: 4px 8px; align-items: center; margin-top: 20px; padding-top: 15px; border-top: 1px solid #e7e1d32b; color: #aeb4a9; font-size: 9px; letter-spacing: .8px; }
+.arc-auth-server i { width: 7px; height: 7px; border-radius: 50%; background: #e4583e; box-shadow: 0 0 10px currentColor; }
+.arc-auth-server i.online { background: #72c7ae; }
+.arc-auth-server i.checking { background: #dec46d; animation: arc-auth-pulse 1s ease-in-out infinite alternate; }
+.arc-auth-server small { grid-column: 2; color: #6f776e; font-size: 8px; letter-spacing: 0; }
+.arc-auth-brief { grid-column: 3; align-self: end; justify-self: end; width: 330px; margin: 0 54px 68px 0; padding: 24px; color: #e9e4d6; background: rgba(24, 31, 26, .83); border-top: 3px solid #d9bf68; }
+.arc-auth-brief span { color: #d9bf68; font-size: 8px; font-weight: 900; letter-spacing: 1.6px; }
+.arc-auth-brief b { display: block; margin: 13px 0; font-size: 21px; line-height: 1.2; }
+.arc-auth-brief p { margin: 0; color: #adb2a7; line-height: 1.5; }
+@keyframes arc-auth-pulse { to { opacity: .35; } }
+.arc-online-head,
+.arc-online-block-title,
+.arc-online-toolbar,
+.arc-online-request,
+.arc-online-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.arc-online-head {
+    padding-bottom: 11px;
+    border-bottom: 1px solid rgba(236, 231, 218, .18);
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 1px;
+}
+
+.arc-online-head i {
+    font-size: 8px;
+    font-style: normal;
+    letter-spacing: .8px;
+}
+.arc-online-head i.online { color: #72c7ae; }
+.arc-online-head i.offline { color: #ee6a4e; }
+.arc-online-head i.checking { color: #dec46d; }
+
+.arc-online-auth-copy {
+    margin: 14px 0;
+    color: #b9b9aa;
+    line-height: 1.5;
+}
+
+.arc-online-auth,
+.arc-online-auth label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.arc-online-auth { gap: 11px; }
+.arc-online-auth label { color: #d9c98f; font-size: 9px; letter-spacing: 1px; }
+
+.arc-online-lobby input {
+    width: 100%;
+    height: 34px;
+    border: 1px solid #5b6358;
+    border-radius: 0;
+    outline: 0;
+    background: #151b17;
+    color: #f1ecdf;
+    padding: 0 10px;
+    font: 600 11px Arial, sans-serif;
+}
+.arc-online-lobby input:focus { border-color: #ddc46e; }
+
+.arc-online-lobby button {
+    min-height: 30px;
+    border: 1px solid #666e62;
+    border-radius: 0;
+    background: #3f473e;
+    color: #eee9dd;
+    padding: 0 10px;
+    font: 800 9px Arial, sans-serif;
+    letter-spacing: .6px;
+    cursor: pointer;
+}
+.arc-online-lobby button:hover:not(:disabled) { background: #586154; }
+.arc-online-lobby button:disabled { opacity: .45; cursor: wait; }
+.arc-online-lobby button.primary { background: #e6573d; border-color: #e6573d; color: white; }
+
+.arc-online-actions button { flex: 1; }
+.arc-online-toolbar { margin: 10px 0 12px; }
+.arc-online-toolbar b { color: #e0c879; font-size: 9px; letter-spacing: .8px; }
+.arc-online-toolbar button:first-of-type { min-width: 30px; padding: 0; font-size: 15px; }
+
+.arc-online-block {
+    margin-top: 10px;
+    padding: 11px;
+    background: rgba(8, 13, 10, .32);
+    border-left: 2px solid #66746a;
+}
+.arc-online-block-title { color: #d9c98f; font-size: 9px; font-weight: 900; letter-spacing: 1px; }
+.arc-online-block-title button { min-height: 24px; }
+.arc-online-members,
+.arc-online-friends { display: grid; gap: 5px; margin: 9px 0; }
+.arc-online-members span,
+.arc-online-friends span { color: #e5e0d4; font-weight: 700; }
+.arc-online-friends span::first-letter { color: #74c7b1; }
+.arc-online-friends em { color: #80887d; font-style: normal; }
+
+.arc-online-inline { display: flex; gap: 6px; margin-top: 8px; }
+.arc-online-inline input { min-width: 0; height: 30px; }
+.arc-online-request { margin-top: 7px; padding-top: 7px; border-top: 1px solid rgba(236, 231, 218, .12); }
+.arc-online-request span { flex: 1; color: #c9c6b8; }
+.arc-online-request button { min-height: 24px; }
+
+.arc-online-queue { margin-top: 12px; }
+.arc-online-queue button { width: 100%; min-height: 40px; }
+.arc-online-message { margin-top: 10px; padding: 8px 10px; background: rgba(105, 185, 177, .12); color: #9fd6cb; border-left: 2px solid #69b9b1; }
+.arc-online-message.error { background: rgba(226, 84, 57, .12); color: #f09884; border-left-color: #e25439; }
+
+/* Navigation selection already has a strong underline; suppress the browser focus halo. */
+.arc-ui[data-mode="menu"] [data-ui^="nav"]:focus-visible { outline: none !important; }
+
+@media (max-width: 1500px) {
+    .arc-online-lobby[data-mode="lobby"] {
+        top: 112px;
+        right: 24px;
+        width: 310px;
+        max-height: calc(100vh - 245px);
+        padding: 14px;
+    }
+    .arc-auth-stage { padding: 34px 40px 38px; }
+    .arc-auth-brief { margin: 0 34px 48px 0; }
+}
+
+@media (max-width: 1050px) {
+    .arc-online-lobby[data-mode="gate"] { grid-template-columns: minmax(24px, 1fr) minmax(390px, 560px) minmax(24px, 1fr); }
+    .arc-auth-brief { display: none; }
+}

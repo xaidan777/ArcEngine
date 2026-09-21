@@ -5,25 +5,64 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ArcEngine — editor</title>
     <link rel="stylesheet" href="./editor.css">
-</head>
+    <link rel="stylesheet" href="../../assets/ui/menu.css">
+<style>
+    #topbar { flex-wrap: wrap; height: auto; min-height: 44px; }
+    #topbar > button, #topbar > select, #terrain-panel button, #terrain-panel select, #terrain-panel input:not([type=checkbox]) {
+        background: #252e38; color: #e0e8f0; border: 1px solid #435161; border-radius: 5px; padding: 6px 8px; font: inherit;
+    }
+    #topbar > button:hover, #terrain-panel button:hover { background: #354453; }
+    #terrain-panel button { width: 100%; margin-top: 12px; }
+    #terrain-panel p { color: #94a4b5; font-size: 12px; line-height: 1.5; }
+    #terrain-panel label:has(input[type=checkbox]) { justify-content: flex-start; }
+    #map-select { max-width: 220px; } #view-toolbar { flex-wrap: wrap; }
+    .map-dialog { color: #dce4ec; background: #20252d; border: 1px solid #647488; border-radius: 10px; width: 420px; max-width: 90vw; }
+    .map-dialog::backdrop { background: #0009; }
+    .map-dialog label, #terrain-panel label { display: flex; gap: 12px; align-items: center; justify-content: space-between; margin: 12px 0; }
+    .map-dialog input, .map-dialog select, #terrain-panel input, #terrain-panel select { max-width: 210px; }
+    #terrain-panel { padding: 14px; overflow: auto; } #terrain-panel input[type=number] { width: 85px; }
+    </style></head>
 <body>
     <!-- Markup texts are English by default; data-i18n* replaces them with the
          language from the switch (i18n.js). -->
     <header id="topbar">
+        <select id="map-select" aria-label="Карта"></select>
+        <button id="btn-new-map" data-i18n="map.new">+ Новая карта</button>
+        <button id="btn-save-as-map" data-i18n="map.saveAs">Сохранить как…</button>
+        <button id="btn-delete-map" data-i18n="map.delete" title="Удалить карту из пула">Удалить карту</button>
         <div id="brand"><span class="brand-arc">ARC</span>ENGINE <span class="brand-sub" data-i18n="brand">editor</span></div>
+        <div id="workspace-tabs" class="workspace-tabs" role="tablist">
+            <button class="ws-tab active" data-workspace="level" title="Редактор карты и рейда"><span>🗺️</span> <span data-i18n="ws.level">Level Editor</span></button>
+            <button class="ws-tab" data-workspace="rig" title="Редактор скелета и суставов"><span>🦴</span> <span data-i18n="ws.rig">Rig Studio</span></button>
+            <button class="ws-tab" data-workspace="anim" title="Студия анимаций и таймлайн"><span>🎬</span> <span data-i18n="ws.anim">Anim Studio</span></button>
+            <button id="btn-add-tab" class="ws-tab ws-add" title="Asset Library / Добавить">+</button>
+        </div>
         <div id="server-status">
             <span id="server-dot"></span>
             <span id="server-label" data-i18n="server.checking">checking server…</span>
         </div>
-        <button id="btn-help" data-i18n-title="onb.help" title="How the editor works">?</button>
         <div id="lang-switch" class="mode-tabs" role="group" data-i18n-title="lang.title" title="Interface language">
             <button data-lang="en">EN</button>
             <button data-lang="ru">RU</button>
         </div>
     </header>
 
+    <!-- Unity-like layout: a menu bar over a Hierarchy | Scene | Inspector row, with a Console
+         strip under it. The existing tabs stay reachable inside the Inspector column, so nothing
+         that worked before is lost while the new panes come online. -->
+    <div id="menu-bar" class="menu-bar" role="menubar"></div>
+
     <main>
-        <!-- LEFT PANE: the location in 3D -->
+        <!-- LEFT COLUMN: the scene tree -->
+        <section id="hierarchy-pane" class="dock-pane">
+            <div class="dock-title" data-i18n="dock.hierarchy">Hierarchy</div>
+            <div id="hierarchy-tree" class="hierarchy"></div>
+        </section>
+
+        <!-- LEFT SPLITTER -->
+        <div id="splitter-left" class="splitter-v" title="Resize / Double click to collapse"><button class="splitter-collapse-btn">◀</button></div>
+
+        <!-- CENTRE: the location in 3D -->
         <section id="view-pane">
             <div id="view-toolbar">
                 <div class="mode-tabs" id="camera-modes">
@@ -38,6 +77,26 @@
                     <button data-gizmo="rotate" data-i18n-title="gizmo.rotateTitle">⟳ <span data-i18n="gizmo.rotate">Rotate</span></button>
                     <button data-gizmo="scale" data-i18n-title="gizmo.scaleTitle">⤢ <span data-i18n="gizmo.scale">Scale</span></button>
                 </div>
+                <!-- LEVEL TOOLS -->
+                <div class="toolbar-group" id="level-tools">
+                    <button id="btn-clear-map" data-i18n="map.clear">🧹 Очистить карту</button>
+                    <select id="marker-kind" aria-label="Тип маркера"><option value="spawn">Спавн игрока</option><option value="extraction">Эвакуация</option><option value="hatch">Люк</option><option value="drive">Накопитель</option></select><button id="btn-add-marker" data-i18n="map.marker">+ Маркер</button>
+                    <button id="btn-add-enemy" data-i18n="map.enemy" class="panel-button" title="Add enemy spawn">+ 🔴 Enemy</button>
+                    <button id="btn-add-crate" data-i18n="map.loot" class="panel-button" title="Add loot crate">+ 🟡 Loot</button>
+                    <button id="btn-add-point-light-top" class="panel-button" title="Добавить точечный свет">+ 💡 Свет</button>
+                    <button id="btn-add-spot-light-top" class="panel-button" title="Добавить прожектор">+ 🔦 Прожектор</button>
+                    <button id="btn-toggle-markers" class="panel-button active" title="Toggle gameplay markers">👁️ Markers</button>
+                    <button id="btn-toggle-rubble" class="panel-button active" title="Включить/выключить камни на карте">🪨 Камни</button>
+                    <button id="btn-toggle-grid" class="panel-button active" title="Показать/скрыть сетку (G)">🌐 Сетка</button>
+                    <label class="panel-toggle" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; cursor: pointer; color: #7ec7ff; padding: 0 4px; user-select: none;" title="Мирный режим: отключить спавн любых врагов в игре для этой карты"><input type="checkbox" id="cb-no-enemies"> <span data-i18n="map.noEnemies">🕊️ Без врагов</span></label>
+                    <button id="btn-save-level" data-i18n="map.save" class="panel-button" title="Save level data">💾 Save Level</button>
+                    <button id="btn-play-game" data-i18n="map.play" class="panel-button btn-play-primary" title="Launch and play raid in game (F5)">▶ Play Raid</button>
+                </div>
+                <!-- RIG TOOLS -->
+                <div class="toolbar-group" id="rig-tools" hidden>
+                    <button id="btn-extrude-joint" class="panel-button" title="Extrude child joint (E)">+ 🦴 Extrude (E)</button>
+                    <button id="btn-save-rig-top" class="panel-button" title="Save rig">💾 Save Rig</button>
+                </div>
                 <div class="toolbar-spacer"></div>
                 <div class="toolbar-group">
                     <select id="debug-mode" data-i18n-title="debug.modeTitle">
@@ -50,39 +109,38 @@
                 </div>
                 <div class="toolbar-group">
                     <label data-i18n-title="opt.toonTitle"><input type="checkbox" id="opt-toon"> <span data-i18n="opt.toon">toon shader</span></label>
-                    <label data-i18n-title="opt.uiTitle"><input type="checkbox" id="opt-ui" checked> <span data-i18n="opt.ui">UI</span></label>
-                    <label data-i18n-title="opt.soundTitle"><input type="checkbox" id="opt-sound"> <span data-i18n="opt.sound">sound</span></label>
+                    <label data-i18n-title="opt.uiTitle"><input type="checkbox" id="opt-ui"> <span data-i18n="opt.ui">UI</span></label>
                 </div>
             </div>
             <div id="view-wrap">
                 <canvas id="view-canvas"></canvas>
                 <div id="view-info" class="float-chip"></div>
                 <div id="view-hints" class="float-chip"></div>
-                <!-- Flight speed right where it is felt: the same CAMERA_FLY_SPEED constant as
-                     in Global Settings (range and step come from the schema, lab.js) -->
-                <div id="view-speed" class="float-chip" data-i18n-title="cam.speedTitle">
-                    <span data-i18n="cam.speed">camera speed</span>
-                    <input type="range" id="cam-speed">
-                    <output id="cam-speed-value"></output>
-                </div>
                 <div id="lint-panel" hidden></div>
             </div>
         </section>
 
+        <!-- RIGHT SPLITTER -->
+        <div id="splitter-right" class="splitter-v" title="Resize / Double click to collapse"><button class="splitter-collapse-btn">▶</button></div>
+
         <!-- RIGHT PANE: the Global Settings (Constants.js), Objects (Objects.js) and UI (UILayout.js) tabs -->
         <aside id="inspector-pane">
-            <div id="pane-tabs" class="mode-tabs">
-                <button data-tab="settings" data-i18n="tab.settings">Global Settings</button>
+            <div id="pane-tabs" class="mode-tabs" role="tablist" aria-label="Inspector">
                 <button data-tab="objects" data-i18n="tab.objects">Objects</button>
-                <button data-tab="ui" data-i18n="tab.ui">UI</button>
-                <button data-tab="sound" data-i18n="tab.sound">Sound</button>
+                <button data-tab="terrain" data-i18n="tab.terrain">Terrain</button>
+                <button data-tab="materials" data-i18n="tab.materials">Materials</button>
+                <button data-tab="lighting" data-i18n="tab.lighting">💡 Освещение</button>
+                <button data-tab="settings" data-i18n="tab.settings">Settings</button>
+                <button data-tab="ui" data-i18n="tab.ui">Interface</button>
             </div>
 
+            <section class="pane-panel" data-tab="terrain" id="terrain-panel" hidden></section>
+            <section class="pane-panel" data-tab="lighting" id="lighting-panel" hidden></section>
             <section class="pane-panel" data-tab="settings">
                 <div id="inspector-header">
                     <div id="inspector-actions">
-                        <button data-role="save-constants" disabled>Save to Constants.js</button>
-                        <button data-role="revert-constants" disabled data-i18n="insp.revert" data-i18n-title="insp.revertTitle">↺ Revert</button>
+                        <button id="btn-save" disabled>Save to Constants.js</button>
+                        <button id="btn-revert" disabled data-i18n="insp.revert" data-i18n-title="insp.revertTitle">↺ Revert</button>
                     </div>
                     <input id="inspector-search" type="search" data-i18n-placeholder="insp.search" placeholder="search: toon, shadow, FOV, CAMERA…">
                 </div>
@@ -97,13 +155,17 @@
                 <div id="objects-header">
                     <button id="btn-import" data-i18n-title="obj.importTitle">Import model…</button>
                     <div id="objects-actions">
-                        <button id="btn-objects-save" disabled data-i18n="obj.save">Save to Objects.js</button>
+                        <button id="btn-objects-save" disabled data-i18n="obj.save">Save map</button>
                         <button id="btn-objects-revert" disabled data-i18n="obj.revert" data-i18n-title="obj.revertTitle">↺ Revert</button>
                     </div>
                 </div>
                 <div id="objects-list"></div>
                 <div id="object-props"></div>
                 <div id="objects-footer" data-i18n="obj.footer">Gizmo arrows move the selected object. Click an object in the view to select it.</div>
+            </section>
+
+            <section class="pane-panel" data-tab="materials" hidden>
+                <div id="materials-host" style="padding: 10px; overflow-y: auto; height: 100%;"></div>
             </section>
 
             <section class="pane-panel" data-tab="ui" hidden>
@@ -118,49 +180,30 @@
                 <div id="ui-props"></div>
                 <div id="ui-footer" data-i18n="ui.footer">Drag an element in the view, resize it by the handles. Arrows nudge by 1 px, Shift — by 10.</div>
             </section>
-
-            <section class="pane-panel" data-tab="sound" hidden>
-                <div id="sound-header">
-                    <div id="sound-actions">
-                        <button data-role="save-constants" disabled>Save to Constants.js</button>
-                        <button data-role="revert-constants" disabled data-i18n="insp.revert" data-i18n-title="insp.revertTitle">↺ Revert</button>
-                    </div>
-                </div>
-                <div id="sound-groups"></div>
-                <div id="sound-files"></div>
-                <div id="sound-footer" data-i18n="snd.footer">A sound of an object is set in the Objects tab; game code plays effects with Sound3D.play. Click a file to hear it.</div>
-            </section>
         </aside>
     </main>
 
+    <!-- BOTTOM SPLITTER -->
+    <div id="splitter-bottom" class="splitter-h" title="Resize / Double click to collapse"><button class="splitter-collapse-btn">▼</button></div>
+
+    <!-- SPECIALIST DOCK: the animation timeline, the model inspector and the rig editor, one
+         at a time, so the viewport keeps its height. -->
+    <section id="editor-panels" class="dock-pane dock-panels"></section>
+
+    <!-- BOTTOM STRIP: findings from every panel, merged by the Console -->
+    <footer id="console-pane" class="dock-pane dock-bottom">
+        <div class="dock-title">
+            <span data-i18n="dock.console">Console</span>
+            <span id="console-badge" class="console-badge"></span>
+            <div class="toolbar-spacer"></div>
+            <button id="btn-console-clear" data-i18n="console.clear">Clear</button>
+            <button id="btn-console-close" class="dock-close-btn" title="Закрыть консоль">✕</button>
+        </div>
+        <div id="console-list" class="console-list"></div>
+    </footer>
+
     <div id="toasts"></div>
     <div id="boot-error"></div>
-
-    <!-- Welcome tour (onboarding.js): #onb-spot frames the part of the editor a slide is about
-         and dims the rest, the card moves to the free space next to it -->
-    <div id="onboarding" hidden>
-        <div id="onb-spot"></div>
-        <div id="onb-card" role="dialog" aria-modal="true">
-            <div id="onb-head">
-                <div id="onb-lang" class="mode-tabs" role="group" data-i18n-title="lang.title" title="Interface language">
-                    <button data-lang="en">EN</button>
-                    <button data-lang="ru">RU</button>
-                </div>
-                <button id="onb-close" data-i18n-title="onb.close" title="Close (Esc)">×</button>
-            </div>
-            <div id="onb-body"></div>
-            <div id="onb-foot">
-                <div id="onb-dots"></div>
-                <label id="onb-hide" data-i18n-title="onb.hideTitle">
-                    <input type="checkbox" id="onb-hide-box"> <span data-i18n="onb.hide">Don't show again</span>
-                </label>
-                <div id="onb-nav">
-                    <button id="onb-prev">← Back</button>
-                    <button id="onb-next" class="primary">Next →</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- The order matters: language, schema and loader -> kit modules from the project root -> editor UI -->
     <script src="./i18n.js"></script>
@@ -169,26 +212,54 @@
     <script src="/libs/simplex-noise.js"></script>
     <script src="/libs/babylon.js"></script>
     <script src="/libs/babylonjs.loaders.min.js"></script>
+    <script src="/js/ShooterRules.js"></script>
+    <script src="/js/RaidWorld.js"></script>
+    <script src="/js/RaidLevel.js"></script>
+    <script src="/js/NavGrid.js"></script>
+    <script src="/js/engine/ArcSpatialGrid.js"></script>
+    <script src="/js/engine/workers/ArcJobWorker.js"></script>
+    <script src="/js/engine/ArcJobSystem.js"></script>
+    <script src="/js/engine/ArcPostProcess.js"></script>
+    <script src="/js/DayNightCycle.js"></script>
     <script src="/js/Objects.js"></script>
     <script src="/js/UILayout.js"></script>
-    <script src="/js/Sound3D.js"></script>
     <script src="/js/World3D.js"></script>
     <script src="/js/Terrain3D.js"></script>
     <script src="/js/CameraControl.js"></script>
     <script src="/js/Model3D.js"></script>
     <script src="/js/Gltf3D.js"></script>
-    <script src="/js/Instances3D.js"></script>
     <script src="/js/Location3D.js"></script>
+    <script src="/js/RaidEnvironment.js"></script>
     <script src="/js/Debug3D.js"></script>
     <script src="/js/UI.js"></script>
     <script src="./history.js"></script>
+    <script src="./scene-doc.js"></script>
+    <script src="./clip-doc.js"></script>
+    <script src="./menu-bar.js"></script>
+    <script src="./hierarchy-panel.js"></script>
+    <script src="./scene-view.js"></script>
+    <script src="./anim-editor.js"></script>
+    <script src="./model-editor.js"></script>
+    <script src="./rig-editor.js"></script>
+    <script src="./console-pane.js"></script>
+    <script src="./editor-panels.js"></script>
     <script src="./inspector.js"></script>
     <script src="./objects-panel.js"></script>
-    <script src="./sound-panel.js"></script>
     <script src="./ui-panel.js"></script>
+    <script src="./dock-manager.js"></script>
+    <script src="./workspace-manager.js"></script>
+    <script src="./raid-layer.js"></script>
+    <script src="./rig-visualizer.js"></script>
+    <script src="./asset-browser.js"></script>
+    <script src="./material-editor.js"></script>
+    <script src="./map-editor.js"></script>
+    <script src="./terrain-panel.js"></script>
+    <script src="./light-manager.js"></script>
+    <script src="./color-picker.js"></script>
+    <script src="./lighting-panel.js"></script>
     <script src="./lab.js"></script>
     <script src="./debug-tools.js"></script>
-    <script src="./onboarding.js"></script>
     <script src="./main.js"></script>
+    <script src="./live-agent.js"></script>
 </body>
 </html>

@@ -36,6 +36,7 @@ class CameraController {
         this.terrain = o.terrain || null;
         this.bounds = o.bounds || null;
         this.free = !!o.free;
+        if (this.cam) this.cam.maxZ = this.free ? 150000 : 30000;
         this.target = { x: 0, y: 0, h: 0 };
         this.lift = 0;                 // px: target height above the ground (flight: W/S along the view, Q/E)
         this.azimuth = 0;
@@ -43,12 +44,17 @@ class CameraController {
         this.zoom = 1;
         this.zoomTarget = 1;
         this.followObj = null;
+        this.firstPersonObj = null;       // optional {x, y}: eye is anchored directly to this actor
+        this.firstPersonEyeHeight = 64;
         this.ignorePointer = null;     // (e) => true — the press is not for the camera (editor: gizmo under the cursor)
         this.viewVersion = 0;          // grows with every camera move (re-project overlays)
         this._lastCam = null;
         this._pointers = new Map();    // pointerId -> { x, y, mode: 'pan' | 'orbit' | 'look' | 'touch', anchor }
         this._pinch = null;
         this._keys = new Set();
+        this.movementEnabled = true;     // false when game logic owns WASD movement
+        this.pointerEnabled = true;      // false when Pointer Lock gameplay owns mouse look
+        this.firstPersonOffset = null;
         this._zoomAnchor = null;       // zoom to cursor: { px, py, x, y, h } — ground point under the cursor
         this._shakeUntil = 0;
         this._shakeAmp = 0;
@@ -56,6 +62,44 @@ class CameraController {
         this._bound = null;
         this.applyConstants();
         this.home();
+    }
+
+    /**
+     * Camera pullback in world px: the distance at which the view frustum covers the canvas.
+     *
+     * `distance` reads like a data field, so a caller will eventually assign to it — MenuSystem
+     * did (`camera.distance = 180`) to frame the menu screens, which replaced this method with a
+     * number and threw "this.distance is not a function" INSIDE the render loop; the game then
+     * rendered zero frames. Internal code therefore goes through `_safeDistance()`, which keeps
+     * working even if that happens, and the mutating caller now sets `zoom` instead.
+     * @returns {number}
+     */
+    distance() {
+        const h = (this.view?.world?.canvas && this.view.world.canvas.clientHeight) || 600;
+        const minZ = this.free ? 0.0005 : 0.01;
+        const fov = (this.cam && this.cam.fov > 0) ? this.cam.fov : (this.c?.fov ? this.c.fov * Math.PI / 180 : 0.9);
+        return h / (2 * Math.tan(fov / 2) * Math.max(minZ, this.zoom));
+    }
+
+    /**
+     * Camera pullback, tolerant of `distance` having been overwritten by an assignment.
+     *
+     * `distance()` is the real implementation. It reads like a data field, so a caller assigned
+     * to it once (MenuSystem framed the menu with `camera.distance = 180`), which replaced the
+     * method with a number and threw inside the render loop. Every internal caller goes through
+     * here, so a stray assignment degrades the framing instead of killing every frame.
+     * @returns {number}
+     */
+    _safeDistance() {
+        if (typeof this.distance === 'function') return this.distance();
+        // Shadowed by a number: honour it as a distance request.
+        const shadowed = Number(this.distance);
+        if (Number.isFinite(shadowed) && shadowed > 0) return shadowed;
+        // Anything else: recompute from the current zoom.
+        const h = (this.view?.world?.canvas && this.view.world.canvas.clientHeight) || 600;
+        const minZ = this.free ? 0.0005 : 0.01;
+        const fov = (this.cam && this.cam.fov > 0) ? this.cam.fov : (this.c?.fov ? this.c.fov * Math.PI / 180 : 0.9);
+        return h / (2 * Math.tan(fov / 2) * Math.max(minZ, this.zoom || 1));
     }
 
     // Camera constants with defaults. In the game they are lexical consts — typeof only.
@@ -91,7 +135,9 @@ class CameraController {
         this.zoom = this._clampZoom(this.zoom);
         this._clampTarget();
         this.lift = this._clampLift(this.lift);
-        this.pitch = this._clampPitch(this.pitch);
+        this.pitch = this.firstPersonObj
+            ? Math.max(CameraController.FPS_PITCH.min, Math.min(CameraController.FPS_PITCH.max, this.pitch))
+            : this._clampPitch(this.pitch);
     }
 
     // Home position: orientation and zoom from the constants, target — the followed
@@ -120,13 +166,69 @@ class CameraController {
 
     follow(obj) { this.followObj = obj || null; }
 
+    // First-person mode keeps the eye on an actor while azimuth/pitch define its view.
+    // Mouse ownership remains with the game layer (Pointer Lock); this only applies the pose.
+    setFirstPerson(obj, eyeHeight) {
+        this.firstPersonObj = obj || null;
+        this.firstPersonEyeHeight = Math.max(1, eyeHeight || 64);
+        this.followObj = null;
+        this._zoomAnchor = null;
+    }
+
+    lookDelta(dx, dy) {
+        const k = this.c.orbitDegPerPx * Math.PI / 180;
+        this.azimuth += dx * k;
+        this.pitch = Math.max(CameraController.FPS_PITCH.min, Math.min(CameraController.FPS_PITCH.max, this.pitch + dy * k));
+        if (this.recoilRecoveryPitch > 0 && dy > 0) {
+            this.recoilRecoveryPitch = Math.max(0, this.recoilRecoveryPitch - dy * k);
+        }
+    }
+
+    applyRecoil(pitchKick, yawKick = 0) {
+        this.pitch = Math.max(CameraController.FPS_PITCH.min, Math.min(CameraController.FPS_PITCH.max, this.pitch - pitchKick));
+        this.azimuth += yawKick;
+        this.recoilRecoveryPitch = (this.recoilRecoveryPitch || 0) + pitchKick * 0.7;
+    }
+
+    // Let gameplay own movement keys while keeping look and zoom controls active.
+    setMovementEnabled(on) {
+        this.movementEnabled = on !== false;
+        if (!this.movementEnabled) this._keys.clear();
+    }
+
+    setPointerEnabled(on) {
+        this.pointerEnabled = on !== false;
+        if (!this.pointerEnabled) {
+            this._pointers.clear();
+            this._pinch = null;
+            this._zoomAnchor = null;
+        }
+    }
+
+    // Unit ground-plane direction used by both the camera and game movement.
+    forward2D() { return { x: Math.cos(this.azimuth), y: Math.sin(this.azimuth) }; }
+    right2D() { return { x: -Math.sin(this.azimuth), y: Math.cos(this.azimuth) }; }
+
+    // Unit 3D forward direction matching the camera look ray in Babylon coordinates.
+    forward3D() {
+        const cp = Math.cos(this.pitch);
+        return {
+            x: Math.cos(this.azimuth) * cp,
+            y: Math.sin(this.azimuth) * cp,
+            h: -Math.sin(this.pitch)
+        };
+    }
+
     setFree(on) {
         this.free = !!on;
+        if (this.cam) this.cam.maxZ = on ? 150000 : 30000;
         this.zoomTarget = this._clampZoom(this.zoomTarget);
         this.zoom = this._clampZoom(this.zoom);
         this._clampTarget();
         this.lift = this._clampLift(this.lift);
-        this.pitch = this._clampPitch(this.pitch);
+        this.pitch = this.firstPersonObj
+            ? Math.max(CameraController.FPS_PITCH.min, Math.min(CameraController.FPS_PITCH.max, this.pitch))
+            : this._clampPitch(this.pitch);
     }
 
     // Location rebuilt (editor): new terrain and dimensions.
@@ -140,8 +242,14 @@ class CameraController {
     // Ground point at the frame center: { x, y, h, k }. The target lifted off the ground
     // (flight) — the view ray lands farther ahead; k — how many times farther than the
     // target the ground is along the ray (the frame's reach on the ground grows with it).
+    // The editor drops a newly imported object here; the shadow frustum does NOT use it —
+    // it is led by the eye, see fitShadowFrustum.
     groundFocus() {
-        const t = this.target, sp = Math.sin(this.pitch), dist = this.distance();
+        if (this.firstPersonObj) {
+            const f = this.firstPersonObj;
+            return { x: f.x, y: f.y, h: this._groundH(f.x, f.y), k: 1 };
+        }
+        const t = this.target, sp = Math.sin(this.pitch), dist = this._safeDistance();
         const k = sp > 0.05 ? Math.max(0.25, Math.min(4, 1 + this.lift / (sp * dist))) : 4;   // toward the horizon — capped
         const run = (k - 1) * dist * Math.cos(this.pitch);
         const x = t.x + Math.cos(this.azimuth) * run, y = t.y + Math.sin(this.azimuth) * run;
@@ -150,14 +258,13 @@ class CameraController {
 
     // --- Screen <-> world ---------------------------------------------------------
 
-    distance() {
-        const h = (this.view.world.canvas && this.view.world.canvas.clientHeight) || 600;
-        return h / (2 * Math.tan(this.cam.fov / 2) * Math.max(0.02, this.zoom));
-    }
+    // `distance` is the read-only accessor installed in the constructor; `_distance()` above
+    // provides its value.
 
     // World px per screen px at the look-at point.
     worldPerScreenPx() {
-        return 1 / Math.max(0.02, this.zoom);
+        const minZ = this.free ? 0.0005 : 0.01;
+        return 1 / Math.max(minZ, this.zoom);
     }
 
     // Screen shift (dx right, dy down) -> shift on the map, accounting for azimuth.
@@ -178,7 +285,9 @@ class CameraController {
 
     // Shake: intensity — fraction of the frame (0.01 — light), converted to world px.
     shake(ms, intensity) {
-        const amp = Math.min(40, (intensity || 0.01) * 600);
+        const i = Math.min(0.04, intensity || 0.01);
+        const amp = i * 600;
+        this._shakeIntensity = Math.max((this._shakeIntensity || 0) * (this._shakeUntil > performance.now() ? 1 : 0), i);
         this._shakeAmp = Math.max(this._shakeAmp * (this._shakeUntil > performance.now() ? 1 : 0), amp);
         this._shakeUntil = performance.now() + (ms || 200);
     }
@@ -187,8 +296,8 @@ class CameraController {
 
     _clampZoom(z) {
         const c = this.c;
-        const lo = this.free ? Math.min(c.zoomMin, 0.12) : c.zoomMin;
-        const hi = Math.max(lo, this.free ? Math.max(c.zoomMax, 6) : c.zoomMax);
+        const lo = this.free ? Math.min(c.zoomMin, 0.001) : c.zoomMin;
+        const hi = Math.max(lo, this.free ? Math.max(c.zoomMax, 10) : c.zoomMax);
         return Math.max(lo, Math.min(hi, Number.isFinite(z) ? z : 1));
     }
 
@@ -227,7 +336,7 @@ class CameraController {
         const t = this.terrain;
         if (!t || !(t.outerRing > 0)) return floor;
         const reach = t.outerRing * 0.85;   // margin: the ring is coarse, distant terrain is higher/lower
-        const dist = this.distance();
+        const dist = this._safeDistance();
         const drop = Math.max(0, this.target.h - (Number.isFinite(t.hMin) ? t.hMin : 0));
         const tV = Math.tan(this.cam.fov / 2);
         const tH = tV * this.view.engine.getAspectRatio(this.cam);
@@ -256,7 +365,7 @@ class CameraController {
 
     // Camera position from target, azimuth, pitch and zoom — without shake and the ground floor.
     _eye() {
-        const d = this.distance(), cp = Math.cos(this.pitch);
+        const d = this._safeDistance(), cp = Math.cos(this.pitch);
         return {
             x: this.target.x - Math.cos(this.azimuth) * cp * d,
             y: this.target.y - Math.sin(this.azimuth) * cp * d,
@@ -305,7 +414,7 @@ class CameraController {
         const e = this._eye();
         this.azimuth += dAzimuth;
         this.pitch = this._clampPitch(this.pitch + dPitch);
-        const d = this.distance(), cp = Math.cos(this.pitch);
+        const d = this._safeDistance(), cp = Math.cos(this.pitch);
         this._setTarget3(
             e.x + Math.cos(this.azimuth) * cp * d,
             e.y + Math.sin(this.azimuth) * cp * d,
@@ -392,6 +501,7 @@ class CameraController {
     }
 
     _onDown(e) {
+        if (!this.pointerEnabled) return;
         if (this.ignorePointer && this.ignorePointer(e)) return;
         let mode = null;
         if (e.pointerType === 'touch') mode = 'touch';
@@ -471,11 +581,12 @@ class CameraController {
     // Wheel: zoom to cursor. The ground point under the cursor is remembered and kept under
     // it while the zoom settles by lerp (update). When following — zoom around the target.
     _onWheel(e) {
+        if (!this.pointerEnabled) return;
         e.preventDefault();
         if (!e.deltaY) return;
         const notches = Math.max(-1, Math.min(1, e.deltaY / 100));   // mouse ~100 per notch, touchpad — small steps
         this.zoomTarget = this._clampZoom(this.zoomTarget * Math.pow(1 + this.c.wheelStep, -notches));
-        if (this.followObj) { this._zoomAnchor = null; return; }
+        if (this.followObj || notches > 0) { this._zoomAnchor = null; return; }
         const p = this._local(e);
         const hit = this._pick(p.x, p.y);
         this._zoomAnchor = hit ? { px: p.x, py: p.y, x: hit.x, y: hit.y, h: hit.h } : null;
@@ -486,11 +597,12 @@ class CameraController {
         if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
         if (e.ctrlKey || e.metaKey || e.altKey) return;
         if (CameraController.FLY_KEYS[e.code]) {
+            if (!this.movementEnabled) return;
             if (down) this._keys.add(e.code); else this._keys.delete(e.code);
             e.preventDefault();
             return;
         }
-        if (down && e.code === 'KeyR' && !e.repeat) this.home();
+        if (this.movementEnabled && down && e.code === 'KeyR' && !e.repeat) this.home();
     }
 
     // --- Frame ----------------------------------------------------------------------
@@ -521,35 +633,99 @@ class CameraController {
             this.lift -= this.lift * k;
             this._clampTarget();
         }
-        this.target.h = this._groundH(this.target.x, this.target.y) + this.lift;
-        this.pitch = this._clampPitch(this.pitch);   // zoom changes the frame's reach — and the pitch limit
+        this.target.h = (f && f.h != null ? f.h + 38 : this._groundH(this.target.x, this.target.y)) + this.lift;
+        this.pitch = this.firstPersonObj
+            ? Math.max(CameraController.FPS_PITCH.min, Math.min(CameraController.FPS_PITCH.max, this.pitch))
+            : this._clampPitch(this.pitch);   // zoom changes the frame's reach — and the pitch limit
 
         const a = this._zoomAnchor;
         if (a) {
             this._dragTo(a, a.px, a.py);
             if (this.zoom === this.zoomTarget) this._zoomAnchor = null;
         }
+
+        if (this.recoilRecoveryPitch && Math.abs(this.recoilRecoveryPitch) > 1e-4) {
+            const step = Math.min(Math.abs(this.recoilRecoveryPitch), Math.abs(this.recoilRecoveryPitch) * 14 * dt + 0.05 * dt);
+            const sign = Math.sign(this.recoilRecoveryPitch);
+            const delta = sign * step;
+            this.pitch = Math.max(CameraController.FPS_PITCH.min, Math.min(CameraController.FPS_PITCH.max, this.pitch + delta));
+            this.recoilRecoveryPitch -= delta;
+        }
+
         this._apply();
     }
 
     // Babylon camera position and target: back from the target along the azimuth by the
     // distance from zoom, at angle pitch to the ground, no lower than ground + EYE_MIN.
     _syncCamera() {
-        const e = this._eye();
-        const px = e.x, pz = e.y;
+        // `distance` is a read-only accessor (see the constructor): an assignment is absorbed into
+        // `zoom` instead of replacing the property, so this cannot throw inside the render loop.
+        const d = this._safeDistance();
+        if (this.cam && this.cam.maxZ < d * 5) {
+            this.cam.maxZ = Math.max(300000, d * 5);
+        }
+        const fp = this.firstPersonObj;
+        const eyeH = fp && fp.eyeHeight != null ? fp.eyeHeight : this.firstPersonEyeHeight;
+        const e = fp ? {
+            x: fp.x,
+            y: fp.y,
+            h: this._groundH(fp.x, fp.y) + eyeH + (fp.jumpOffset || 0)
+        } : this._eye();
+        let px = e.x, pz = e.y;
         const py = Math.max(e.h, this._groundH(px, pz) + CameraController.EYE_MIN);
+
+        // Lateral camera offset (lean)
+        const az = this.azimuth;
+        const rightX = -Math.sin(az);
+        const rightZ = Math.cos(az);
+        if (fp && fp.leanOffset) {
+            px += rightX * fp.leanOffset;
+            pz += rightZ * fp.leanOffset;
+        }
+
         let sx = 0, sy = 0, sh = 0;
+        if (fp) {
+            if (fp.bobX) {
+                sx += rightX * fp.bobX;
+                sy += rightZ * fp.bobX;
+            }
+            if (fp.bobY) {
+                sh += fp.bobY;
+            }
+        }
+
+        let shakePitch = 0, shakeYaw = 0;
         const now = performance.now();
         if (this._shakeUntil > now) {
-            const amp = this._shakeAmp * Math.min(1, (this._shakeUntil - now) / 200);
-            sx = (Math.random() * 2 - 1) * amp;
-            sy = (Math.random() * 2 - 1) * amp;
-            sh = (Math.random() * 2 - 1) * amp * 0.5;
+            const decay = Math.min(1, (this._shakeUntil - now) / 120);
+            const amp = this._shakeAmp * decay;
+            const intensity = (this._shakeIntensity || 0.005) * decay;
+            const posJitter = Math.min(1.2, amp * 0.15);
+            sx += (Math.random() * 2 - 1) * posJitter;
+            sy += (Math.random() * 2 - 1) * posJitter;
+            sh += (Math.random() * 2 - 1) * posJitter * 0.5;
+            const rotShake = Math.min(0.015, intensity * 1.2);
+            shakePitch = (Math.random() * 2 - 1) * rotShake;
+            shakeYaw = (Math.random() * 2 - 1) * rotShake;
         } else {
             this._shakeAmp = 0;
+            this._shakeIntensity = 0;
         }
         this.cam.position.set(px + sx, py + sh, pz + sy);
-        this.cam.setTarget(new BABYLON.Vector3(this.target.x + sx, this.target.h + sh, this.target.y + sy));
+        if (fp) {
+            const pitch = Math.max(CameraController.FPS_PITCH.min, Math.min(CameraController.FPS_PITCH.max, this.pitch + shakePitch));
+            const azimuth = this.azimuth + shakeYaw;
+            const cp = Math.cos(pitch);
+            this.target.x = px + sx + Math.cos(azimuth) * cp * 200;
+            this.target.y = pz + sy + Math.sin(azimuth) * cp * 200;
+            this.target.h = py + sh - Math.sin(pitch) * 200;
+            this.cam.setTarget(new BABYLON.Vector3(this.target.x, this.target.h, this.target.y));
+            if (fp.leanRoll != null) {
+                this.cam.rotation.z = fp.leanRoll;
+            }
+        } else {
+            this.cam.setTarget(new BABYLON.Vector3(this.target.x + sx, this.target.h + sh, this.target.y + sy));
+        }
     }
 
     _apply() {
@@ -561,7 +737,11 @@ class CameraController {
         // building with the head raised it lands a thousand px past the building, in flight forward
         // and down it falls behind the camera, and from above it sits under the eye.
         // maxR is the frame's own footprint, a request: the box is tightened by the caster bounds.
-        const cv = this.view.world.canvas, e = this._eye();
+        const cv = this.view.world.canvas, fp = this.firstPersonObj;
+        // First-person: the eye is on the PLAYER (_syncCamera anchors to fp.x/fp.y), while _eye()
+        // still returns the ORBIT eye behind them. Feeding the orbit eye here would centre the
+        // shadow on the pivot behind the player and drop the shadows of what stands in front.
+        const e = fp ? { x: fp.x, y: fp.y } : this._eye();
         const halfDiag = 0.5 * Math.hypot((cv && cv.clientWidth) || 800, (cv && cv.clientHeight) || 600) * this.worldPerScreenPx();
         this.view.fitShadowFrustum({
             x: e.x, y: e.y, h: this._groundH(e.x, e.y),
@@ -577,6 +757,7 @@ class CameraController {
 }
 
 // Flight keys: key code -> [forward along the view, right, up along the world vertical].
+CameraController.FPS_PITCH = { min: -80 * Math.PI / 180, max: 80 * Math.PI / 180 };
 CameraController.FLY_KEYS = {
     KeyW: [1, 0, 0], ArrowUp: [1, 0, 0], KeyS: [-1, 0, 0], ArrowDown: [-1, 0, 0],
     KeyA: [0, -1, 0], ArrowLeft: [0, -1, 0], KeyD: [0, 1, 0], ArrowRight: [0, 1, 0],

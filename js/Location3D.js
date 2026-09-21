@@ -2,10 +2,10 @@
 // of size LOCATION_WIDTH × LOCATION_HEIGHT with the LOCATION_GROUND texture, and
 // objects — models from Objects.js (LOCATION_OBJECTS), placed by the editor.
 // Shared by the game (main.js) and the editor (_utils/editor/lab.js): both call
-// update(dt) every frame — part spin (def.anim), the looped clip (def.clip) and the sound
-// (def.sound) of the models. Game code finds what the editor placed by name or by tag
-// (findByTag) and shows hidden objects with setHidden. The game creates its own
-// objects in location.view.scene and registers them with World3D.addObject(location.view,
+// update(dt) every frame — part spin of models (def.anim) and the looped clip (def.clip).
+// Game code finds what the editor placed by tag (findByTag) and reveals objects the
+// designer left out of the scene (setHidden). The game creates its own objects in
+// location.view.scene and registers them with World3D.addObject(location.view,
 // mesh, 'actor' | 'prop'); put them on the ground via location.terrain.heightAt(x, y).
 
 class Location3D {
@@ -14,32 +14,117 @@ class Location3D {
     constructor(opts) {
         this.opts = opts || {};
         this.view = World3D.createView({});
+        /** @type {Terrain3D | null} */
         this.terrain = null;
         /** @type {LocationObject[]} */
         this.objects = [];   // { def, mesh, error, loaded } — see addObject
         this._groundImage = null;
         this._groundIndex = -1;
         this.buildTerrain();
+        this.lights = [];
+        if (!this.opts.isEditor && this.opts.level?.lights) {
+            this.buildLights(this.opts.level.lights);
+        }
         const models = (this.opts.objects || []).map(def => this.addObject(def).loaded);
-        // Ready — the ground texture and object models have arrived (or were not found) and the scene shaders are built.
-        this.ready = Promise.all([this.loadGround()].concat(models))
-            .then(() => new Promise(resolve => this.view.scene.executeWhenReady(() => resolve(undefined))));
+        // Readiness belongs to this location's assets, not to the entire live scene.
+        // Global executeWhenReady also waits for gameplay particles, glow/shadow targets
+        // and post-process recompiles added later, which can keep the loader open forever.
+        this.ready = Promise.all([this.loadGround(), Promise.resolve(this.terrain.ready).then(() => this.placeObjects())].concat(models));
     }
 
-    get width() { return Math.max(64, (typeof LOCATION_WIDTH !== 'undefined') ? LOCATION_WIDTH : 2048); }
-    get height() { return Math.max(64, (typeof LOCATION_HEIGHT !== 'undefined') ? LOCATION_HEIGHT : 2048); }
+    buildLights(lightsList) {
+        for (const l of this.lights) {
+            try { l.dispose(); } catch (_) {}
+        }
+        this.lights = [];
+        const scene = this.view.scene;
+        if (!scene || !Array.isArray(lightsList)) return;
+        for (const def of lightsList) {
+            const pos = new BABYLON.Vector3(def.x || 0, def.h != null ? def.h : 60, def.y || 0);
+            const color = def.color ? BABYLON.Color3.FromHexString(def.color) : new BABYLON.Color3(1, 0.95, 0.8);
+            if (def.type === 'spot') {
+                const dirArr = def.direction || [0, -1, 0.2];
+                const dir = new BABYLON.Vector3(dirArr[0], dirArr[1], dirArr[2]).normalize();
+                const angle = (def.angle || 60) * Math.PI / 180;
+                const spot = new BABYLON.SpotLight('loc_spot_' + def.id, pos, dir, angle, def.exponent != null ? def.exponent : 1.5, scene);
+                spot.diffuse = color;
+                spot.intensity = def.intensity != null ? def.intensity : 2.0;
+                spot.range = def.range || 450;
+                spot.falloffType = BABYLON.Light.FALLOFF_STANDARD;
+                spot.innerAngle = (angle * 0.6);
+                this.lights.push(spot);
+            } else {
+                const pt = new BABYLON.PointLight('loc_point_' + def.id, pos, scene);
+                pt.diffuse = color;
+                pt.intensity = def.intensity != null ? def.intensity : 1.5;
+                pt.range = def.range || 300;
+                pt.falloffType = BABYLON.Light.FALLOFF_STANDARD;
+                this.lights.push(pt);
+            }
+        }
+    }
+
+    // Convert the editor's persisted lighting schema at the shared location boundary.
+    // Both preview and gameplay use View3D's same lighting implementation.
+    applyLightingSettings(settings = {}) {
+        const base = World3D.cfg();
+        const color = (value, fallback) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value)
+            ? parseInt(value.slice(1), 16) : fallback;
+        const sunEl = settings.sunElevation ?? settings.sunEl ?? base.sunEl;
+        const nightFactor = settings.nightFactor != null
+            ? Number(settings.nightFactor)
+            : (settings.sunEnabled === false
+                ? 1.0
+                : (sunEl >= 0 ? 0.0 : Math.min(1.0, Math.max(0.0, -sunEl / 20.0))));
+        const cfg = {
+            ...base,
+            sunEnabled: settings.sunEnabled !== false,
+            sunAz: settings.sunAzimuth ?? settings.sunAz ?? base.sunAz,
+            sunEl: sunEl,
+            sunIntensity: settings.sunEnabled === false ? 0 : (settings.sunIntensity ?? settings.sunInt ?? base.sunIntensity),
+            sunColor: color(settings.sunColor ?? settings.sunCol, base.sunColor),
+            skyIntensity: Math.max(0.15, settings.ambientIntensity ?? settings.skyIntensity ?? settings.ambInt ?? base.skyIntensity),
+            skyLight: color(settings.skyLight ?? settings.skyColor, base.skyLight),
+            sky: color(settings.sky ?? settings.skyColor, base.sky),
+            groundLight: color(settings.groundLight ?? settings.groundColor, base.groundLight),
+            shadowColor: color(settings.shadowColor, base.shadowColor),
+            shadowStrength: settings.shadowStrength ?? base.shadowStrength,
+            nightFactor: nightFactor
+        };
+        this.view.applyLighting(cfg);
+        return cfg;
+    }
+
+    get width() { return Math.max(64, this.opts.level?.dimensions?.width || ((typeof LOCATION_WIDTH !== 'undefined') ? LOCATION_WIDTH : 2048)); }
+    get height() { return Math.max(64, this.opts.level?.dimensions?.height || ((typeof LOCATION_HEIGHT !== 'undefined') ? LOCATION_HEIGHT : 2048)); }
 
     // (Re)build the ground from the location size and TERRAIN_* (editor — live).
     // Location objects settle onto the new ground; the game's own objects are the owner's concern.
     buildTerrain() {
         if (this.terrain) this.terrain.dispose();
+        const t = this.opts.level?.terrain || {};
+        const hasHeightmap = !!(t.samples || t.heightmap);
+        let outerRingCfg = t.outerRing;
+        if (outerRingCfg === undefined) {
+            outerRingCfg = (this.opts.isEditor || hasHeightmap) ? 0 : Terrain3D.OUTER_RING;
+        }
         this.terrain = new Terrain3D(this.view, {
+            cell: t.cell,
+            noise: { base: t.base, amp: t.noiseAmp, scale: t.noiseScale, seed: t.seed },
+            heightmap: t.samples || t.heightmap,
+            heightmapOptions: { width: t.nx, height: t.ny, minHeight: t.minHeight, maxHeight: t.maxHeight, blendNoise: t.samples ? 0 : t.blendNoise },
             worldW: this.width,
             worldH: this.height,
-            groundImage: this._groundImage
+            groundImage: this._groundImage,
+            outerRing: outerRingCfg,
+            outerRingMode: t.outerRingMode
         });
         this.placeObjects();
-        return this.terrain;
+        const terrain = this.terrain;
+        terrain.ready = Promise.resolve(terrain.ready).then(() => {
+            if (this.terrain === terrain && this.view) this.placeObjects();
+        });
+        return terrain;
     }
 
     // --- Location objects -----------------------------------------------------------
@@ -47,9 +132,9 @@ class Location3D {
     // LOCATION_OBJECTS record -> object: { def, mesh, error, loaded }. The record
     // is returned immediately; the mesh appears once the model finishes loading (loaded —
     // a promise). No file — an object without a mesh (error), the scene doesn't crash.
-    // def: { name, model, kind, x, y, h, rot, scale, anim?, clip?, tag?, hidden?, sound? } — the
-    // fields are live: edit + placeObject; anim, clip and sound are read every frame (spinPart,
-    // playClip, updateSound); hidden — through setHidden.
+    // def: { name, model, kind, x, y, h, rot, scale, anim?, clip?, tag?, hidden? } — the fields are
+    // live: edit + placeObject; anim and clip are read every frame (spinPart, playClip);
+    // hidden — through setHidden.
     /** @param {LocationObjectDef} def @returns {LocationObject} */
     addObject(def) {
         /** @type {LocationObject} */
@@ -62,6 +147,12 @@ class Location3D {
             World3D.addObject(this.view, rec.mesh, def.kind);
             this.placeObject(rec);
             this.applyHidden(rec);
+            rec.mesh.alwaysSelectAsActiveMesh = true;
+            for (const child of rec.mesh.getChildMeshes(false)) {
+                child.alwaysSelectAsActiveMesh = true;
+                child.computeWorldMatrix(true);
+                if (child.refreshBoundingInfo) child.refreshBoundingInfo({});
+            }
             return rec;
         }).catch((e) => {
             rec.error = (e && e.message) || String(e);
@@ -86,36 +177,54 @@ class Location3D {
         m.rotationQuaternion = null;   // a quaternion (the gizmo may set one) would override rotation
         m.rotation.set((Number(r[0]) || 0) * D, -(Number(r[1]) || 0) * D, (Number(r[2]) || 0) * D);
         m.scaling.set(k(s[0]), k(s[1]), k(s[2]));
+        m.computeWorldMatrix(true);
+        for (const child of m.getChildMeshes(false)) {
+            child.computeWorldMatrix(true);
+            if (child.refreshBoundingInfo) child.refreshBoundingInfo({});
+        }
     }
 
     placeObjects() {
         for (const rec of this.objects) this.placeObject(rec);
     }
 
-    // Objects with def.tag === tag, in list order: what the editor placed and game code picks
-    // up as a group — findByTag('coin'). None — an empty array.
+    // --- Tags and hidden objects ----------------------------------------------------
+
+    // Objects whose def.tag === tag, in list order: what the editor placed and game code picks
+    // up as a group — findByTag('loot'), findByTag('extraction'). No tag or no match — an
+    // empty array. Game code reads the record's def for its own state, never the mesh name.
     /** @param {string} tag @returns {LocationObject[]} */
     findByTag(tag) {
         return tag ? this.objects.filter(rec => rec.def.tag === tag) : [];
     }
 
-    // def.hidden: the object is placed but not in the scene — no mesh in the frame, no sound —
-    // until the game shows it: setHidden(rec, false). Works before the model has loaded too.
-    /** @param {LocationObject} rec @param {boolean} hidden */
-    setHidden(rec, hidden) {
-        if (hidden) rec.def.hidden = true;
-        else delete rec.def.hidden;
-        this.applyHidden(rec);
+    // def.hidden: the object exists in the scene data but is inert — disabled, children
+    // included — until the game reveals it: setHidden(rec, false). Works before the model has
+    // loaded too (applyHidden runs again when the mesh arrives). A tag is also accepted, so a
+    // whole group is revealed at once: setHidden('loot', false).
+    /** @param {LocationObject|string} objectOrTag @param {boolean} hidden */
+    setHidden(objectOrTag, hidden) {
+        const list = typeof objectOrTag === 'string' ? this.findByTag(objectOrTag)
+            : (objectOrTag ? [objectOrTag] : []);
+        for (const rec of list) {
+            if (hidden) rec.def.hidden = true;
+            else delete rec.def.hidden;
+            this.applyHidden(rec);
+        }
     }
 
-    // opts.showHidden (the editor): a hidden object stays in the frame as a ghost — otherwise
-    // there is nothing to click and drag.
+    // Push def.hidden onto the mesh: setEnabled(false) also disables every child, and a
+    // disabled mesh casts no shadow and is not drawn. opts.showHidden (the editor) keeps a
+    // hidden object in the frame as a translucent ghost — otherwise there is nothing to click.
+    // Hidden objects are SILENT: our engine has no object-owned loop or source to stop (audio
+    // is ProceduralAudio.js + js/audio/*, driven by the game, not by a location record), so a
+    // hidden object stays quiet only because nothing starts a sound from this record.
     /** @param {LocationObject} rec */
     applyHidden(rec) {
         if (!rec.mesh) return;
         const hidden = !!rec.def.hidden, ghost = hidden && !!this.opts.showHidden;
         rec.mesh.setEnabled(!hidden || ghost);
-        for (const m of rec.mesh.getChildMeshes()) m.visibility = ghost ? Location3D.GHOST_ALPHA : 1;
+        for (const m of rec.mesh.getChildMeshes(false)) m.visibility = ghost ? Location3D.GHOST_ALPHA : 1;
     }
 
     // Object animation frame — before World3D.renderFrame().
@@ -124,27 +233,6 @@ class Location3D {
         for (const rec of this.objects) {
             this.spinPart(rec, dt);
             this.playClip(rec);
-            this.updateSound(rec);
-        }
-    }
-
-    // def.sound = { src, volume?, loop?, falloffMin?, falloffMax? }: a sound standing at the object
-    // (Sound3D, follows def.x, def.y), looped unless loop is false. Restarted when the file or
-    // loop changes, volume and distances apply on the fly (the editor); a hidden object is silent.
-    /** @param {LocationObject} rec */
-    updateSound(rec) {
-        const s = rec.def.sound, on = !!(s && s.src) && !rec.def.hidden;
-        const key = on ? s.src + (s.loop === false ? '|once' : '|loop') : '';
-        if (key !== (rec.soundKey || '')) {
-            if (rec.sound) rec.sound.stop();
-            rec.sound = on ? Sound3D.play((this.opts.assetBase || '') + s.src, { at: rec.def, node: rec.mesh,
-                loop: s.loop !== false, volume: s.volume, falloffMin: s.falloffMin, falloffMax: s.falloffMax }) : null;
-            rec.soundKey = key;
-        } else if (rec.sound && rec.sound.playing) {
-            rec.sound.setVolume(s.volume == null ? 1 : s.volume);
-            rec.sound.falloffMin = Number(s.falloffMin) > 0 ? Number(s.falloffMin) : 0;
-            rec.sound.falloffMax = Number(s.falloffMax) > 0 ? Number(s.falloffMax) : 0;
-            rec.sound.node = rec.mesh;   // the model may have arrived after the sound started
         }
     }
 
@@ -201,9 +289,6 @@ class Location3D {
     removeObject(rec) {
         const i = this.objects.indexOf(rec);
         if (i >= 0) this.objects.splice(i, 1);
-        if (rec.sound) rec.sound.stop();
-        rec.sound = null;
-        rec.soundKey = '';
         if (rec.mesh && this.view) Model3D.dispose(this.view, rec.mesh);
         rec.mesh = null;
     }
@@ -240,7 +325,6 @@ class Location3D {
     }
 
     dispose() {
-        for (const rec of this.objects) if (rec.sound) rec.sound.stop();
         this.objects = [];   // meshes and materials die with the scene
         if (this.terrain) this.terrain.dispose();
         this.terrain = null;
@@ -249,7 +333,8 @@ class Location3D {
     }
 }
 
-Location3D.GHOST_ALPHA = 0.35;   // a hidden object in the editor (opts.showHidden)
+// A hidden object shown to the designer as a ghost — opts.showHidden (the editor).
+Location3D.GHOST_ALPHA = 0.35;
 
 // Ground textures by LOCATION_GROUND: 0 — grass, 1 — sand, 2 — snow.
 Location3D.GROUNDS = [

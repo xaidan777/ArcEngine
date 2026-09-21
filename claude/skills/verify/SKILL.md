@@ -44,11 +44,6 @@ Debug3D.release();
 
 ## Reproduce the user's state, not yours
 
-- A screenshot of the game or the editor carries the whole camera in its HUD line: zoom, azimuth,
-  pitch and target. Put those numbers into the controller (`camera.azimuth/pitch/zoom/target`,
-  then `_apply()`) and check THAT pose before theorizing — the numbers that look extreme in the
-  HUD are usually the defect. Guessing a pose that merely resembles the screenshot reproduces a
-  different bug, and the fix for it fixes nothing.
 - Use the constants from the user's `Constants.js` and the quality or mode they run. A check
   passed with a value you forced in the console proves nothing about their screen.
 - Rules that depend on tunable constants are tested on the real constants: the user moves
@@ -80,8 +75,7 @@ Debug3D.benchToggle({ on() { /* feature on */ }, off() { /* feature off */ } });
 
 `await Debug3D.lint()` (editor: "Lint scene") — inside-out meshes, normal map convention,
 lights over the material limit and the sun not being last, shaders that failed or sit at the
-WebGL2 limits, heavy meshes, hundreds of separate look-alike meshes that should be instances,
-a fully white or black frame. Zero findings on the kit's own
+WebGL2 limits, heavy meshes, a fully white or black frame. Zero findings on the kit's own
 scene; every finding text says what to change. `Debug3D.setMode('backfaces' | 'normals' |
 'wireframe' | 'off')` (editor: the "view:" select). Skill `render-conventions` explains each rule.
 

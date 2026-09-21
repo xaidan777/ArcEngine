@@ -10,11 +10,19 @@
 //   speed — rpm, dir — 'cw' | 'ccw': clockwise/counterclockwise as seen from the end of the axis;
 //   clip — looped animation clip of a .glb model (optional): 'idle', 'run'…
 //   tag — a group name for game code (optional): location.findByTag(tag);
-//   hidden: true — placed but not in the scene until the game calls location.setHidden(rec, false);
-//   sound — a sound standing at the object (optional, Sound3D.js): src — a file from assets/sounds,
-//   volume 0..1, loop: false — once instead of looped, falloffMin — px of full volume around the
-//   object, falloffMax — px, silent from there on (0 or absent — the common AUDIO_FALLOFF_*).
+//   hidden: true — placed but out of the scene until the game calls location.setHidden(rec, false).
 const LOCATION_OBJECTS = [
-    { name: 'mill', model: 'assets/models/mill.fbx', kind: 'prop', x: 1150.2, y: 894.4, h: 8.8, rot: [0, 34.4, 0], scale: [1.36, 1.36, 1.36], anim: { part: 'w1..003', axis: '-y', speed: 10, dir: 'ccw' }, sound: { src: 'assets/sounds/mill.mp3', volume: 0.25 } },
-    { name: 'character', model: 'assets/models/character.glb', kind: 'actor', x: 1029.4, y: 1010, h: 0, rot: [0, 60, 0], scale: [0.25, 0.25, 0.25], clip: 'idle', tag: 'player', sound: { src: 'assets/sounds/farmer.mp3', falloffMax: 512 } },
+    { name: 'character', model: 'assets/models/character.glb', kind: 'actor', x: 1029.4, y: 1010, h: 0, rot: [0, 60, 0], scale: [0.25, 0.25, 0.25], clip: 'idle' },
+    { name: 'barrier-1', model: 'assets/models/polyhaven/concrete_road_barrier.glb', kind: 'prop', x: 125, y: 1385.2, h: 0, rot: [0, 18.7, 0], scale: [0.52, 0.52, 0.52] },
+    { name: 'barrier-2', model: 'assets/models/polyhaven/concrete_road_barrier.glb', kind: 'prop', x: 125, y: 1240, h: 0, rot: [0, -2.4, 0], scale: [0.52, 0.52, 0.52] },
+    { name: 'barrier-3', model: 'assets/models/polyhaven/concrete_road_barrier.glb', kind: 'prop', x: 407.3, y: 1530, h: 0, rot: [0, 0, 0], scale: [0.5, 0.5, 0.5] },
+    { name: 'barrier-4', model: 'assets/models/polyhaven/concrete_road_barrier.glb', kind: 'prop', x: 450, y: 1230, h: 0, rot: [0, 12.9, 0], scale: [0.5, 0.5, 0.5] },
+    { name: 'barrel-1', model: 'assets/models/polyhaven/barrel_03.glb', kind: 'prop', x: 450, y: 1550.4, h: 0, rot: [0, 0, 0], scale: [0.65, 0.65, 0.65] },
+    { name: 'barrel-2', model: 'assets/models/polyhaven/barrel_03.glb', kind: 'prop', x: 440.4, y: 1506.4, h: 0, rot: [0, -45, 0], scale: [0.7, 0.7, 0.7] },
+    { name: 'barrel-3', model: 'assets/models/polyhaven/barrel_03.glb', kind: 'prop', x: 480.3, y: 1513.4, h: 0, rot: [0, 20, 0], scale: [0.65, 0.65, 0.65] },
+    { name: 'barrel-4', model: 'assets/models/polyhaven/barrel_03.glb', kind: 'prop', x: 1080, y: 1200, h: 0, rot: [0, 0, 0], scale: [0.7, 0.7, 0.7] },
+    { name: 'barrel-5', model: 'assets/models/polyhaven/barrel_03.glb', kind: 'prop', x: 1118, y: 1210, h: -14.2, rot: [0, -40, 0], scale: [0.65, 0.65, 0.65] },
+    { name: 'barrel-6', model: 'assets/models/polyhaven/barrel_03.glb', kind: 'prop', x: 1580, y: 730, h: 0, rot: [0, -15, 0], scale: [0.6, 0.6, 0.6] },
+    { name: 'barrier', model: 'assets/models/polyhaven/concrete_road_barrier.glb', kind: 'prop', x: 135.3, y: 1527.8, h: 0, rot: [0, -17.5, 0], scale: [0.52, 0.52, 0.52] },
+    { name: 'tripo_pbr_model_28de8de4-6660-4fca-a713-f6002ffaf55d_meshopt', model: 'assets/models/tripo_pbr_model_28de8de4-6660-4fca-a713-f6002ffaf55d_meshopt.glb', kind: 'prop', x: -277.6, y: 942.4, h: 392.2, rot: [0, -88, 0], scale: [7.804, 7.804, 7.804] },
 ];

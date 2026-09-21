@@ -118,7 +118,7 @@ async function main() {
   //     the other modules read its globals already at load time.
   const indexSrc = await fsp.readFile(path.join(ROOT, 'index.html'), 'utf8');
   const srcOrder = [...indexSrc.matchAll(/<script\s+src=["']([^"']+)["']/g)].map(m => m[1]);
-  const localOrder = srcOrder.filter(s => !/^https?:/.test(s) && !s.startsWith('libs/'));
+  const localOrder = srcOrder.filter(s => !/^https?:/.test(s) && !s.startsWith('libs/')).map(s => s.split('?')[0]);
   if (localOrder[0] !== 'js/Constants.js') {
     fail('первым локальным скриптом должен идти js/Constants.js, а идёт ' + localOrder[0]);
   } else {
@@ -199,6 +199,11 @@ async function main() {
     process.exit(1);
   }
   if (problems.length) warn('--force: собираю несмотря на ' + problems.length + ' проблем(ы)');
+
+  // Required redistribution notices must be present in every release archive.
+  for (const rel of ['LICENSE', 'THIRD_PARTY_NOTICES.md', 'assets/LICENSES.md']) {
+    if (!CODE_FILES.includes(rel) && !scan.refs.includes(rel)) fail('release notice missing from package list: ' + rel);
+  }
 
   // === 2. ASSEMBLING build/ ================================================
   say('\n' + C.b + '  [2/4] копирование в build/' + C.r);

@@ -31,8 +31,7 @@
 //
 // WORLD OBJECTS are registered by addObject(view, mesh, kind): material group,
 // shadow, ink edges and outline. kind: 'actor' — the main objects of the frame
-// (characters, cars), 'prop' — environment (cubes, walls, trees). Hundreds of copies of one
-// thing — addInstances(view, mesh, kind, items): one draw call (Instances3D.js).
+// (characters, cars), 'prop' — environment (cubes, walls, trees).
 //
 // The toon shader is ArcToonPlugin (BABYLON.MaterialPluginBase, registered on
 // ALL StandardMaterial at World3D.init): after the light of all sources is summed,
@@ -55,6 +54,10 @@ const World3D = {
     _bg: null,
     /** @type {typeof ArcToon} */
     toon: null,             // toon plugin state — ArcToon below, after ArcToonPlugin
+    /** @type {'webgpu' | 'webgl2' | null} */
+    backend: null,          // modern active graphics backend
+    /** @type {{ api: string, nativeBackend: string, renderer: string, vendor: string, computeSupported: boolean } | null} */
+    gpuInfo: null,          // detected GPU hardware, driver, and native graphics backend
 
     // Render layers (Babylon renderingGroupId), the depth buffer is SHARED (see View3D):
     //   WORLD   — the ground and everything standing on it;
@@ -67,6 +70,57 @@ const World3D = {
 
     available() {
         return typeof BABYLON !== 'undefined' && !!this.engine;
+    },
+
+    // Asynchronous engine initialization: tries modern WebGPU first,
+    // falling back to WebGL2 for older browsers/hardware.
+    async initAsync(canvas, options = {}) {
+        if (typeof BABYLON === 'undefined') {
+            console.warn('World3D: libs/babylon.js не загружен — 3D-мир недоступен.');
+            return false;
+        }
+        if (this.engine) return true;
+        this.canvas = canvas;
+
+        const preferWebGPU = options.preferWebGPU !== false;
+        if (preferWebGPU && typeof navigator !== 'undefined' && (/** @type {any} */ (navigator)).gpu && (/** @type {any} */ (BABYLON)).WebGPUEngine) {
+            try {
+                const supported = await (/** @type {any} */ (BABYLON)).WebGPUEngine.IsSupportedAsync;
+                if (supported) {
+                    const webgpu = new (/** @type {any} */ (BABYLON)).WebGPUEngine(canvas, {
+                        stencil: true,
+                        antialias: true,
+                        adaptToDeviceRatio: false,
+                        powerPreference: 'high-performance',
+                        doNotHandleContextLost: true
+                    });
+                    await webgpu.initAsync();
+                    this.engine = webgpu;
+                    this.backend = 'webgpu';
+                    console.log('[World3D] Modern WebGPU backend initialized successfully.');
+                }
+            } catch (e) {
+                console.warn('[World3D] WebGPU initialization failed, falling back to WebGL2:', e);
+                this.engine = null;
+            }
+        }
+
+        if (!this.engine) {
+            const ok = this.init(canvas);
+            if (ok) this.backend = 'webgl2';
+            return ok;
+        }
+
+        const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+        const cap = (typeof IS_MOBILE !== 'undefined' && IS_MOBILE) ? 1.5 : 2;
+        this.engine.setHardwareScalingLevel(1 / Math.min(dpr, cap));
+        this._bg = new BABYLON.Color4(0.133, 0.133, 0.133, 1);
+        if (this.toon && typeof this.toon.register === 'function') {
+            this.toon.register();
+        }
+        this.resize();
+        this.detectGpuHardware();
+        return true;
     },
 
     // Brings up the engine on the canvas (one per page). false — no Babylon or WebGL.
@@ -86,6 +140,7 @@ const World3D = {
                 powerPreference: 'high-performance',
                 doNotHandleContextLost: true
             }, false);
+            this.backend = 'webgl2';
         } catch (e) {
             console.error('World3D: WebGL недоступен', e);
             this.engine = null;
@@ -101,11 +156,99 @@ const World3D = {
         // before the first scene.
         this.toon.register();
         this.resize();
+        this.detectGpuHardware();
         return true;
     },
 
+    /**
+     * Detects underlying native graphics driver and hardware (Vulkan / OpenGL / D3D12 / Metal).
+     * @returns {{ api: string, nativeBackend: string, renderer: string, vendor: string, computeSupported: boolean }}
+     */
+    detectGpuHardware() {
+        const info = {
+            api: this.backend || 'webgl2',
+            nativeBackend: 'OpenGL',
+            renderer: 'Generic GPU',
+            vendor: 'Generic Vendor',
+            computeSupported: false
+        };
+
+        if (this.backend === 'webgpu' && this.engine) {
+            info.api = 'webgpu';
+            info.computeSupported = true;
+            const adapter = this.engine._adapter || (/** @type {any} */ (this.engine)).adapter;
+            const adapterInfo = adapter?.info || (/** @type {any} */ (this.engine))._adapterInfo;
+            if (adapterInfo) {
+                info.renderer = adapterInfo.description || adapterInfo.device || 'WebGPU Device';
+                info.vendor = adapterInfo.vendor || 'WebGPU Vendor';
+                const backendStr = (adapterInfo.backend || '').toLowerCase();
+                if (backendStr.includes('vulkan')) info.nativeBackend = 'Vulkan';
+                else if (backendStr.includes('metal')) info.nativeBackend = 'Metal';
+                else if (backendStr.includes('d3d12') || backendStr.includes('direct3d')) info.nativeBackend = 'Direct3D 12';
+                else if (backendStr.includes('opengl') || backendStr.includes('gl')) info.nativeBackend = 'OpenGL';
+                else info.nativeBackend = 'Vulkan'; // Default for Chromium/Dawn on Linux & Android
+            } else {
+                info.nativeBackend = 'Vulkan';
+            }
+        } else if (this.canvas && typeof this.canvas.getContext === 'function') {
+            try {
+                const gl = this.canvas.getContext('webgl2') || this.canvas.getContext('webgl');
+                if (gl && typeof (/** @type {any} */ (gl)).getExtension === 'function') {
+                    const ext = (/** @type {any} */ (gl)).getExtension('WEBGL_debug_renderer_info');
+                    if (ext) {
+                        const renderer = (/** @type {any} */ (gl)).getParameter(ext.UNMASKED_RENDERER_WEBGL) || '';
+                        const vendor = (/** @type {any} */ (gl)).getParameter(ext.UNMASKED_VENDOR_WEBGL) || '';
+                        if (renderer) info.renderer = renderer;
+                        if (vendor) info.vendor = vendor;
+                        const rLower = (renderer || '').toLowerCase();
+                        if (rLower.includes('vulkan')) info.nativeBackend = 'Vulkan';
+                        else if (rLower.includes('metal')) info.nativeBackend = 'Metal';
+                        else if (rLower.includes('direct3d') || rLower.includes('d3d')) info.nativeBackend = 'Direct3D';
+                        else info.nativeBackend = 'OpenGL';
+                    }
+                }
+            } catch (_) {}
+        }
+
+        this.gpuInfo = info;
+        return info;
+    },
+
+    /**
+     * Returns detected GPU hardware capabilities and driver information.
+     */
+    getGpuInfo() {
+        if (!this.gpuInfo) this.detectGpuHardware();
+        return this.gpuInfo;
+    },
+
+    /**
+     * Creates a WebGPU Compute Shader pipeline (running on Vulkan/WebGPU compute hardware).
+     * @param {string} wgslCode
+     * @param {string} [entryPoint='main']
+     * @returns {BABYLON.ComputeShader | null}
+     */
+    createComputePipeline(wgslCode, entryPoint = 'main') {
+        if (this.backend !== 'webgpu' || !this.engine || typeof BABYLON.ComputeShader === 'undefined') {
+            return null;
+        }
+        try {
+            return new BABYLON.ComputeShader('arcComputeShader', this.engine, { computeSource: wgslCode }, {
+                entryPoint,
+                bindingsMapping: {}
+            });
+        } catch (e) {
+            console.warn('[World3D] Failed to create WebGPU compute shader:', e);
+            return null;
+        }
+    },
+
     resize() {
-        if (this.engine) this.engine.resize();
+        if (!this.engine || !this.canvas) return;
+        const w = this.canvas.clientWidth;
+        const h = this.canvas.clientHeight;
+        if (w <= 0 || h <= 0) return;
+        this.engine.resize();
     },
 
     renderFrame() {
@@ -183,6 +326,7 @@ const World3D = {
         const c = this.cfg();
         view.applyLighting(c);
         this.toon.apply(c);
+        if (typeof Gltf3D !== 'undefined') Gltf3D.applyMaterialMode(view.scene, c.toon);
         for (const m of view.scene.materials) this.applyMaterialConstants(m, c);
         this.applyInk(view.scene, c);
         this.applyOutlines(view, c);
@@ -192,6 +336,9 @@ const World3D = {
     // Material specular highlight by group (metadata.toonGroup): ground, environment, main objects.
     // The ground ring beyond the edge (metadata.outer) — also the WORLD3D_OUTER_TINT brightness.
     applyMaterialConstants(m, c) {
+        if (!m) return;
+        if (m.maxSimultaneousLights != null && m.maxSimultaneousLights < 16) m.maxSimultaneousLights = 16;
+        if (m.usePhysicalLightFalloff !== undefined) m.usePhysicalLightFalloff = false;
         const g = m && m.metadata && m.metadata.toonGroup;
         if (!g || !(m instanceof BABYLON.StandardMaterial)) return;
         c = c || this.cfg();
@@ -232,8 +379,9 @@ const World3D = {
                 this.applyMaterialConstants(sm, c);
             }
             const solid = m.getTotalVertices && m.getTotalVertices() > 0;
-            // Every part gets ink edges, a skinned one too: its lines are built from the rest
-            // pose and re-posed with the bones before each draw (InkSkin).
+            // Every solid part gets ink edges, a SKINNED one too: EdgesRenderer builds its
+            // lines once, from the rest pose, and InkSkin re-poses them with the bones before
+            // every draw (otherwise a character's ink would hang in the rest pose).
             if (solid && o.ink !== false) this.inkMesh(m, k, c);
             // All parts — into ONE outline layer: the line follows the overall silhouette, not a part.
             if (solid && o.outline !== false) this.outlineAdd(view, m, k, c);
@@ -242,31 +390,71 @@ const World3D = {
         return mesh;
     },
 
-    // Many copies of ONE mesh or model (a forest, identical props, bullets): thin instances, one
-    // draw call per part whatever the count — a separate addObject mesh costs the CPU 10–15 µs
-    // per frame (main pass, shadow map, outline mask, ink edges): 2000 of them are a whole frame.
-    // items: [{ x, y, h, heading?, scale? }]; returns Instances3D (set / setAll / flush / dispose),
-    // .ok is false for a skinned model. Details — Instances3D.js.
-    addInstances(view, source, kind, items, opts) {
-        return new Instances3D(view, source, kind, items, opts);
-    },
-
     // Remove an object: outline, shadows, the mesh with its children. Materials stay with the owner.
     removeObject(view, mesh) {
         if (!mesh) return;
         const parts = [mesh].concat(mesh.getChildMeshes ? mesh.getChildMeshes(false) : []);
+        // Drop the ink helpers BEFORE the meshes go away: a helper holds a reference to the
+        // renderer's line buffers and to an observer on the mesh. Mesh.dispose does NOT clear
+        // onBeforeRenderObservable (only Scene.dispose does), so a stale observer would survive
+        // our game's reset() flow and later write into a disposed buffer — a real crash risk.
+        for (const m of parts) this.inkSkinRelease(m);
         for (const m of parts) this.outlineRemove(view, m);
         if (view) view.removeShadowCaster(mesh);
         mesh.dispose(false, false);
+    },
+
+    // Many copies of ONE mesh or model, in one draw call per part (Babylon thin instances).
+    //
+    // WHY. Every separate mesh costs the CPU each frame: the active-mesh check, the world
+    // matrix, material and light binding, a draw call — and in this kit every addObject mesh
+    // is drawn again for the shadow map, the outline mask and the ink edges. Measured on the
+    // kit: 1000 two-part trees as 2000 meshes cost 26 ms of CPU per frame; the same trees as
+    // instances cost 0.1 ms. A forest, identical props, fence posts, debris — anything with
+    // more than a couple of hundred identical copies belongs here, not in addObject.
+    //
+    // items: [{ x, y, h, heading?, scale? }] — map px, height of the copy's origin, radians
+    // (the nose along +X turns to atan2(vy, vx)), scale as a number or [x, y, z].
+    // opts: { dynamic, castShadow, receiveShadows, ink, outline } — as in addObject.
+    // Returns an Instances3D (set / setAll / flush / dispose), or null if it cannot be built.
+    addInstances(view, source, kind, items, opts) {
+        if (typeof Instances3D === 'undefined' || !source) return null;
+        const instances = new Instances3D(view, source, kind, items, opts);
+        // A skinned source is refused by Instances3D (one skeleton is one pose). Rather than
+        // hand back a dead handle, fall back to a plain object so the caller still sees it.
+        return instances.ok ? instances : null;
+    },
+
+    // Closed chamfered hard-surface primitive, using the engine's clockwise winding.
+    createBeveledBox(name, size, scene, bevel) {
+        const [w,h,d] = size;
+        const b = Math.min(bevel || Math.min(w,h,d) * 0.12, Math.min(w,h,d) * 0.24);
+        const positions=[], indices=[], normals=[], uvs=[];
+        for (const [y,inset] of [[-h/2,b],[-h/2+b,0],[h/2-b,0],[h/2,b]]) {
+            const x=w/2-inset,z=d/2-inset,c=b*0.6;
+            for (const [px,pz] of [[-x+c,-z],[x-c,-z],[x,-z+c],[x,z-c],[x-c,z],[-x+c,z],[-x,z-c],[-x,-z+c]]) {
+                positions.push(px,y,pz);uvs.push(px/w+0.5,pz/d+0.5);
+            }
+        }
+        for(let ring=0;ring<3;ring++) for(let i=0;i<8;i++) {
+            const a=ring*8+i,n=ring*8+(i+1)%8;
+            indices.push(a,n,a+8,a+8,n,n+8);
+        }
+        for(let i=1;i<7;i++) { indices.push(0,i+1,i);indices.push(24,24+i,25+i); }
+        BABYLON.VertexData.ComputeNormals(positions,indices,normals);
+        const mesh=new BABYLON.Mesh(name,scene), data=new BABYLON.VertexData();
+        data.positions=positions;data.indices=indices;data.normals=normals;data.uvs=uvs;
+        data.applyToMesh(mesh);mesh.convertToFlatShadedMesh();
+        return mesh;
     },
 
     // --- Ink edges (EdgesRenderer) ---------------------------------------------
 
     // Mesh edges creased sharper than WORLD3D_TOON_INK_ANGLE are drawn as lines in the ink
     // color. group: 'actor' (level 1) | 'prop' (level 2). Cost: ~5 ms per
-    // mesh of 1300 triangles, once. Ink edges are part of the toon look, like the
-    // silhouette outline: at WORLD3D_TOON = 0 they are off. EVERY object of the scene gets
-    // them — a skinned one keeps its lines on the bones through InkSkin.
+    // mesh of 1300 triangles, once. An ink line is part of the toon look, exactly like the
+    // silhouette outline: at WORLD3D_TOON = 0 (the editor's "toon shader" checkbox) there are
+    // no edge lines either. A skinned mesh keeps its lines on the bones through InkSkin.
     inkMesh(mesh, group, c) {
         if (!mesh || !mesh.enableEdgesRendering) return;
         c = c || this.cfg();
@@ -274,6 +462,8 @@ const World3D = {
         md.ink = group;
         const want = c.toon > 0 && c.ink >= (group === 'prop' ? 2 : 1) && c.inkWidth > 0;
         if (!want) {
+            // The renderer goes away below — its line buffers are the helper's. Drop the
+            // helper FIRST, or its observer keeps writing into disposed buffers.
             this.inkSkinRelease(mesh);
             if (mesh.edgesRenderer) mesh.disableEdgesRendering();
             md.inkEps = null;
@@ -291,12 +481,15 @@ const World3D = {
         const col = this.hexColor3(c.inkColor);
         mesh.edgesColor = new BABYLON.Color4(col.r, col.g, col.b, 1);
         if (group === 'prop') mesh.edgesShareWithInstances = true;
+        // A skinned mesh: keep the fresh lines on the bones (InkSkin, below).
         if (mesh.skeleton) this.inkSkin(mesh);
     },
 
-    // Lines of a SKINNED mesh follow its bones (InkSkin, below): one helper per mesh, built
-    // on the current edges renderer. Returns null when the mesh carries no skinning data.
+    // Lines of a SKINNED mesh follow its bones (InkSkin, below): one helper per mesh, built on
+    // the edges renderer the mesh carries right now. Returns the helper, or null when the mesh
+    // has no skeleton or no skinning data (a skeleton-less mesh is never given one).
     inkSkin(mesh) {
+        if (!mesh) return null;
         const md = mesh.metadata || (mesh.metadata = {});
         if (md.inkSkin) return md.inkSkin;
         const skin = new InkSkin(mesh);
@@ -304,7 +497,9 @@ const World3D = {
         return md.inkSkin;
     },
 
-    // Drop the follow — BEFORE the edges renderer that owns the line buffers goes away.
+    // Drop the follow. Idempotent and null-safe: called both when the edges renderer is about
+    // to be rebuilt/disposed and from removeObject, where it may run for a mesh that never had
+    // a helper. After the call metadata.inkSkin is null, so a repeat is a no-op.
     inkSkinRelease(mesh) {
         const md = mesh && mesh.metadata;
         if (!md || !md.inkSkin) return;
@@ -328,7 +523,7 @@ const World3D = {
     // BABYLON.HighlightLayer with isStroke (#define STROKE in glowMapMerge gives a
     // hard edge instead of a glow). Levels — WORLD3D_TOON_OUTLINE. The outline is
     // part of the toon look: at WORLD3D_TOON = 0 (the editor's "toon shader" checkbox)
-    // there is none. Ink edges (inkMesh) do not depend on WORLD3D_TOON.
+    // there is none. Ink edges (inkMesh) follow the same gate: no toon — no edge lines.
     //
     // Each object kind ('actor' / 'prop') has its own width, while a layer has one for
     // everything — so different kinds need different layers.
@@ -540,31 +735,38 @@ const World3D = {
     // 90 — down), elevation above the horizon.
     sunDirection(c) {
         c = c || this.cfg();
-        const az = c.sunAz * Math.PI / 180;
-        const el = c.sunEl * Math.PI / 180;
+        if (c.sunDirection && typeof c.sunDirection.clone === 'function') return c.sunDirection.clone();
+        if (c.sunDirection && typeof c.sunDirection.x === 'number') return new BABYLON.Vector3(c.sunDirection.x, c.sunDirection.y, c.sunDirection.z);
+        const az = (c.sunAz != null ? c.sunAz : (c.sunAzimuthDeg != null ? c.sunAzimuthDeg : 0)) * Math.PI / 180;
+        const el = (c.sunEl != null ? c.sunEl : (c.sunElevationDeg != null ? c.sunElevationDeg : 0)) * Math.PI / 180;
         const ce = Math.cos(el);
         return new BABYLON.Vector3(Math.cos(az) * ce, -Math.sin(el), Math.sin(az) * ce);
     },
 
     hexColor3(v) {
+        if (!v && v !== 0) return new BABYLON.Color3(0, 0, 0);
+        if (v instanceof BABYLON.Color3) return v.clone();
+        if (Array.isArray(v)) return new BABYLON.Color3(v[0], v[1], v[2]);
+        if (typeof v === 'object' && typeof v.r === 'number') return new BABYLON.Color3(v.r, v.g, v.b);
         if (typeof v === 'string') return BABYLON.Color3.FromHexString(v);
         const n = (v >>> 0) & 0xffffff;
         return new BABYLON.Color3(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
     }
 };
 
-// --- Ink edges of a skinned mesh ------------------------------------------------
+// --- Ink edges of a skinned mesh (InkSkin) --------------------------------------
 
-// EdgesRenderer builds its lines ONCE, out of the rest pose, and Babylon's "line" shader
-// knows nothing about bones: on a character the ink would hang in the rest pose while the
-// bones move the mesh (that is why skinned meshes used to be left without ink at all).
+// EdgesRenderer builds its lines ONCE, from the REST pose, and Babylon's line shader knows
+// nothing about bones: on a character the ink outline would hang in the rest pose while the
+// bones move the mesh. That is why skinned meshes used to be left without ink at all.
 // The SET of lines never changes — only where their ends are. So each line end is mapped
-// ONCE to the mesh vertex it was copied from, and before every draw the posed ends are
-// written into the line buffers. The mesh itself is still skinned on the GPU: the CPU here
-// touches only the vertices the lines use (812 of them on the kit's character — ~0.05 ms).
+// ONCE to the mesh vertex the renderer copied it from, and before every draw the posed ends
+// are written into the line buffers. The mesh itself is still skinned on the GPU: the CPU
+// here touches only the vertices the lines actually use.
 //
-// Created by World3D.inkMesh for a mesh with a skeleton, dropped by inkSkinRelease before
-// the edges renderer that owns the buffers goes away (mesh.metadata.inkSkin).
+// Created by World3D.inkMesh for a mesh with a skeleton, dropped by World3D.inkSkinRelease
+// BEFORE the edges renderer that owns the buffers goes away (the helper lives in
+// mesh.metadata.inkSkin).
 class InkSkin {
     constructor(mesh) {
         this.mesh = mesh;
@@ -582,9 +784,11 @@ class InkSkin {
         this._rest = pos;
         this._bones = bones;
         this._weights = weights;
+        // 5..8 influences live in the Extra pair; only a mesh that declares them is asked for
+        // it, and a mesh that has indices but no weights is treated as a 4-influence one.
         this._bonesExtra = mesh.numBoneInfluencers > 4 ? mesh.getVerticesData(VB.MatricesIndicesExtraKind) : null;
         this._weightsExtra = this._bonesExtra ? mesh.getVerticesData(VB.MatricesWeightsExtraKind) : null;
-        if (!this._weightsExtra) this._bonesExtra = null;   // 5..8 influences, but no weights for them
+        if (!this._weightsExtra) this._bonesExtra = null;
         this._map(er, pos, indices);
         this._own(er, scene.getEngine());
         this._observer = mesh.onBeforeRenderObservable.add(() => this.update());
@@ -592,13 +796,12 @@ class InkSkin {
         this.update();
     }
 
-    // Line end -> mesh vertex. The renderer copies vertex coordinates verbatim
-    // (createLine: p0, p0, p1, p1 for the positions and the opposite end in the normals), so
-    // the position is an exact key. Lowpoly duplicates every vertex per face, so a key
-    // usually has several candidates: the pair that shares a TRIANGLE wins — at a seam where
-    // two bones meet, the other candidate would fly away with the wrong bone. The four
-    // vertices of one line quad are resolved together, or the quad would be stretched
-    // between two bones.
+    // Line end -> mesh vertex. The renderer copies vertex coordinates verbatim (createLine:
+    // p0, p0, p1, p1 into the positions and the opposite end into the normals), so the
+    // position is an EXACT key. Lowpoly duplicates every vertex per face, so a key usually
+    // has several candidates — and the pair that shares a TRIANGLE must win: at a seam where
+    // two bones meet the other candidate would fly away with the wrong bone. The four ends of
+    // one line quad are resolved TOGETHER, or the quad would be stretched between two bones.
     _map(er, pos, indices) {
         const n = pos.length / 3;
         const byPos = new Map();
@@ -607,6 +810,7 @@ class InkSkin {
             const list = byPos.get(key);
             if (list) list.push(v); else byPos.set(key, [v]);
         }
+        // Vertex pairs that share a TRIANGLE, keyed a * n + b.
         const pair = new Set();
         for (let t = 0; t + 2 < indices.length; t += 3) {
             const a = indices[t], b = indices[t + 1], c = indices[t + 2];
@@ -616,8 +820,8 @@ class InkSkin {
         }
         const lp = er.linesPositions, ln = er.linesNormals;
         const count = lp.length / 3;
-        const from = this._from = new Int32Array(count);     // vertex of the line end itself
-        const to = this._to = new Int32Array(count);         // vertex of the other end (normal.xyz)
+        const from = this._from = new Int32Array(count);   // the vertex of the line end itself
+        const to = this._to = new Int32Array(count);       // the vertex of the other end (normal.xyz)
         const used = new Set();
         for (let i = 0; i < count; i += 4) {
             const A = byPos.get(lp[3 * i] + '|' + lp[3 * i + 1] + '|' + lp[3 * i + 2]) || [0];
@@ -628,6 +832,7 @@ class InkSkin {
                     for (const y of B) if (pair.has(x * n + y)) { a = x; b = y; break search; }
                 }
             }
+            // ONE pair for the whole quad: the two duplicated ends on each side.
             from[i] = from[i + 1] = a; from[i + 2] = from[i + 3] = b;
             to[i] = to[i + 1] = b; to[i + 2] = to[i + 3] = a;
             used.add(a); used.add(b);
@@ -636,36 +841,44 @@ class InkSkin {
         this._posed = new Float32Array(n * 3);
     }
 
-    // The renderer's own line buffers are static (updatable = false) and updateDirectly on
-    // them does nothing at all, without a word — the pair is replaced with updatable ones.
-    // They belong to the renderer from here on: it disposes and rebuilds them as its own.
+    // The renderer's own line buffers are created STATIC (updatable = false), and
+    // updateDirectly on a static buffer does nothing at all, without a word — the pair is
+    // replaced with updatable ones. From here on they belong to the renderer: it disposes and
+    // rebuilds them as its own (hence inkSkinRelease before any renderer rebuild).
     _own(er, engine) {
         const VB = BABYLON.VertexBuffer;
         const line = this._line = new Float32Array(er.linesPositions);
         const next = this._next = new Float32Array(er.linesNormals);
         const bufLine = new VB(engine, line, VB.PositionKind, true, false, 3);
         const bufNext = new VB(engine, next, VB.NormalKind, true, false, 4);
-        er._buffers[VB.PositionKind].dispose();
-        er._buffers[VB.NormalKind].dispose();
+        // Dispose the old pair: it is static and of no use to anyone now. A partial renderer
+        // (a missing buffer) must not throw here — the replacement happens either way.
+        if (er._buffers[VB.PositionKind]) er._buffers[VB.PositionKind].dispose();
+        if (er._buffers[VB.NormalKind]) er._buffers[VB.NormalKind].dispose();
         er._buffers[VB.PositionKind] = bufLine;
         er._buffers[VB.NormalKind] = bufNext;
-        er._buffersForInstances[VB.PositionKind] = bufLine;
-        er._buffersForInstances[VB.NormalKind] = bufNext;
+        // Instanced draws bind _buffersForInstances: point them at the same objects (the
+        // renderer draws the same lines for every instance).
+        if (er._buffersForInstances) {
+            er._buffersForInstances[VB.PositionKind] = bufLine;
+            er._buffersForInstances[VB.NormalKind] = bufNext;
+        }
         this._bufLine = bufLine;
         this._bufNext = bufNext;
     }
 
     // Pose the lines. Called before the mesh is drawn, when the skeleton's matrices for the
-    // frame are ready; the shadow map and the outline mask draw the same mesh again — hence
-    // the render id guard.
+    // frame are ready. The shadow map and the outline mask draw the same mesh again in the
+    // same frame — hence the render id guard (the pose is computed once per frame).
     update() {
         if (!this._bufLine) return;
         const mesh = this.mesh, scene = mesh.getScene();
         const frame = scene.getRenderId();
         if (frame === this._frame) return;
         this._frame = frame;
-        // The same sum the vertex shader does (bonesVertex): the skeleton's matrices are in
-        // the mesh's space, the mesh's world matrix is applied by the line shader afterwards.
+        // The same sum the vertex shader does (bonesVertex): the skeleton's matrices live in
+        // the mesh's space, and the line shader applies the mesh's world matrix afterwards.
+        // Row-vector convention: posed = (x, y, z, 1) · M, translation in columns 12..14.
         const m = mesh.skeleton.getTransformMatrices(mesh);
         const rest = this._rest, out = this._posed;
         for (const v of this._used) {
@@ -673,6 +886,8 @@ class InkSkin {
             let px = 0, py = 0, pz = 0;
             for (let k = 0; k < 8; k++) {
                 const extra = k > 3;
+                // The mesh may carry 4 influences or 8 (the Extra pair): stop as soon as the
+                // Extra pair is absent rather than reading undefined.
                 if (extra && !this._bonesExtra) break;
                 const idx = extra ? this._bonesExtra : this._bones;
                 const wts = extra ? this._weightsExtra : this._weights;
@@ -697,6 +912,8 @@ class InkSkin {
         this._bufNext.updateDirectly(next, 0);
     }
 
+    // Drop the follow: the observer must go with the helper, because Mesh.dispose does not
+    // clear onBeforeRenderObservable. Idempotent — a repeat finds no observer and no buffers.
     dispose() {
         if (this._observer) this.mesh.onBeforeRenderObservable.remove(this._observer);
         this._observer = null;
@@ -731,7 +948,17 @@ class ArcToonPlugin extends BABYLON.MaterialPluginBase {
         const m = /** @type {BABYLON.StandardMaterial} */ (this._material);
         const lit = !m.disableLighting;
         defines.ARCTOON = !!(s.on && lit && !(m.metadata && m.metadata.toon === false));
-        defines.ARCSHADOW = !!(lit && scene.metadata && scene.metadata.arcSun);
+        // ARCSHADOW is on when the sun still contributes light AND casts a visible shadow.
+        //
+        // The lit test reads the colour's components directly: Babylon's `Color3` has NO
+        // `length()` method (it has `lengthSquared` on Vector3 only, not Color3 — verified in
+        // both libs/babylon.js and libs/babylon.d.ts). Calling it threw inside
+        // `isReadyForSubMesh` on EVERY frame, which aborted the render loop, so the loading
+        // screen never received its first rendered frame and the game looked stuck on it.
+        const sun = scene.metadata && scene.metadata.arcSun;
+        const col = sun && sun.color;
+        const sunLit = !!col && (Math.abs(col.r || 0) + Math.abs(col.g || 0) + Math.abs(col.b || 0)) > 0.001;
+        defines.ARCSHADOW = !!(lit && sunLit);
     }
 
     getUniforms() {
@@ -778,8 +1005,9 @@ ArcToonPlugin.CODE = {
     CUSTOM_FRAGMENT_DEFINITIONS: `
 #ifdef ARCTOON
 float arcToonLevel(float v) {
+    if (v <= 0.001) return 0.0;
     float bands = arcToonA.x;
-    float lo = arcToonA.z;
+    float lo = arcToonA.z * smoothstep(0.0, 0.08, v);
     float t = clamp((v - lo) / max(1e-4, 1.0 - lo), 0.0, 1.0);
     float x = t * (bands - 1.0);
     float k = floor(x + 0.5);
@@ -793,6 +1021,7 @@ float arcToonLevel(float v) {
     // Shadow fraction at the point — shared by the colored shadow and the toon rim light.
     CUSTOM_FRAGMENT_MAIN_BEGIN: `
 float arcShadowA = 0.0;
+float arcToonLum = 0.0;
 `,
     // Right after the light of all sources is summed (default.fragment):
     // diffuseBase and specularBase are not yet multiplied by color/texture. First
@@ -815,8 +1044,13 @@ float arcShadowA = 0.0;
 #ifdef ARCTOON
 if (arcToonA.x >= 1.5) {
     float arcV = max(diffuseBase.r, max(diffuseBase.g, diffuseBase.b));
-    float arcQ = arcToonLevel(arcV);
-    diffuseBase = arcV > 1e-4 ? diffuseBase * (arcQ / arcV) : vec3(arcQ);
+    arcToonLum = arcV;
+    if (arcV <= 1e-4) {
+        diffuseBase = vec3(0.0);
+    } else {
+        float arcQ = arcToonLevel(arcV);
+        diffuseBase = diffuseBase * (arcQ / arcV);
+    }
 #ifdef SPECULARTERM
     float arcS = max(specularBase.r, max(specularBase.g, specularBase.b));
     float arcW = max(0.005, arcToonA.y * 0.25);
@@ -826,13 +1060,13 @@ if (arcToonA.x >= 1.5) {
 }
 #endif
 `,
-    // Rim light along the silhouette edge — lighter than the base color, fades out in shadow.
+    // Rim light along the silhouette edge — lighter than the base color, fades out in shadow and darkness.
     CUSTOM_FRAGMENT_BEFORE_FOG: `
 #ifdef ARCTOON
-if (arcToonB.y > 0.0) {
+if (arcToonB.y > 0.0 && arcToonLum > 0.01) {
     float arcF = 1.0 - max(0.0, dot(normalW, viewDirectionW));
     float arcE = 1.0 - arcToonB.z;
-    float arcR = smoothstep(arcE - 0.05, arcE + 0.05, arcF) * arcToonB.y * (1.0 - arcShadowA);
+    float arcR = smoothstep(arcE - 0.05, arcE + 0.05, arcF) * arcToonB.y * (1.0 - arcShadowA) * smoothstep(0.01, 0.1, arcToonLum);
     color.rgb += baseColor.rgb * arcR;
 }
 #endif
@@ -945,6 +1179,18 @@ class View3D {
         this._mapSize = mapSize;
         this.shadow = new BABYLON.ShadowGenerator(mapSize, this.sun);
         this.shadow.transparencyShadow = false;
+        const shadowMap = this.shadow.getShadowMap();
+        if (shadowMap) {
+            shadowMap.renderListPredicate = (mesh) => {
+                if (mesh.metadata && mesh.metadata.cullShadow) return false;
+                let p = mesh.parent;
+                while (p) {
+                    if (p.metadata && p.metadata.cullShadow) return false;
+                    p = p.parent;
+                }
+                return true;
+            };
+        }
         this.applyLighting(c);
         this.updateLightFrustum(0, 0, 0);
 
@@ -965,15 +1211,29 @@ class View3D {
         const sky = World3D.hexColor3(o.sky != null ? o.sky : c.sky);
         scene.clearColor = new BABYLON.Color4(sky.r, sky.g, sky.b, 1);
         scene.fogColor = sky;
-        scene.fogDensity = Math.max(0, o.fogDensity != null ? o.fogDensity : c.fog);
+        scene.fogDensity = Math.max(0, o.fogDensity != null ? o.fogDensity : (c.fog != null ? c.fog : (c.fogDensity != null ? c.fogDensity : 0)));
 
-        this.hemi.intensity = Math.max(0, c.skyIntensity);
-        this.hemi.diffuse = World3D.hexColor3(c.skyLight);
+        const skyIntensity = c.skyIntensity != null ? c.skyIntensity : (c.ambInt != null ? c.ambInt : 1);
+        const sunIntensity = c.sunIntensity != null ? c.sunIntensity : (c.sunInt != null ? c.sunInt : 1);
+        const sunColor = c.sunColor != null ? c.sunColor : (c.sunCol != null ? c.sunCol : 0xfff7e6);
+        const skyLight = c.skyLight != null ? c.skyLight : (c.sky != null ? c.sky : 0xf2f7ff);
+
+        this.hemi.intensity = Math.max(0, skyIntensity);
+        this.hemi.diffuse = World3D.hexColor3(skyLight);
         this.hemi.groundColor = World3D.hexColor3(o.groundTint != null ? o.groundTint : c.groundLight);
 
+        const sunEnabled = c.sunEnabled !== false && sunIntensity > 0;
+        this.sun.setEnabled(sunEnabled);
         this.sun.direction = World3D.sunDirection(c);
-        this.sun.intensity = Math.max(0, c.sunIntensity);
-        this.sun.diffuse = World3D.hexColor3(c.sunColor);
+        this.sun.intensity = sunEnabled ? Math.max(0, sunIntensity) : 0;
+        this.sun.diffuse = World3D.hexColor3(sunColor);
+
+        // Environment texture intensity (IBL ambient reflection for PBR materials)
+        if (scene.environmentTexture) {
+            const nightFactor = c.nightFactor != null ? c.nightFactor : (sunEnabled ? 0 : 1);
+            const envBase = Math.max(0.2, skyIntensity * (sunEnabled ? 1.0 : 0.45));
+            scene.environmentIntensity = Math.max(0.18, envBase * (1.0 - nightFactor * 0.75));
+        }
 
         const md = scene.metadata || (scene.metadata = {});
         md.arcSun = {
@@ -982,38 +1242,45 @@ class View3D {
         };
         md.arcShadow = {
             color: World3D.hexColor3(o.shadowColor != null ? o.shadowColor : c.shadowColor),
-            strength: Math.max(0, Math.min(1, c.shadowStrength))
+            strength: Math.max(0, Math.min(1, c.shadowStrength != null ? c.shadowStrength : 0.5))
         };
 
         const sg = this.shadow;
-        sg.setDarkness(0);   // shadow color and strength come from the plugin (ARCSHADOW), Babylon — visibility only
-        sg.bias = c.shadowBias;
-        // Shadow edge: 0 — hard (one map sample), otherwise PCF (WebGL2) or
-        // Poisson (WebGL1); on mobile — no higher than low quality.
-        let soft = Math.max(0, Math.min(3, Math.round(c.shadowSoft)));
-        if (IS_MOBILE && soft > 1) soft = 1;
-        const webgl2 = this.engine.webGLVersion >= 2;
-        if (webgl2) {
-            sg.usePoissonSampling = false;
-            sg.usePercentageCloserFiltering = soft > 0;
-            if (soft > 0) {
-                sg.filteringQuality = soft >= 3 ? BABYLON.ShadowGenerator.QUALITY_HIGH
-                    : (soft === 2 ? BABYLON.ShadowGenerator.QUALITY_MEDIUM : BABYLON.ShadowGenerator.QUALITY_LOW);
+        if (sg) {
+            sg.setDarkness(0);   // shadow color and strength come from the plugin (ARCSHADOW), Babylon — visibility only
+            if (c.shadowBias != null) sg.bias = c.shadowBias;
+            // Shadow edge: 0 — hard (one map sample), otherwise PCF (WebGL2) or
+            // Poisson (WebGL1); on mobile — no higher than low quality.
+            let soft = Math.max(0, Math.min(3, Math.round(c.shadowSoft != null ? c.shadowSoft : 1)));
+            if (IS_MOBILE && soft > 1) soft = 1;
+            const webgl2 = this.engine && this.engine.webGLVersion >= 2;
+            if (webgl2) {
+                sg.usePoissonSampling = false;
+                sg.usePercentageCloserFiltering = soft > 0;
+                if (soft > 0) {
+                    sg.filteringQuality = soft >= 3 ? BABYLON.ShadowGenerator.QUALITY_HIGH
+                        : (soft === 2 ? BABYLON.ShadowGenerator.QUALITY_MEDIUM : BABYLON.ShadowGenerator.QUALITY_LOW);
+                }
+            } else {
+                sg.usePercentageCloserFiltering = false;
+                sg.usePoissonSampling = soft > 0;
             }
-        } else {
-            sg.usePercentageCloserFiltering = false;
-            sg.usePoissonSampling = soft > 0;
+            // Normal bias is in map TEXELS: "shadow acne" (stripes and a "sawtooth" on faces
+            // at an acute angle to the sun) grows with the texel, and the shadow frustum shrinks
+            // and grows (fitShadowFrustum). The edge filter compares depth on neighboring
+            // texels too — its radius is added to the constant (PCF 1/3/5 samples —
+            // 0.5/1.5/2.5 texels, Poisson — 1), otherwise with a soft edge the "sawtooth"
+            // comes back. updateLightFrustum converts it to world px.
+            const filter = soft === 0 ? 0 : (webgl2 ? [0, 0.5, 1.5, 2.5][soft] : 1);
+            this._normalBiasTexels = Math.max(0, (c.shadowNormalBias != null ? c.shadowNormalBias : 0)) + filter;
         }
-        // Normal bias is in map TEXELS: "shadow acne" (stripes and a "sawtooth" on faces
-        // at an acute angle to the sun) grows with the texel, and the shadow frustum shrinks
-        // and grows (fitShadowFrustum). The edge filter compares depth on neighboring
-        // texels too — its radius is added to the constant (PCF 1/3/5 samples —
-        // 0.5/1.5/2.5 texels, Poisson — 1), otherwise with a soft edge the "sawtooth"
-        // comes back. updateLightFrustum converts it to world px.
-        const filter = soft === 0 ? 0 : (webgl2 ? [0, 0.5, 1.5, 2.5][soft] : 1);
-        this._normalBiasTexels = Math.max(0, c.shadowNormalBias) + filter;
         // The sun position depends on the direction — recompute the ortho frustum.
         if (this._lightAt) this.updateLightFrustum(this._lightAt.x, this._lightAt.y, this._lightAt.h, this._lightAt.r);
+    }
+
+    setSunPosition(azimuthDeg, elevationDeg) {
+        const c = Object.assign({}, World3D.cfg(), { sunAz: azimuthDeg, sunEl: elevationDeg });
+        this.applyLighting(c);
     }
 
     // The sun's ortho frustum follows the point of interest (usually the camera target):
@@ -1230,6 +1497,6 @@ class View3D {
 View3D.LIGHT_DIST = 2200;
 // Minimum half-size of the shadow ortho frustum: one object with its shadow.
 View3D.SHADOW_MIN_RADIUS = 140;
-// How far ahead of the camera the shadow frustum sits, in its own half-sizes: the quarter left
-// behind covers the ground under and just past the eye, the rest reaches into the frame.
+// Where the "nothing to cast" box sits: fraction of its own half-size ahead of the eye, so that
+// it covers the ground right at the camera and out into the frame (fitShadowFrustum).
 View3D.SHADOW_AHEAD = 0.75;

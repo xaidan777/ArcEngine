@@ -13,9 +13,6 @@
 // an object selects it. A move along X/Z keeps the height above the ground (the object
 // follows the terrain), a move along Y changes h.
 //
-// The sound of the selected object draws two faint yellow spheres — the volume it fills
-// (§Sound spheres in the view).
-//
 // The layout is dirty when the JSON of the records differs from the saved one (saved).
 // Field precision — as the server writes: position and heading to 0.1, scale to 0.001.
 
@@ -25,6 +22,7 @@ const ObjectsPanel = {
     lab: null,
     /** @type {LocationObject | null} */
     selected: null,     // a location.objects record
+    selectedObjects: new Set(),
     saved: '[]',        // layout JSON as of load or save
     /** @type {BABYLON.GizmoManager | null} */
     gizmo: null,
@@ -73,20 +71,18 @@ const ObjectsPanel = {
         this.render();
     },
 
-    // SoundPanel found other files in assets/sounds (it owns the list): redraw the "Sound"
-    // section — unless the user is typing in this panel right now.
-    onSoundsChanged() {
-        const host = document.getElementById('object-props');
-        if (!host || !host.contains(document.activeElement)) this.renderProps();
-    },
-
     // --- Selection --------------------------------------------------------------
 
-    select(rec, fromView) {
+    select(rec, fromView, additive = false) {
+        if (typeof MapEditor !== 'undefined' && this.lab) MapEditor.select(rec, additive);
         this.selected = rec && this.lab.location.objects.includes(rec) ? rec : null;
         this.gizmo.attachToMesh(this.selected && this.selected.mesh ? this.selected.mesh : null);
         if (fromView && this.selected) PaneTabs.show('objects');
         this.render();
+        const matHost = document.getElementById('materials-host');
+        if (matHost && typeof MaterialEditor !== 'undefined' && typeof PaneTabs !== 'undefined' && PaneTabs.current === 'materials') {
+            MaterialEditor.render(matHost);
+        }
     },
 
     // A click without movement: the object under the cursor or nothing (deselect).
@@ -95,8 +91,43 @@ const ObjectsPanel = {
         this._down = null;
         if (!d || e.button !== 0 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 4) return;
         const r = this.lab.canvas.getBoundingClientRect();
+
+        // Check if a raid entity (spawn, crate, hatch, etc.) or district prop was clicked
+        const fullPick = this.lab.location.view.scene.pick(e.clientX - r.left, e.clientY - r.top);
+        if (fullPick && fullPick.hit && fullPick.pickedMesh) {
+            for (let n = fullPick.pickedMesh; n; n = n.parent) {
+                if (n.metadata && n.metadata.raidEntity) {
+                    if (typeof RaidLayer !== 'undefined') {
+                        RaidLayer.selectEntity(n.metadata.raidEntity.id, e.shiftKey || e.ctrlKey || e.metaKey);
+                    }
+                    return;
+                }
+                if (n.metadata && (n.metadata.isEditorLight || n.metadata.lightRecord)) {
+                    const rec = n.metadata.lightRecord;
+                    if (typeof LightManager !== 'undefined' && rec) {
+                        LightManager.select(rec.id);
+                        if (typeof PaneTabs !== 'undefined') PaneTabs.show('lighting');
+                    }
+                    return;
+                }
+                if (n.metadata && (n.metadata.districtPropRoot || n.metadata.isDistrictStructure)) {
+                    const root = n.metadata.districtPropRoot || n;
+                    if (typeof RaidLayer !== 'undefined' && RaidLayer.selectDistrictProp) {
+                        RaidLayer.selectDistrictProp(root, e.shiftKey || e.ctrlKey || e.metaKey);
+                    }
+                    return;
+                }
+                if (n.metadata && n.metadata.isRubble) {
+                    if (typeof RaidLayer !== 'undefined' && RaidLayer.selectRubble) {
+                        RaidLayer.selectRubble(n, e.shiftKey || e.ctrlKey || e.metaKey);
+                    }
+                    return;
+                }
+            }
+        }
+
         const hit = this.lab.location.view.scene.pick(e.clientX - r.left, e.clientY - r.top, (m) => !!this.recOf(m));
-        this.select(hit && hit.hit ? this.recOf(hit.pickedMesh) : null, true);
+        this.select(hit && hit.hit ? this.recOf(hit.pickedMesh) : null, true, e.shiftKey || e.ctrlKey || e.metaKey);
     },
 
     recOf(mesh) {
@@ -183,32 +214,76 @@ const ObjectsPanel = {
         for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#gizmo-modes [data-gizmo]'))) {
             btn.classList.toggle('active', btn.dataset.gizmo === this.gizmoMode);
         }
+        if (typeof SceneView !== 'undefined' && SceneView.setGizmoMode) {
+            SceneView.setGizmoMode(this.gizmoMode);
+        }
     },
 
     // Move: along X/Z and along the ground the height above the ground stays (the object follows the terrain); along Y — h changes.
     onMoveDrag(vertical) {
         const rec = this.selected;
-        if (!rec || !rec.mesh) return;
-        const p = rec.mesh.position, d = rec.def, t = this.lab.location.terrain;
-        const ground = t ? t.heightAt(p.x, p.z) : 0;
-        d.x = this.round(p.x, 1);
-        d.y = this.round(p.z, 1);
-        if (vertical) d.h = this.round(p.y - ground, 1);
-        else p.y = ground + (Number(d.h) || 0);
-        this.syncProps();
-        this.renderHeader();
+        if (rec && rec.mesh) {
+            const p = rec.mesh.position, d = rec.def, t = this.lab.location.terrain;
+            const ground = t ? t.heightAt(p.x, p.z) : 0;
+            d.x = this.round(p.x, 1);
+            d.y = this.round(p.z, 1);
+            if (vertical) d.h = this.round(p.y - ground, 1);
+            else p.y = ground + (Number(d.h) || 0);
+            this.syncProps();
+            this.renderHeader();
+            return;
+        }
+        const mesh = this.gizmo && this.gizmo.attachedMesh;
+        if (mesh && typeof LightManager !== 'undefined' && LightManager.selectedId) {
+            LightManager.onTransform(LightManager.selectedId);
+            return;
+        }
+        if (mesh && typeof RaidLayer !== 'undefined') {
+            if (RaidLayer.selectedDistrictProp === mesh) {
+                const posX = /** @type {HTMLInputElement} */ (document.getElementById('prop-pos-x'));
+                const posZ = /** @type {HTMLInputElement} */ (document.getElementById('prop-pos-z'));
+                const posY = /** @type {HTMLInputElement} */ (document.getElementById('prop-pos-y'));
+                if (posX) posX.value = String(Math.round(mesh.position.x));
+                if (posZ) posZ.value = String(Math.round(mesh.position.z));
+                if (posY) posY.value = String(Math.round(mesh.position.y));
+            } else if (RaidLayer.selectedEntityId) {
+                const erec = RaidLayer.entityMeshes.get(RaidLayer.selectedEntityId);
+                if (erec && erec.entity) {
+                    erec.entity.x = mesh.position.x;
+                    erec.entity.y = mesh.position.z;
+                    const posX = /** @type {HTMLInputElement} */ (document.getElementById('re-pos-x'));
+                    const posY = /** @type {HTMLInputElement} */ (document.getElementById('re-pos-y'));
+                    if (posX) posX.value = String(Math.round(erec.entity.x));
+                    if (posY) posY.value = String(Math.round(erec.entity.y));
+                }
+            }
+        }
     },
 
     // The rings rotate the mesh (rotation, or rotationQuaternion if it is set); the angles go
     // into rot [x, y, z] in degrees, y with the heading sign (rotation.y = −y).
     onRotateDrag() {
         const rec = this.selected, m = rec && rec.mesh;
-        if (!m) return;
-        const e = m.rotationQuaternion ? m.rotationQuaternion.toEulerAngles() : m.rotation;
-        const deg = (v) => this.round(((v * 180 / Math.PI + 180) % 360 + 360) % 360 - 180, 1);
-        rec.def.rot = [deg(e.x), deg(-e.y), deg(e.z)];
-        this.syncProps();
-        this.renderHeader();
+        if (m) {
+            const e = m.rotationQuaternion ? m.rotationQuaternion.toEulerAngles() : m.rotation;
+            const deg = (v) => this.round(((v * 180 / Math.PI + 180) % 360 + 360) % 360 - 180, 1);
+            rec.def.rot = [deg(e.x), deg(-e.y), deg(e.z)];
+            this.syncProps();
+            this.renderHeader();
+            return;
+        }
+        const mesh = this.gizmo && this.gizmo.attachedMesh;
+        if (mesh && typeof LightManager !== 'undefined' && LightManager.selectedId) {
+            LightManager.onTransform(LightManager.selectedId);
+            return;
+        }
+        if (mesh && typeof RaidLayer !== 'undefined' && RaidLayer.selectedDistrictProp === mesh) {
+            const rotY = /** @type {HTMLInputElement} */ (document.getElementById('prop-rot-y'));
+            if (rotY) {
+                const e = mesh.rotationQuaternion ? mesh.rotationQuaternion.toEulerAngles() : mesh.rotation;
+                rotY.value = String(Math.round((e.y * 180 / Math.PI + 360) % 360));
+            }
+        }
     },
 
     onScaleDrag() {
@@ -222,6 +297,9 @@ const ObjectsPanel = {
     // Released: the mesh — strictly per def (rounded numbers, Euler instead of the gizmo quaternion), the step — into history.
     onGizmoDragEnd() {
         if (this.selected) this.lab.location.placeObject(this.selected);
+        if (typeof LightManager !== 'undefined' && LightManager.selectedId) {
+            LightManager.onTransform(LightManager.selectedId);
+        }
         this.syncProps();
         if (this._dragBefore) this.commit(null, this._dragBefore);
         this._dragBefore = null;
@@ -241,6 +319,7 @@ const ObjectsPanel = {
         const after = this.snapshot();
         if (after.defs !== before.defs) EditHistory.record(key, () => this.restore(before), () => this.restore(after));
         this.renderHeader();
+        if (typeof MapEditor !== 'undefined') MapEditor.syncHierarchy();
     },
 
     restore(snap) {
@@ -253,7 +332,6 @@ const ObjectsPanel = {
                 for (const k of Object.keys(rec.def)) delete rec.def[k];
                 Object.assign(rec.def, d);
                 loc.placeObject(rec);
-                loc.applyHidden(rec);
             });
         } else {
             this.gizmo.attachToMesh(null);
@@ -275,6 +353,7 @@ const ObjectsPanel = {
     },
 
     removeSelected() {
+        if (typeof MapEditor !== 'undefined') { MapEditor.removeSelection(); return; }
         const rec = this.selected;
         if (!rec) return;
         const before = this.snapshot();
@@ -333,28 +412,6 @@ const ObjectsPanel = {
         this.commit('field:' + before.selected + ':anim', before);
     },
 
-    // An optional field of the selected one (tag, hidden): an empty value removes it from the record.
-    setOptional(key, value) {
-        const rec = this.selected;
-        if (!rec) return;
-        const before = this.snapshot();
-        if (value) rec.def[key] = value;
-        else delete rec.def[key];
-        if (key === 'hidden') this.lab.location.applyHidden(rec);
-        this.commit('field:' + before.selected + ':' + key, before);
-    },
-
-    // The whole sound of the selected one ({ src, volume?, loop?, falloffMin?, falloffMax? });
-    // null — remove. Location3D.updateSound picks the change up on the next frame.
-    setSound(sound) {
-        const rec = this.selected;
-        if (!rec) return;
-        const before = this.snapshot();
-        if (sound) rec.def.sound = sound;
-        else delete rec.def.sound;
-        this.commit('field:' + before.selected + ':sound', before);
-    },
-
     // The looped clip of the selected .glb model; '' — remove (the rest pose).
     setClip(name) {
         const rec = this.selected;
@@ -402,6 +459,7 @@ const ObjectsPanel = {
     },
 
     onKey(e) {
+        if (e.target && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable)) return;
         if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') { this.save(); return; }   // the default is suppressed by the inspector
         if (PaneTabs.current === 'ui') return;   // Del, Esc, Ctrl+D belong to the UI tab's element
         const t = e.target;
@@ -471,6 +529,7 @@ const ObjectsPanel = {
     },
 
     async save() {
+        if (typeof MapEditor !== 'undefined') return MapEditor.save();
         if (!this.isDirty()) return;
         if (!Inspector.saveAvailable) { Toast.show(I18N.t('toast.noSave'), true); return; }
         const objects = this.defs();
@@ -520,17 +579,13 @@ const ObjectsPanel = {
             return;
         }
         for (const rec of list) {
-            const row = this.el('div', 'object-row' + (rec === this.selected ? ' selected' : '') + (rec.error ? ' broken' : '') +
-                (rec.def.hidden ? ' ghost' : ''));
+            const row = this.el('div', 'object-row' + ((this.selectedObjects?.has(rec) || rec === this.selected) ? ' selected' : '') + (rec.error ? ' broken' : ''));
             row.append(
                 this.el('span', 'object-name', rec.def.name || '—'),
                 this.el('span', 'object-file', rec.error ? '⚠ ' + I18N.t('obj.missing') : rec.def.model.split('/').pop()));
             row.title = rec.error ? rec.def.model + ' — ' + rec.error : rec.def.model;
-            // Clicking the selected row again clears the selection: the property list below
-            // folds away and the gizmo leaves the view.
-            row.addEventListener('click', () => this.select(this.selected === rec ? null : rec));
-            // The two clicks of a double click have just toggled it off — select it again.
-            row.addEventListener('dblclick', () => { this.select(rec); this.focusSelected(); });
+            row.addEventListener('click', e => this.select(rec, false, e.shiftKey || e.ctrlKey || e.metaKey));
+            row.addEventListener('dblclick', () => this.focusSelected());
             host.appendChild(row);
         }
     },
@@ -541,10 +596,37 @@ const ObjectsPanel = {
         this.propEls = null;
         const rec = this.selected;
         if (!rec) {
-            if (this.lab.location.objects.length) host.appendChild(this.el('div', 'objects-empty', I18N.t('obj.noSelection')));
+            const empty = this.el('div', 'objects-empty');
+            empty.appendChild(this.el('p', '', I18N.t('obj.noSelection')));
+            const materials = this.el('button', 'empty-action', I18N.t('obj.groundMaterials'));
+            materials.addEventListener('click', () => { MaterialEditor.forcedTarget = 'terrain'; PaneTabs.show('materials'); });
+            empty.appendChild(materials); host.appendChild(empty);
             return;
         }
-        const d = rec.def, els = this.propEls = { pos: null, rot: null, scale: null, sound: null };
+        const d = rec.def, els = this.propEls = { pos: null, rot: null, scale: null };
+
+        // Quick Studio actions
+        const studioActions = this.el('div', 'studio-quick-actions');
+        studioActions.style.display = 'flex';
+        studioActions.style.gap = '6px';
+        studioActions.style.margin = '8px 0 12px';
+
+        const btnRig = this.el('button', 'panel-button', '🦴 Rig Studio');
+        btnRig.title = 'Edit skeleton and joints in Rig Studio';
+        btnRig.style.flex = '1';
+        btnRig.addEventListener('click', () => {
+            if (typeof WorkspaceManager !== 'undefined') WorkspaceManager.setWorkspace('rig');
+        });
+
+        const btnAnim = this.el('button', 'panel-button', '🎬 Anim Studio');
+        btnAnim.title = 'Edit and author animation clips in Anim Studio';
+        btnAnim.style.flex = '1';
+        btnAnim.addEventListener('click', () => {
+            if (typeof WorkspaceManager !== 'undefined') WorkspaceManager.setWorkspace('anim');
+        });
+
+        studioActions.append(btnRig, btnAnim);
+        host.appendChild(studioActions);
 
         const name = this.input('text', d.name);
         name.maxLength = 64;
@@ -556,16 +638,6 @@ const ObjectsPanel = {
         const kind = this.choice([['prop', I18N.t('obj.kindProp')], ['actor', I18N.t('obj.kindActor')]], d.kind === 'actor' ? 'actor' : 'prop');
         kind.addEventListener('change', () => this.setKind(kind.value));
         host.appendChild(this.row('obj.kind', 'obj.kindHint', kind));
-
-        const tag = this.input('text', d.tag || '');
-        tag.maxLength = 64;
-        tag.addEventListener('input', () => this.setOptional('tag', tag.value.trim()));
-        host.appendChild(this.row('obj.tag', 'obj.tagHint', tag));
-
-        const hidden = this.input('checkbox', '');
-        hidden.checked = !!d.hidden;
-        hidden.addEventListener('change', () => { this.setOptional('hidden', hidden.checked); this.renderList(); });
-        host.appendChild(this.row('obj.hidden', 'obj.hiddenHint', hidden));
 
         const posKeys = ['x', 'y', 'h'];
         els.pos = this.vector(['X', 'Y', 'H'], 10, (i) => d[posKeys[i]], (i, v) => this.setField(posKeys[i], this.round(v, 1)));
@@ -579,7 +651,6 @@ const ObjectsPanel = {
         host.appendChild(this.row('obj.scale', 'obj.scaleHint', ...els.scale.parts));
 
         this.renderAnim(host, rec);
-        this.renderSound(host, rec);
 
         const actions = this.el('div', 'object-actions');
         for (const [key, fn, cls] of [['obj.focus', () => this.focusSelected()], ['obj.duplicate', () => this.duplicateSelected()],
@@ -604,167 +675,40 @@ const ObjectsPanel = {
             const clip = this.choice([['', I18N.t('obj.animNone')]].concat(list.map(n => [n, n])), rec.def.clip || '');
             clip.addEventListener('change', () => this.setClip(clip.value));
             host.appendChild(this.row('obj.animClip', 'obj.animClipHint', clip));
-            return;
-        }
-        const names = rec.mesh ? rec.mesh.getChildMeshes(true).map(m => m.metadata && m.metadata.part).filter(Boolean) : [];
-        if (a && !names.includes(a.part)) names.push(a.part);
-        const part = this.choice([['', I18N.t('obj.animNone')]].concat(names.map(n => [n, n])), a ? a.part : '');
-        part.addEventListener('change', () => {
-            const cur = rec.def.anim;
-            this.setAnim(part.value ? { part: part.value, axis: this.guessAxis(rec, part.value),
-                speed: cur ? cur.speed : 10, dir: cur ? cur.dir : 'cw' } : null);
-            this.renderProps();
-        });
-        host.appendChild(this.row('obj.animPart', 'obj.animPartHint', part));
-        if (!a) return;
-
-        const edit = (key, value) => this.setAnim(Object.assign({}, rec.def.anim, { [key]: value }));
-        const axis = this.choice(['x', '-x', 'y', '-y', 'z', '-z'].map(k => [k, (k[0] === '-' ? '−' : '+') + k.slice(-1).toUpperCase()]), a.axis);
-        axis.addEventListener('change', () => edit('axis', axis.value));
-        host.appendChild(this.row('obj.animAxis', 'obj.animAxisHint', axis));
-
-        const speed = this.input('number', this.fmt(a.speed));
-        speed.min = '0';
-        speed.step = '1';
-        speed.addEventListener('input', () => {
-            const v = Number(speed.value);
-            if (speed.value !== '' && Number.isFinite(v) && v >= 0) edit('speed', this.round(v, 1));
-        });
-        speed.addEventListener('blur', () => { if (rec.def.anim) speed.value = this.fmt(rec.def.anim.speed); });
-        host.appendChild(this.row('obj.animSpeed', 'obj.animSpeedHint', speed));
-
-        const dir = this.choice([['cw', I18N.t('obj.animCw')], ['ccw', I18N.t('obj.animCcw')]], a.dir === 'ccw' ? 'ccw' : 'cw');
-        dir.addEventListener('change', () => edit('dir', dir.value));
-        host.appendChild(this.row('obj.animDir', 'obj.animDirHint', dir));
-    },
-
-    // The "Sound" section: a file of assets/sounds playing at the object. Location3D.updateSound
-    // reads def.sound every frame — an edit is heard at once (the toolbar's "sound" checkbox).
-    // The file list is SoundPanel's, already fetched: nothing here waits, so rows never land in
-    // a stale panel.
-    renderSound(host, rec) {
-        const s = rec.def.sound;
-        host.appendChild(this.el('div', 'props-section', I18N.t('obj.sound')));
-        const files = SoundPanel.files.slice();
-        if (s && !files.includes(s.src)) files.push(s.src);
-        if (!files.length) {
-            host.appendChild(this.el('div', 'objects-empty', I18N.t('obj.soundEmpty')));
-            return;
-        }
-        const file = this.choice([['', I18N.t('obj.soundNone')]].concat(files.map(p => [p, p.split('/').pop()])), s ? s.src : '');
-        file.addEventListener('change', () => {
-            this.setSound(file.value ? Object.assign({}, rec.def.sound, { src: file.value }) : null);
-            this.renderProps();
-        });
-        host.appendChild(this.row('obj.soundFile', 'obj.soundFileHint', file));
-        if (!s) return;
-
-        // A default (volume 1, looped, the common radii) is not kept in the record.
-        const edit = (key, value, isDefault) => {
-            const next = Object.assign({}, rec.def.sound);
-            if (isDefault) delete next[key];
-            else next[key] = value;
-            this.setSound(next);
-        };
-        const number = (key, fallback, min, max, step, digits) => {
-            const num = this.input('number', this.fmt(s[key] == null ? fallback : s[key]));
-            Object.assign(num, { min: String(min), max: String(max), step: String(step) });
-            num.addEventListener('input', () => {
-                const v = Number(num.value);
-                if (num.value === '' || !Number.isFinite(v)) return;
-                const value = Math.max(min, Math.min(max, this.round(v, digits)));
-                edit(key, value, value === fallback);
+        } else {
+            const names = rec.mesh ? rec.mesh.getChildMeshes(true).map(m => m.metadata && m.metadata.part).filter(Boolean) : [];
+            if (a && !names.includes(a.part)) names.push(a.part);
+            const part = this.choice([['', I18N.t('obj.animNone')]].concat(names.map(n => [n, n])), a ? a.part : '');
+            part.addEventListener('change', () => {
+                const cur = rec.def.anim;
+                this.setAnim(part.value ? { part: part.value, axis: this.guessAxis(rec, part.value),
+                    speed: cur ? cur.speed : 10, dir: cur ? cur.dir : 'cw' } : null);
+                this.renderProps();
             });
-            num.addEventListener('blur', () => { const cur = rec.def.sound; if (cur) num.value = this.fmt(cur[key] == null ? fallback : cur[key]); });
-            return num;
-        };
-        host.appendChild(this.row('obj.soundVolume', null, number('volume', 1, 0, 1, 0.05, 2)));
-        // The two radii the spheres in the view show; els keeps them in sync.
-        const els = this.propEls.sound = {};
-        for (const key of ['falloffMin', 'falloffMax']) {
-            els[key] = number(key, 0, 0, 20000, 10, 0);
-            host.appendChild(this.row('obj.' + key, 'obj.' + key + 'Hint', els[key]));
+            host.appendChild(this.row('obj.animPart', 'obj.animPartHint', part));
+            if (a) {
+                const edit = (key, value) => this.setAnim(Object.assign({}, rec.def.anim, { [key]: value }));
+                const axis = this.choice(['x', '-x', 'y', '-y', 'z', '-z'].map(k => [k, (k[0] === '-' ? '−' : '+') + k.slice(-1).toUpperCase()]), a.axis);
+                axis.addEventListener('change', () => edit('axis', axis.value));
+                host.appendChild(this.row('obj.animAxis', 'obj.animAxisHint', axis));
+
+                const speed = this.input('number', this.fmt(a.speed));
+                speed.min = '0';
+                speed.step = '1';
+                speed.addEventListener('input', () => {
+                    const v = Number(speed.value);
+                    if (speed.value !== '' && Number.isFinite(v) && v >= 0) edit('speed', this.round(v, 1));
+                });
+                speed.addEventListener('blur', () => { if (rec.def.anim) speed.value = this.fmt(rec.def.anim.speed); });
+                host.appendChild(this.row('obj.animSpeed', 'obj.animSpeedHint', speed));
+
+                const dir = this.choice([['cw', I18N.t('obj.animCw')], ['ccw', I18N.t('obj.animCcw')]], a.dir === 'ccw' ? 'ccw' : 'cw');
+                dir.addEventListener('change', () => edit('dir', dir.value));
+                host.appendChild(this.row('obj.animDir', 'obj.animDirHint', dir));
+            }
         }
-        const loop = this.choice([['1', I18N.t('obj.soundLooped')], ['0', I18N.t('obj.soundOnce')]], s.loop === false ? '0' : '1');
-        loop.addEventListener('change', () => edit('loop', false, loop.value === '1'));
-        host.appendChild(this.row('obj.soundLoop', 'obj.soundLoopHint', loop));
-    },
-
-    // --- Sound spheres in the view --------------------------------------------------
-    //
-    // Two barely visible yellow SPHERES around the selected object — the volume its sound fills:
-    // falloffMin (full volume) and falloffMax (silence beyond). Sound3D measures the straight 3D
-    // distance from the camera, so a sphere is exactly the audible region: inside it is heard,
-    // outside it is not. The radii drawn are the EFFECTIVE ones — the object's own value, or the
-    // AUDIO_FALLOFF_* constant when it is 0; the numbers are edited in the panel.
-    //
-    // Each sphere is drawn the way a gizmo is — as LINES: three great circles (one flat on the
-    // map, two upright), so the shape reads as a volume and hides nothing behind it. A line mesh
-    // keeps its 1 px width at any scale, so one unit wireframe scaled to the radius is enough —
-    // no geometry is rebuilt while a radius changes.
-    //
-    // They live in the gizmo's utility layer (the toon plugin does not quantize them and they
-    // draw over the world) and are NOT pickable: a sphere covers most of the screen, and a
-    // pickable one would swallow every camera drag through it.
-
-    SPHERE: { color: '#ffd24a', minAlpha: 0.55, maxAlpha: 0.32, segments: 64 },
-
-    // The pair actually heard, in px (never min > max — that is not a ring, it is a knot).
-    soundRadii(sound) {
-        const global = (name, dflt) => {
-            const v = Number(/** @type {any} */ (window)[name]);
-            return Number.isFinite(v) ? v : dflt;
-        };
-        const min = Number(sound.falloffMin) > 0 ? Number(sound.falloffMin) : global('AUDIO_FALLOFF_MIN', 150);
-        const max = Number(sound.falloffMax) > 0 ? Number(sound.falloffMax) : global('AUDIO_FALLOFF_MAX', 1024);
-        return { min: Math.max(0, Math.min(min, max)), max: Math.max(0, max) };
-    },
-
-    // A unit wireframe sphere: three closed great circles of radius 1.
-    sphereLines() {
-        const n = this.SPHERE.segments, flat = [], upX = [], upZ = [];
-        for (let i = 0; i <= n; i++) {
-            const t = (i / n) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t);
-            flat.push(new BABYLON.Vector3(c, 0, s));   // on the map
-            upX.push(new BABYLON.Vector3(c, s, 0));    // upright, along x
-            upZ.push(new BABYLON.Vector3(0, s, c));    // upright, along y of the map
-        }
-        return [flat, upX, upZ];
-    },
-
-    spheres() {
-        if (this._spheres) return this._spheres;
-        const scene = this.gizmo.utilityLayer.utilityLayerScene;
-        const lines = this.sphereLines();
-        const make = (key, alpha) => {
-            const mesh = BABYLON.MeshBuilder.CreateLineSystem('sound-' + key, { lines }, scene);
-            mesh.color = BABYLON.Color3.FromHexString(this.SPHERE.color);
-            mesh.alpha = alpha;
-            mesh.isPickable = false;      // never swallow a camera drag or a click on the object
-            return mesh;
-        };
-        this._spheres = { falloffMin: make('falloffMin', this.SPHERE.minAlpha), falloffMax: make('falloffMax', this.SPHERE.maxAlpha) };
-        return this._spheres;
-    },
-
-    // Every frame (Lab.tick): the object may have been moved by the gizmo, the terrain rebuilt,
-    // the radii changed in a field or on the Sound tab. The spheres sit on the SAME world point
-    // Sound3D measures from — the model's own position, so what is drawn is what is heard.
-    syncSpheres() {
-        const rec = this.selected, s = rec && rec.def.sound;
-        // Sound off on the view toolbar — no sound, so nothing to show either.
-        const on = !!s && PaneTabs.current === 'objects' && !Sound3D.muted;
-        if (!on && !this._spheres) return;
-        const spheres = this.spheres();
-        for (const key of ['falloffMin', 'falloffMax']) spheres[key].setEnabled(on);
-        if (!on) return;
-        const x = Number(rec.def.x) || 0, y = Number(rec.def.y) || 0;
-        const t = this.lab.location.terrain;
-        const at = rec.mesh ? rec.mesh.position : new BABYLON.Vector3(x, (t ? t.heightAt(x, y) : 0) + (Number(rec.def.h) || 0), y);
-        const eff = this.soundRadii(s);
-        for (const key of ['falloffMin', 'falloffMax']) {
-            spheres[key].position.copyFrom(at);
-            spheres[key].scaling.setAll(Math.max(1, eff[key === 'falloffMin' ? 'min' : 'max']));
+        if (typeof MaterialEditor !== 'undefined') {
+            MaterialEditor.render(host);
         }
     },
 
@@ -775,11 +719,6 @@ const ObjectsPanel = {
         const d = rec.def, values = { pos: [d.x, d.y, d.h], rot: d.rot, scale: d.scale };
         for (const key of ['pos', 'rot', 'scale']) {
             els[key].inputs.forEach((num, i) => { if (document.activeElement !== num) num.value = this.fmt(values[key][i]); });
-        }
-        // The sound radii follow the spheres in the view.
-        for (const key of Object.keys(els.sound || {})) {
-            const num = els.sound[key];
-            if (document.activeElement !== num) num.value = this.fmt(d.sound && d.sound[key] != null ? d.sound[key] : 0);
         }
     },
 
@@ -848,17 +787,27 @@ const ObjectsPanel = {
     },
 };
 
-// Right pane tabs: Global Settings and Sound (Constants.js), Objects (Objects.js), UI (UILayout.js).
+// Right pane tabs: Global Settings (Constants.js), Objects (Objects.js) and UI (UILayout.js).
 // The open tab is remembered in localStorage; a switch — the window 'pane-tab' event.
 /** @satisfies {Record<string, any>} */
 const PaneTabs = {
     KEY: 'arcengine.editor.tab',
-    TABS: ['settings', 'objects', 'ui', 'sound'],
+    TABS: ['objects', 'terrain', 'materials', 'lighting', 'settings', 'ui'],
     current: 'settings',
 
     init() {
         for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#pane-tabs [data-tab]'))) {
+            btn.setAttribute('role', 'tab');
+            btn.id = 'pane-tab-' + btn.dataset.tab;
+            btn.setAttribute('aria-controls', 'pane-content-' + btn.dataset.tab);
             btn.addEventListener('click', () => this.show(btn.dataset.tab));
+            btn.addEventListener('keydown', e => {
+                const index = this.TABS.indexOf(btn.dataset.tab);
+                const next = e.key === 'ArrowRight' ? (index + 1) % this.TABS.length : e.key === 'ArrowLeft' ? (index + this.TABS.length - 1) % this.TABS.length : e.key === 'Home' ? 0 : e.key === 'End' ? this.TABS.length - 1 : -1;
+                if (next < 0) return;
+                e.preventDefault(); this.show(this.TABS[next]);
+                document.getElementById('pane-tab-' + this.TABS[next]).focus();
+            });
         }
         let saved = null;
         try { saved = localStorage.getItem(this.KEY); } catch (e) { /* storage is unavailable */ }
@@ -866,10 +815,27 @@ const PaneTabs = {
     },
 
     show(tab) {
+        if (!this.TABS.includes(tab)) return;
         this.current = tab;
-        for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#pane-tabs [data-tab]'))) btn.classList.toggle('active', btn.dataset.tab === tab);
-        for (const panel of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.pane-panel'))) panel.hidden = panel.dataset.tab !== tab;
+        for (const btn of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#pane-tabs [data-tab]'))) {
+            const active = btn.dataset.tab === tab;
+            btn.classList.toggle('active', active); btn.setAttribute('aria-selected', String(active)); btn.tabIndex = active ? 0 : -1;
+        }
+        for (const panel of /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.pane-panel'))) {
+            panel.hidden = panel.dataset.tab !== tab;
+            panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', 'pane-tab-' + panel.dataset.tab);
+            // Terrain and Lighting IDs are also used by their panel controls.
+            if (panel.dataset.tab !== 'terrain' && panel.dataset.tab !== 'lighting') panel.id = 'pane-content-' + panel.dataset.tab;
+            else document.getElementById('pane-tab-' + panel.dataset.tab)?.setAttribute('aria-controls', panel.id);
+        }
         try { localStorage.setItem(this.KEY, tab); } catch (e) { /* the choice will last until F5 */ }
+        if (tab === 'materials' && typeof MaterialEditor !== 'undefined') {
+            const host = document.getElementById('materials-host');
+            if (host) MaterialEditor.render(host);
+        }
+        if (tab === 'lighting' && typeof LightingPanel !== 'undefined') {
+            LightingPanel.render();
+        }
         window.dispatchEvent(new CustomEvent('pane-tab', { detail: tab }));
     },
 };

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 640">
+<defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#315052" stroke-width=".7"/></pattern><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6L6 0" stroke="#62666d" stroke-width="1"/></pattern></defs>
+<rect width="900" height="640" fill="#132327"/><ellipse cx="455" cy="335" rx="335" ry="245" fill="#739884" opacity=".035"/><rect width="900" height="640" fill="url(#grid)"/>
+<g fill="none" stroke="#345453" stroke-width="2" opacity=".8"><path d="M0 200Q160 270 90 430T160 640M0 150Q210 220 145 435T210 640M0 100Q270 175 200 440T265 640M900 50Q700 75 750 310T690 640M900 90Q750 130 790 335T740 640M900 130Q800 160 835 370T800 640"/></g>
+<path d="M240 585L270 490 412 430 414 310 550 310 550 198 702 140 752 65" fill="none" stroke="#363e47" stroke-width="52"/><path d="M240 585L270 490 412 430 414 310 550 310 550 198 702 140 752 65" fill="none" stroke="#717576" stroke-width="2" stroke-dasharray="12 10"/>
+<g fill="#2c4546" stroke="#678782" stroke-width="2"><path d="M220 350h138v90H220zM306 170h182v92H306zM593 320h133v148H593zM583 69h101v75H583zM192 485h52v88H192z"/><path d="M224 354h130v82H224zM310 174h174v84H310zM597 324h125v140H597z" fill="url(#hatch)"/><path d="M420 495h60v110h-60zM490 495h60v110h-60zM564 515h58v90h-58zM670 508h80v35h-80zM670 554h80v35h-80z"/></g>
+<g fill="none" stroke="#83b5a3" stroke-width="2"><path d="M284 154h220v126H284zM572 304h176v180H572z"/><path d="M165 465L251 465 258 596 165 596z"/></g>
+<path d="M241 573L280 490 412 430 415 296 552 296 552 186 724 114" fill="none" stroke="#cbe3ac" stroke-width="2" stroke-dasharray="5 7" opacity=".8"/>
+<g font-family="sans-serif" font-size="15" font-weight="600" fill="#e5e5dc"><text x="306" y="144">01 / FOUNDRY</text><text x="581" y="292">02 / STORAGE</text><text x="430" y="630">03 / SERVICE YARD</text><text x="78" y="610">INSERTION</text><text x="661" y="88">EXTRACTION</text></g>
+<g stroke="#d5e7b4" stroke-width="2" fill="#151b27"><path d="M235 555l18 18-18 18-18-18z"/><circle cx="723" cy="115" r="19"/><path d="M723 104v22m-8-8 8 8 8-8"/><path d="M386 282l12 12-12 12-12-12zM560 474l12 12-12 12-12-12zM275 451l12 12-12 12-12-12z"/></g>
+<g fill="#b3b8bd" font-family="monospace" font-size="12"><text x="32" y="35">BW—01 / TACTICAL OVERVIEW</text><text x="32" y="55">INDUSTRIAL PERIMETER</text><text x="837" y="45">N</text><path d="M842 56l-5 18h10z"/><text x="32" y="640">SCHEMATIC / NOT TO SCALE</text></g>
+</svg>

@@ -21,9 +21,13 @@ export const EXTRA_REFS = [];
 // Files needed in the build that are not "assets". A new <script> in
 // index.html = a new line here, otherwise the file will not get into the archive.
 export const CODE_FILES = [
-  'index.html',
-  'js/Constants.js', 'js/Objects.js', 'js/UILayout.js', 'js/Sound3D.js', 'js/World3D.js', 'js/Terrain3D.js', 'js/CameraControl.js', 'js/Model3D.js', 'js/Gltf3D.js', 'js/Instances3D.js', 'js/Location3D.js', 'js/Debug3D.js', 'js/UI.js', 'js/Game.js', 'js/main.js',
+  'js/RaidRules.js', 'js/MapPool.js', 'GAME_API.md',
+  'js/RaidClient.js', 'js/ProgressionSystem.js', 'js/OnlineBridge.js', 'server/main.mjs', 'server/simulation.mjs', 'server/accounts.mjs', 'server/social.mjs', 'server/matchmaking.mjs', 'server/README.md',
+  'index.html', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'GAMEPLAY.md',
+  'js/Constants.js', 'js/Objects.js', 'js/UILayout.js', 'js/World3D.js', 'js/Instances3D.js', 'js/DayNightCycle.js', 'js/Terrain3D.js', 'js/CameraControl.js', 'js/Model3D.js', 'js/Gltf3D.js', 'js/BotRig3D.js', 'js/Location3D.js', 'js/Debug3D.js', 'js/UI.js', 'js/ShooterRules.js', 'js/RaidWorld.js', 'js/NavGrid.js', 'js/RaidEnvironment.js', 'js/WeatherSystem.js', 'js/TacticalMap.js', 'js/RaidInventory.js', 'js/MenuSystem.js', 'js/audio/AudioCore.js', 'js/audio/WeaponSynth.js', 'js/audio/AmbienceSynth.js', 'js/audio/FoleySynth.js', 'js/audio/CombatSynth.js', 'js/audio/ArcMachineSynth.js', 'js/audio/VoiceManager.js', 'js/ProceduralAudio.js', 'js/engine/ArcSpatialGrid.js', 'js/engine/ArcEventBus.js', 'js/engine/ArcStateMachine.js', 'js/engine/ArcActor.js', 'js/engine/ArcPostProcess.js', 'js/engine/ArcInspector.js', 'js/engine/ArcPerformanceOverlay.js', 'js/engine/workers/ArcJobWorker.js', 'js/engine/ArcJobSystem.js', 'js/engine/ArcEngine.js', 'js/KeyBindings.js', 'js/ControlsMenu.js', 'js/Game.js', 'js/main.js',
   'libs/simplex-noise.js', 'libs/babylon.js', 'libs/babylonjs.loaders.min.js',
+  'assets/LICENSES.md', 'assets/licenses/kenney-space-station-kit-CC0.txt', 'assets/licenses/kenney-impact-sounds-CC0.txt', 'assets/licenses/kenney-scifi-sounds-CC0.txt',
+  'assets/models/industrial/Textures/colormap.png',
 ];
 
 // What definitely does not go into the build.
@@ -32,7 +36,7 @@ export const BUILD_EXCLUDE = [
   'CLAUDE.md', 'run.bat', 'build.bat', 'check.bat', 'upload.bat', 'editor.bat', 'README.md', 'tsconfig.json', 'globals.d.ts',
 ];
 
-const SCAN_EXT = new Set(['.js', '.html', '.css']);
+const SCAN_EXT = new Set(['.js', '.html', '.css', '.json']);
 
 async function walk(dir, root, out = []) {
   for (const e of await fsp.readdir(dir, { withFileTypes: true })) {
@@ -65,6 +69,9 @@ export async function collectRefs(root) {
       refs.add(m[1].split('?')[0].split('#')[0]);
     }
   }
+
+  // Every registered level and its JSON references must ship, including user-created maps.
+  for (const rel of all) if (rel.startsWith('assets/levels/') && /\.(json|png|raw)$/i.test(rel)) refs.add(rel);
 
   const onDisk  = all.filter(f => f.startsWith('assets/')).sort();
   const diskSet = new Set(onDisk);
