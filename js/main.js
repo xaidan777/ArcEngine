@@ -1,5 +1,5 @@
 // main.js — entry point: 3D engine -> location with objects from Objects.js -> camera ->
-// UI (UILayout.js) -> game (Game.js) -> frame loop (Sound3D hears from where the camera is). window.app = { location, camera, game } —
+// UI (UILayout.js) -> game (Game.js) -> frame loop. window.app = { location, camera, game } —
 // for the console and for game code built on top of the kit.
 
 function updateLoadingProgress(percent) {
@@ -22,14 +22,20 @@ function showBootError(text) {
     if (el) el.textContent = text;
 }
 
-function startGame() {
+async function startGame() {
     if (window.app) return;                 // guard against a repeated start
     if (typeof SimplexNoise === 'undefined') { showBootError('Нет libs/simplex-noise.js'); return; }
     const canvas = /** @type {HTMLCanvasElement} */ (document.getElementById('world3d'));
     updateLoadingProgress(40);
-    if (!World3D.init(canvas)) { showBootError('3D недоступен: нет libs/babylon.js или WebGL'); return; }
+    if (typeof ArcJobSystem !== 'undefined') {
+        ArcJobSystem.init();
+    }
+    if (!(await World3D.initAsync(canvas))) { showBootError('3D недоступен: нет libs/babylon.js или WebGL/WebGPU'); return; }
 
-    const location = new Location3D({ objects: typeof LOCATION_OBJECTS !== 'undefined' ? LOCATION_OBJECTS : [] });
+    const level = await MapPool.load(new URLSearchParams(window.location.search).get('map') || 'default_raid');
+    MapPool.activate(level);
+    const location = new Location3D({ level, objects: level.props || (typeof LOCATION_OBJECTS !== 'undefined' ? LOCATION_OBJECTS : []) });
+    await location.terrain.ready;
     const camera = new CameraController(location.view, {
         terrain: location.terrain,
         bounds: { w: location.width, h: location.height }
@@ -37,8 +43,18 @@ function startGame() {
     camera.attach(canvas);
     UI.init(canvas);
     window.app = { location, camera, game: null };
+    if (typeof ArcEngine !== 'undefined') {
+        ArcEngine.init({
+            scene: location.view.scene,
+            camera: camera.cam,
+            canvas
+        });
+    }
+    if (typeof ArcPerformanceOverlay !== 'undefined') {
+        ArcPerformanceOverlay.init(World3D.engine, typeof ArcEngine !== 'undefined' ? ArcEngine : null);
+    }
     const game = window.app.game = new Game(window.app);
-    console.log('ArcEngine: локация запущена, объектов ' + location.objects.length + '.');
+    console.log('Blackwater Protocol: raid environment ready, objects ' + location.objects.length + '.');
     updateLoadingProgress(70);
 
     let last = performance.now();
@@ -48,11 +64,12 @@ function startGame() {
         game.update(Math.min(0.1, dt));
         location.update(dt);
         camera.update(dt);
-        Sound3D.update(camera);
         World3D.renderFrame();
     });
     window.addEventListener('resize', () => World3D.resize());
-    location.ready.then(hideLoader);
+    const readyPromises = Promise.all([location.ready, game.ready || Promise.resolve()]);
+    const timeoutFallback = new Promise(resolve => setTimeout(resolve, 2000));
+    Promise.race([readyPromises, timeoutFallback]).then(hideLoader);
 }
 
-window.onload = () => startGame();
+window.onload = () => startGame().catch(e => showBootError(e.message));

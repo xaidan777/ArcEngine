@@ -20,6 +20,19 @@
         "--no-open"
       ],
       "port": 9377
+    },
+    {
+      "name": "online-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "server/main.mjs"
+      ],
+      "env": {
+        "PORT": "8787",
+        "CLIENT_ORIGIN": "http://127.0.0.1:9378",
+        "ACCOUNTS_DIR": "./var/accounts"
+      },
+      "port": 8787
     }
   ]
 }

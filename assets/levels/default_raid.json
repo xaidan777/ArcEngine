@@ -1,0 +1,777 @@
+{
+  "dimensions": {
+    "width": 4096,
+    "height": 4096
+  },
+  "terrain": {
+    "base": 0,
+    "noiseAmp": 24,
+    "noiseScale": 1400,
+    "seed": 4,
+    "cell": 12,
+    "nx": 343,
+    "ny": 343
+  },
+  "environment": {
+    "skyline": true,
+    "roads": true,
+    "structures": true,
+    "rubble": true
+  },
+  "props": [],
+  "enemies": [
+    {
+      "id": "enemy_1",
+      "archetype": "spotter",
+      "x": 780,
+      "y": 2950,
+      "dormant": false
+    },
+    {
+      "id": "enemy_2",
+      "archetype": "stalker",
+      "x": 920,
+      "y": 2450,
+      "dormant": false
+    },
+    {
+      "id": "enemy_3",
+      "archetype": "cricket",
+      "x": 1040,
+      "y": 3100,
+      "dormant": false
+    },
+    {
+      "id": "enemy_4",
+      "archetype": "pop",
+      "x": 1450,
+      "y": 1850,
+      "dormant": false
+    },
+    {
+      "id": "enemy_5",
+      "archetype": "sentinel",
+      "x": 1850,
+      "y": 1550,
+      "dormant": false
+    },
+    {
+      "id": "enemy_6",
+      "archetype": "screamer",
+      "x": 3200,
+      "y": 1100,
+      "dormant": false
+    },
+    {
+      "id": "enemy_7",
+      "archetype": "bombard",
+      "x": 3450,
+      "y": 750,
+      "dormant": false
+    },
+    {
+      "id": "enemy_8",
+      "archetype": "spotter",
+      "x": 1200,
+      "y": 1400,
+      "dormant": false
+    },
+    {
+      "id": "enemy_9",
+      "archetype": "cricket",
+      "x": 2100,
+      "y": 2200,
+      "dormant": false
+    },
+    {
+      "id": "enemy_10",
+      "archetype": "heavy",
+      "x": 2900,
+      "y": 2800,
+      "dormant": true
+    },
+    {
+      "id": "enemy_11",
+      "archetype": "stalker",
+      "x": 3350,
+      "y": 3100,
+      "dormant": true
+    },
+    {
+      "id": "enemy_12",
+      "archetype": "screamer",
+      "x": 3650,
+      "y": 1250,
+      "dormant": true
+    }
+  ],
+  "containers": [
+    {
+      "id": "crate_0",
+      "type": "medkit",
+      "x": 430,
+      "y": 2930,
+      "radius": 48
+    },
+    {
+      "id": "crate_1",
+      "type": "scrap",
+      "x": 1180,
+      "y": 2520,
+      "radius": 48
+    },
+    {
+      "id": "crate_2",
+      "type": "medkit",
+      "x": 930,
+      "y": 1470,
+      "radius": 48
+    },
+    {
+      "id": "crate_3",
+      "type": "medkit",
+      "x": 1890,
+      "y": 1820,
+      "radius": 48
+    },
+    {
+      "id": "crate_4",
+      "type": "electronics",
+      "x": 2850,
+      "y": 1120,
+      "radius": 48
+    },
+    {
+      "id": "crate_5",
+      "type": "ammo",
+      "x": 3450,
+      "y": 850,
+      "radius": 48
+    },
+    {
+      "id": "crate_6",
+      "type": "intel",
+      "x": 3300,
+      "y": 2850,
+      "radius": 48
+    },
+    {
+      "id": "crate_7",
+      "type": "scrap",
+      "x": 2750,
+      "y": 3350,
+      "radius": 48
+    }
+  ],
+  "drives": [
+    {
+      "id": "drive_0",
+      "x": 1150,
+      "y": 2950,
+      "radius": 48
+    },
+    {
+      "id": "drive_1",
+      "x": 2150,
+      "y": 1650,
+      "radius": 48
+    },
+    {
+      "id": "drive_2",
+      "x": 3300,
+      "y": 2800,
+      "radius": 48
+    }
+  ],
+  "lights": [],
+  "lighting": {
+    "timeOfDay": 12,
+    "cycleEnabled": false,
+    "cycleSpeed": 15,
+    "sunEnabled": true,
+    "sunAzimuth": 53,
+    "sunElevation": 48,
+    "sunIntensity": 1,
+    "sunColor": "#FFF7E6",
+    "ambientIntensity": 0.6,
+    "skyColor": "#8BB5D9",
+    "groundColor": "#3D362D"
+  },
+  "name": "test_pipeline_raid",
+  "ground": {
+    "preset": "asphalt",
+    "diff": "/assets/textures/pbr/asphalt_02_diff_1k.jpg",
+    "nor": "/assets/textures/pbr/asphalt_02_nor_gl_1k.jpg",
+    "rough": "/assets/textures/pbr/asphalt_02_rough_1k.jpg",
+    "color": "#a0a09a",
+    "uScale": 8,
+    "vScale": 8,
+    "uOffset": 0,
+    "vOffset": 0,
+    "rot": 0,
+    "roughness": 0.95,
+    "metallic": 0
+  },
+  "rubble": {
+    "enabled": false
+  },
+  "spawn": {
+    "x": 280,
+    "y": 1660,
+    "heading": 0
+  },
+  "extraction": {
+    "x": 3680,
+    "y": 520,
+    "radius": 130
+  },
+  "hatch": {
+    "x": 780,
+    "y": 1250,
+    "radius": 60
+  },
+  "id": "default_raid",
+  "districtStructures": [
+    {
+      "id": "env_west_factory",
+      "position": [
+        -100,
+        150,
+        1030
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_1",
+      "position": [
+        610,
+        0,
+        1440
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_2",
+      "position": [
+        980,
+        0,
+        1070
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_3",
+      "position": [
+        1390,
+        0,
+        1360
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_4",
+      "position": [
+        1500,
+        0,
+        600
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_5",
+      "position": [
+        720,
+        0,
+        570
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_6",
+      "position": [
+        2900,
+        0,
+        1100
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_7",
+      "position": [
+        3400,
+        0,
+        950
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_8",
+      "position": [
+        2850,
+        0,
+        2600
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_9",
+      "position": [
+        3350,
+        0,
+        3100
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_tank_10",
+      "position": [
+        1043.6312255859375,
+        0,
+        2800
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_arch_1",
+      "position": [
+        280,
+        0,
+        1150
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_arch_2",
+      "position": [
+        280,
+        0,
+        550
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_arch_3",
+      "position": [
+        280,
+        0,
+        2500
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_arch_4",
+      "position": [
+        1800,
+        0,
+        1400
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_arch_5",
+      "position": [
+        3200,
+        0,
+        1400
+      ],
+      "rotation": [
+        0,
+        1.5707963267948966,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_arch_6",
+      "position": [
+        3200,
+        0,
+        2500
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_pipe_1",
+      "position": [
+        1400,
+        0,
+        900
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_pipe_2",
+      "position": [
+        1400,
+        0,
+        410
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_pipe_3",
+      "position": [
+        1400,
+        0,
+        2200
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_radar_1",
+      "position": [
+        3450,
+        0,
+        700
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_radar_2",
+      "position": [
+        3650,
+        0,
+        1235.1566162109375
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_lamp_1",
+      "position": [
+        405,
+        0,
+        1600
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_lamp_2",
+      "position": [
+        405,
+        0,
+        1020
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_lamp_3",
+      "position": [
+        405,
+        0,
+        430
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_lamp_4",
+      "position": [
+        1640,
+        0,
+        400
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_lamp_5",
+      "position": [
+        2400,
+        0,
+        1400
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_lamp_6",
+      "position": [
+        3200,
+        0,
+        1400
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_lamp_7",
+      "position": [
+        3200,
+        0,
+        2200
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "id": "env_lamp_8",
+      "position": [
+        3600,
+        0,
+        600
+      ],
+      "rotation": [
+        0,
+        0,
+        0
+      ],
+      "scale": [
+        1,
+        1,
+        1
+      ]
+    }
+  ],
+  "noEnemies": false
+}

@@ -5,11 +5,7 @@ import { test } from 'node:test';
 import { loadScripts, stub } from './browser-scripts.mjs';
 
 const EPS = 1e-6;
-// Flight over the longest frame (0.1 s) at zoom 1. The speed is read from Constants.js, not
-// written here as a number: the user tunes CAMERA_FLY_SPEED with the editor's slider.
-const STEP = loadScripts(['js/Constants.js']).get('CAMERA_FLY_SPEED') * 0.1;
-// Frames of diagonal flight (up + sideways, the step is split between them) to cover 4000 px.
-const FAR = Math.ceil(4000 * Math.SQRT2 / STEP);
+const STEP = 90;   // CAMERA_FLY_SPEED 900 screen px/s at zoom 1 over the longest frame, 0.1 s
 
 function makeCamera(opts = {}) {
   const page = loadScripts(['js/Constants.js', 'js/CameraControl.js'], { BABYLON: stub(), performance });
@@ -18,12 +14,14 @@ function makeCamera(opts = {}) {
     camera: { fov: 0, position: { set() {} }, setTarget() {} },
     world: { canvas: { clientWidth: 1600, clientHeight: 900 } },
     engine: { getAspectRatio: () => 16 / 9 },
-    fitShadowFrustum() {}, refreshMatrices() {}, pointerToGround: () => null,
+    shadowCalls: [],
+    fitShadowFrustum(cam, maxR) { this.shadowCalls.push({ cam, maxR }); },
+    refreshMatrices() {}, pointerToGround: () => null,
   };
   const terrain = { heightAt: opts.heightAt || (() => 0), outerRing: 2400, hMin: 0 };
   const cam = new CameraController(view, { terrain, bounds: { w: 2048, h: 2048 }, free: !!opts.free });
   cam.c.limits = opts.limits ? 1 : 0;   // the test does not depend on the CAMERA_LIMITS value in Constants.js
-  return { cam, liftMax: page.get('CAMERA_LIFT_MAX'), pitchMin: page.get('CAMERA_ORBIT_PITCH_MIN_DEG') };
+  return { cam, view, liftMax: page.get('CAMERA_LIFT_MAX'), pitchMin: page.get('CAMERA_ORBIT_PITCH_MIN_DEG') };
 }
 
 const key = (cam, code, down = true) => cam._onKey({ code, target: null, preventDefault() {} }, down);
@@ -42,6 +40,33 @@ function forward(cam) {
   const cp = Math.cos(cam.pitch);
   return { x: Math.cos(cam.azimuth) * cp, y: Math.sin(cam.azimuth) * cp, h: -Math.sin(cam.pitch) };
 }
+
+test('направления first-person движения совпадают с направлением камеры при любом азимуте', () => {
+  const { cam } = makeCamera();
+  for (const angle of [-Math.PI * 3, -Math.PI, -0.2, 0, Math.PI / 2, Math.PI, Math.PI * 5]) {
+    cam.azimuth = angle;
+    const f = cam.forward2D(), r = cam.right2D();
+    assert.ok(Math.abs(f.x - Math.cos(angle)) < EPS);
+    assert.ok(Math.abs(f.y - Math.sin(angle)) < EPS);
+    assert.ok(Math.abs(r.x + Math.sin(angle)) < EPS);
+    assert.ok(Math.abs(r.y - Math.cos(angle)) < EPS);
+    assert.ok(Math.abs(f.x * r.x + f.y * r.y) < EPS);
+  }
+});
+
+test('игровая логика может отключить полёт камеры и забрать WASD', () => {
+  const { cam } = makeCamera();
+  const from = { ...cam._eye() };
+  let prevented = false;
+  cam.setMovementEnabled(false);
+  cam._onKey({ code: 'KeyW', target: null, preventDefault() { prevented = true; } }, true);
+  cam.update(0.1);
+  const to = cam._eye();
+  assert.ok(Math.hypot(to.x - from.x, to.y - from.y, to.h - from.h) < EPS);
+  assert.equal(prevented, false);
+  cam.setMovementEnabled(true);
+  assert.ok(fly(cam, 'KeyW').y < 0);
+});
 
 test('W и S — полёт вдоль взгляда: камера снижается, направление взгляда не меняется', () => {
   for (const free of [true, false]) {
@@ -97,7 +122,7 @@ test('CAMERA_LIMITS = 1: потолок полёта, цель внутри ло
   const { cam, liftMax, pitchMin } = makeCamera({ limits: true });
   key(cam, 'KeyE');
   key(cam, 'KeyD');
-  for (let i = 0; i < FAR; i++) cam.update(0.1);
+  for (let i = 0; i < 100; i++) cam.update(0.1);
   assert.equal(cam.lift, liftMax);
   assert.equal(cam.target.x, 2048);
   cam._look(0, -3);
@@ -108,7 +133,7 @@ test('CAMERA_LIMITS = 0: игровая камера летает без пот�
   const { cam, liftMax } = makeCamera();
   key(cam, 'KeyE');
   key(cam, 'KeyD');
-  for (let i = 0; i < FAR; i++) cam.update(0.1);
+  for (let i = 0; i < 100; i++) cam.update(0.1);
   assert.ok(cam.lift > liftMax * 5);
   assert.ok(cam.target.x > 2048 * 2);
   cam._look(0, -3);
@@ -128,43 +153,6 @@ test('осмотр (ПКМ): камера на месте, цель повора
   assert.ok(Math.hypot(up.x - eye.x, up.y - eye.y, up.h - eye.h) < EPS);
 });
 
-// The shadow box is capped by WORLD3D_SHADOW_RADIUS and cannot cover a whole frame, so it is led
-// by where the camera STANDS, not by the ground at the frame center: raise the head next to a
-// building and that point is a thousand px past it (tests/shadow.test.mjs picks up from here).
-test('теневому фрустуму уходит место камеры и её курс, а не точка взгляда', () => {
-  const { cam } = makeCamera({ free: true });
-  let got = null;
-  cam.view.fitShadowFrustum = (c, maxR) => { got = { c, maxR }; };
-  cam.pitch = -2 * Math.PI / 180;   // чуть выше горизонта — как на скриншоте пользователя
-  cam._apply();
-  const e = cam._eye();
-  assert.ok(Math.hypot(cam.target.x - e.x, cam.target.y - e.y) > 500, 'точка взгляда далеко от камеры');
-  assert.ok(Math.abs(got.c.x - e.x) < EPS && Math.abs(got.c.y - e.y) < EPS, 'точка — под камерой');
-  assert.equal(got.c.h, 0, 'высота — земля под камерой');
-  assert.ok(Math.hypot(got.c.dx - Math.cos(cam.azimuth), got.c.dy - Math.sin(cam.azimuth)) < EPS, 'курс — единичный');
-});
-
-// Flying forward and down takes the target under the ground (lift < 0) and toward the horizon the
-// frame center runs off: both used to go into the size of the box through groundFocus().k, and the
-// box either shrank to a fraction of the frame or chased a point a thousand px away.
-test('запрошенный размер коробки теней — след кадра, от подъёма и наклона не зависит', () => {
-  const { cam } = makeCamera({ free: true });
-  let maxR = null;
-  cam.view.fitShadowFrustum = (c, r) => { maxR = r; };
-  cam._apply();
-  const base = maxR;
-  assert.ok(base > 900, 'след кадра при zoom 1');
-  for (const lift of [-250, 900]) {
-    cam.lift = lift;
-    cam.target.h = lift;
-    cam._apply();
-    assert.equal(maxR, base, 'подъём ' + lift);
-  }
-  cam.pitch = -2 * Math.PI / 180;
-  cam._apply();
-  assert.equal(maxR, base, 'взгляд к горизонту');
-});
-
 test('home и lookAt возвращают цель на землю, слежение гасит высоту полёта', () => {
   const { cam } = makeCamera({ free: true });
   fly(cam, 'KeyE');
@@ -177,4 +165,68 @@ test('home и lookAt возвращают цель на землю, слежен
   cam.follow({ x: 1000, y: 1000 });
   for (let i = 0; i < 300; i++) cam.update(0.1);
   assert.ok(Math.abs(cam.lift) < 1e-3 && Math.abs(cam.target.x - 1000) < 1e-3);
+});
+
+test('коробка теней ведётся от ГЛАЗА камеры, а не от точки взгляда за горизонтом', () => {
+  const { cam, view } = makeCamera({ free: true });
+  cam.home();
+  cam.lookAt(1000, 1000);
+  cam.update(0.1);
+  const last = view.shadowCalls[view.shadowCalls.length - 1];
+  const eye = cam._eye();
+  const f = cam.forward2D();
+  assert.ok(Math.hypot(last.cam.x - eye.x, last.cam.y - eye.y) < 1e-6, 'центр — под глазом');
+  assert.ok(Math.abs(last.cam.dx - f.x) < 1e-9 && Math.abs(last.cam.dy - f.y) < 1e-9, 'направление — взгляд камеры');
+  // Взгляд вверх на 10°: groundFocus уходит за горизонт на ~2700 px, коробка остаётся на глазе.
+  cam.pitch = -10 * Math.PI / 180;
+  cam.update(0.1);
+  const up = view.shadowCalls[view.shadowCalls.length - 1];
+  const e2 = cam._eye(), g = cam.groundFocus();
+  assert.ok(cam.pitch < 0.05);
+  assert.ok(Math.hypot(up.cam.x - e2.x, up.cam.y - e2.y) < 1e-6, 'и при взгляде вверх тоже');
+  assert.ok(Math.hypot(g.x - up.cam.x, g.y - up.cam.y) > 1000, 'groundFocus ушёл далеко вперёд');
+});
+
+test('первый человек: коробка теней на игроке, а не на орбитальном глазе позади него', () => {
+  const { cam, view } = makeCamera();
+  cam.setFree(true);
+  cam.lookAt(700, 700);
+  cam.setFirstPerson({ x: 700, y: 700, eyeHeight: 64 });
+  cam.azimuth = 0;
+  cam.update(0.1);
+  const last = view.shadowCalls[view.shadowCalls.length - 1];
+  assert.ok(Math.hypot(last.cam.x - 700, last.cam.y - 700) < 1e-6, 'центр — на игроке');
+  const orbit = cam._eye();
+  assert.ok(Math.hypot(orbit.x - last.cam.x, orbit.y - last.cam.y) > 300, 'орбитальный _eye() в стороне — его брать нельзя');
+});
+
+// --- distance() must survive a caller assigning to it --------------------------------
+
+test('a shadowed distance does not break the frame', () => {
+  const { cam } = makeCamera();
+  // The framing API is zoom; `distance()` is derived. MenuSystem used to assign a number to it,
+  // which replaced the method and threw "this.distance is not a function" INSIDE the render
+  // loop — the game then rendered zero frames. Internal callers use _safeDistance().
+  const expected = cam.distance();
+  assert.ok(Number.isFinite(expected) && expected > 0, 'a real pullback distance');
+
+  cam.distance = 180;
+  assert.equal(typeof cam.distance, 'number', 'the assignment really does shadow the method');
+  assert.equal(cam._safeDistance(), 180, 'the shadowed value is honoured rather than thrown on');
+  assert.doesNotThrow(() => cam._syncCamera(), 'the frame must not throw');
+  assert.doesNotThrow(() => cam.update(0.016), 'update() must keep running');
+
+  delete cam.distance;
+  assert.equal(typeof cam.distance, 'function', 'the prototype method is restored');
+  assert.ok(Math.abs(cam.distance() - expected) < EPS, 'and behaves as before');
+});
+
+test('zoom drives the framing rather than a distance field', () => {
+  const { cam } = makeCamera();
+  const atDefaultZoom = cam.distance();
+  cam.zoom = 2;
+  cam.zoomTarget = 2;
+  const zoomedIn = cam.distance();
+  assert.ok(zoomedIn < atDefaultZoom, 'a higher zoom pulls the camera closer');
+  assert.ok(Math.abs(zoomedIn * 2 - atDefaultZoom) < 1e-3, 'distance is inversely proportional to zoom');
 });

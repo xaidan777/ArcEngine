@@ -1,7 +1,18 @@
-# Do not upload to GitHub: personal stuff and what gets built by itself. A leading "/" — root only
-# (without it build/ would also hide claude/skills/build/).
+# Personal / Agent directories
 /.claude/
-/upload.bat
+/.agents/
+/.codex/
+/.gemini/
+/scratch/
 /_utils/.backups/
+
+# Build artifacts and distributions
 /build/
 /dist/
+/docs/concepts/
+node_modules/
+
+# OS artifacts & logs
+*.log
+.DS_Store
+Thumbs.db

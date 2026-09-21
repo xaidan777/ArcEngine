@@ -5,10 +5,6 @@
 // Groups are collapsed at startup. Those expanded by hand are remembered for the session
 // (open): a language change rebuilds the pane without collapsing them; search expands
 // the matches temporarily, an empty query restores the manual state.
-//
-// A group with `tab: '<name>'` in the schema is built into THAT tab (<name>-groups) instead of
-// Global Settings — the Sound tab is such a group. All of them are one set of constants: one
-// dirty state, one save (every [data-role="save-constants"] button), one Ctrl+S.
 
 /** @satisfies {Record<string, any>} */
 const Inspector = {
@@ -19,8 +15,6 @@ const Inspector = {
     fieldByName: {},      // name -> field description
     /** @type {Record<string, any>} */
     fieldEls: {},         // name -> { row, slider|select|color, num|text, field }
-    /** @type {Record<string, string>} */
-    tabOf: {},            // name -> the tab its group lives on ('settings' by default)
     open: new Set(),      // ids of the groups expanded by hand
     query: '',            // the current search query
     saveAvailable: false, // /api/status answered — the editor server, not a foreign one
@@ -34,23 +28,21 @@ const Inspector = {
     init() {
         this.schema = KIT_SCHEMA;
         for (const g of this.schema) {
-            // Global Settings is long — its groups start collapsed; a tab of its own holds a
-            // couple of groups and would just look empty.
-            if (g.tab) this.open.add(g.id);
             for (const f of g.fields) {
                 this.fieldByName[f.name] = f;
                 this.originals[f.name] = this.get(f.name);
-                this.tabOf[f.name] = g.tab || 'settings';
             }
         }
         this.build();
         this.refreshSaveButton();
         this.checkServer();
 
-        for (const btn of this.buttons('save')) btn.addEventListener('click', () => this.save());
-        for (const btn of this.buttons('revert')) btn.addEventListener('click', () => this.revertAll());
+        document.getElementById('btn-save').addEventListener('click', () => this.save());
+        document.getElementById('btn-revert').addEventListener('click', () => this.revertAll());
         document.getElementById('inspector-search').addEventListener('input', e => this.filter(/** @type {HTMLInputElement} */ (e.target).value));
         window.addEventListener('keydown', e => {
+            const target = /** @type {HTMLElement} */ (e.target);
+            if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return;
             if ((e.ctrlKey || e.metaKey) && e.code === 'KeyS') { e.preventDefault(); this.save(); }
         });
         window.addEventListener('lang-changed', () => {
@@ -93,22 +85,28 @@ const Inspector = {
 
     // --- Building the DOM -----------------------------------------------------
 
-    // Save / revert buttons: one set of constants, but a button on every tab that shows them.
-    buttons(role) {
-        return /** @type {NodeListOf<HTMLButtonElement>} */ (document.querySelectorAll(`[data-role="${role}-constants"]`));
-    },
-
-    // The host of a group: its tab's <tab>-groups, Global Settings by default (and as a
-    // fallback, so a group with a tab that has no panel is still shown somewhere).
-    groupHost(group) {
-        return (group.tab && document.getElementById(group.tab + '-groups')) || document.getElementById('inspector-groups');
-    },
-
     build() {
+        const host = document.getElementById('inspector-groups');
+        host.innerHTML = '';
         this.fieldEls = {};
-        for (const host of new Set(this.schema.map(g => this.groupHost(g)))) host.innerHTML = '';
+
+        const lightNotice = document.createElement('div');
+        lightNotice.className = 'inspector-lighting-notice';
+        lightNotice.style.cssText = 'margin: 6px 4px 10px; padding: 8px 10px; background: rgba(126, 199, 255, 0.08); border: 1px solid rgba(126, 199, 255, 0.25); border-radius: 6px; font-size: 11px; display: flex; justify-content: space-between; align-items: center; gap: 8px;';
+        lightNotice.innerHTML = `
+            <span>💡 <strong>${I18N.pick({ en: 'Lighting & Sun', ru: 'Освещение и солнце' })}</strong>: ${I18N.pick({ en: 'configured in the Lighting tab', ru: 'настраиваются во вкладке «Освещение»' })}</span>
+            <button type="button" class="btn-goto-lighting" style="padding: 3px 8px; font-size: 11px; background: #253342; border: 1px solid #4a637d; color: #7ec7ff; border-radius: 4px; cursor: pointer; white-space: nowrap;">${I18N.pick({ en: 'Open →', ru: 'Перейти →' })}</button>
+        `;
+        const gotoBtn = lightNotice.querySelector('.btn-goto-lighting');
+        if (gotoBtn) {
+            gotoBtn.addEventListener('click', () => {
+                const tabBtn = /** @type {HTMLElement | null} */ (document.querySelector('[data-tab="lighting"]'));
+                if (tabBtn) tabBtn.click();
+            });
+        }
+        host.appendChild(lightNotice);
+
         for (const group of this.schema) {
-            const host = this.groupHost(group);
             const box = document.createElement('section');
             box.className = 'group';
             box.classList.toggle('collapsed', !this.open.has(group.id));
@@ -258,17 +256,11 @@ const Inspector = {
     },
 
     refreshSaveButton() {
-        const dirty = this.dirtyList(), n = dirty.length;
-        for (const btn of this.buttons('save')) {
-            btn.textContent = n ? I18N.t('insp.saveN', { n }) : I18N.t('insp.save');
-            btn.disabled = n === 0;
-        }
-        for (const btn of this.buttons('revert')) btn.disabled = n === 0;
-        // A dirty mark on the tab that holds the changed constants, like the Objects and UI tabs.
-        for (const tab of ['settings', 'sound']) {
-            const el = document.querySelector('#pane-tabs [data-tab="' + tab + '"]');
-            if (el) el.classList.toggle('dirty', dirty.some(name => this.tabOf[name] === tab));
-        }
+        const n = this.dirtyList().length;
+        const btn = /** @type {HTMLButtonElement} */ (document.getElementById('btn-save'));
+        btn.textContent = n ? I18N.t('insp.saveN', { n }) : I18N.t('insp.save');
+        btn.disabled = n === 0;
+        /** @type {HTMLButtonElement} */ (document.getElementById('btn-revert')).disabled = n === 0;
     },
 
     revertAll() {

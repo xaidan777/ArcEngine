@@ -41,9 +41,6 @@ const rejected = (name, code) => ({ name, ok: false, code, error: ERRORS[code] }
 // Model path: an .fbx or .glb inside assets/, ASCII with no spaces and no . / .. in the segments.
 const MODEL_PATH = /^assets\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+\.(?:fbx|glb)$/i;
 export const isModelPath = p => MODEL_PATH.test(p) && !p.split('/').some(s => s === '.' || s === '..');
-// Sound path: the same rules, a .wav, .mp3 or .ogg.
-const SOUND_PATH = /^assets[/](?:[A-Za-z0-9_.-]+[/])*[A-Za-z0-9_.-]+[.](?:wav|mp3|ogg)$/i;
-export const isSoundPath = p => SOUND_PATH.test(p) && !p.split('/').some(s => s === '.' || s === '..');
 
 // --- Backups -----------------------------------------------------------------
 
@@ -139,10 +136,7 @@ export const OBJECTS_HEADER = `// Objects.js — location objects: models placed
 //   speed — rpm, dir — 'cw' | 'ccw': clockwise/counterclockwise as seen from the end of the axis;
 //   clip — looped animation clip of a .glb model (optional): 'idle', 'run'…
 //   tag — a group name for game code (optional): location.findByTag(tag);
-//   hidden: true — placed but not in the scene until the game calls location.setHidden(rec, false);
-//   sound — a sound standing at the object (optional, Sound3D.js): src — a file from assets/sounds,
-//   volume 0..1, loop: false — once instead of looped, falloffMin — px of full volume around the
-//   object, falloffMax — px, silent from there on (0 or absent — the common AUDIO_FALLOFF_*).
+//   hidden: true — placed but out of the scene until the game calls location.setHidden(rec, false).
 `;
 
 // A number with fixed precision and no float tails; not a number — null.
@@ -186,28 +180,12 @@ function fmtTag(v) {
   return tag ? `, tag: '${tag}'` : '';
 }
 
-// sound: { src, volume?, loop?, falloffMin?, falloffMax? } -> the record tail `, sound: { … }`;
-// no sound — '', invalid — null. Defaults (volume 1, looped, the common radii) are not written.
-function fmtSound(s) {
-  if (s == null) return '';
-  if (typeof s !== 'object' || !isSoundPath(String(s.src || ''))) return null;
-  const parts = [`src: '${s.src}'`];
-  if (s.volume != null) {
-    const volume = fmtFixed(s.volume, 2);
-    if (volume === null || Number(volume) < 0 || Number(volume) > 1) return null;
-    if (Number(volume) !== 1) parts.push(`volume: ${volume}`);
-  }
-  if (s.loop === false) parts.push('loop: false');
-  for (const key of ['falloffMin', 'falloffMax']) {
-    if (s[key] == null) continue;
-    const px = fmtFixed(s[key], 0);
-    if (px === null || Number(px) < 0) return null;
-    if (Number(px) > 0) parts.push(`${key}: ${px}`);
-  }
-  return `, sound: { ${parts.join(', ')} }`;
+// hidden: true -> the record tail `, hidden: true`; absent or false — '' (the default is not written).
+function fmtHidden(v) {
+  return v ? ', hidden: true' : '';
 }
 
-// objects: [{ name, model, kind, x, y, h, rot: [x, y, z], scale: [x, y, z], anim?, clip?, tag?, hidden?, sound? }] ->
+// objects: [{ name, model, kind, x, y, h, rot: [x, y, z], scale: [x, y, z], anim?, clip?, tag?, hidden? }] ->
 // { ok, src, count } or a rejection (index — the number of the invalid record).
 export function formatObjects(objects) {
   if (!Array.isArray(objects)) return failure('bad_objects');
@@ -221,11 +199,10 @@ export function formatObjects(objects) {
       rot: fmtTriple(o.rot, 1, r => [0, r, 0], false),
       scale: fmtTriple(o.scale, 3, s => [s, s, s], true),
       anim: fmtAnim(o.anim),
-      sound: fmtSound(o.sound),
     };
     if (Object.values(n).includes(null)) return failure('bad_value', { index: i });
     const kind = o.kind === 'actor' ? 'actor' : 'prop';
-    lines.push(`    { name: '${cleanName(o.name)}', model: '${model}', kind: '${kind}', x: ${n.x}, y: ${n.y}, h: ${n.h}, rot: ${n.rot}, scale: ${n.scale}${n.anim}${fmtClip(o.clip)}${fmtTag(o.tag)}${o.hidden ? ', hidden: true' : ''}${n.sound} },\n`);
+    lines.push(`    { name: '${cleanName(o.name)}', model: '${model}', kind: '${kind}', x: ${n.x}, y: ${n.y}, h: ${n.h}, rot: ${n.rot}, scale: ${n.scale}${n.anim}${fmtClip(o.clip)}${fmtTag(o.tag)}${fmtHidden(o.hidden)} },\n`);
   }
   return { ok: true, src: OBJECTS_HEADER + 'const LOCATION_OBJECTS = [\n' + lines.join('') + '];\n', count: lines.length };
 }
@@ -248,10 +225,6 @@ export const UI_HEADER = `// UILayout.js — the game's UI layout: every HUD ele
 //   kind — 'text' | 'panel' | 'bar' | 'button'; anchor — one of 9 screen points ('top-left' …
 //   'bottom-right'): x, y go from it to the same point of the element (inward from an edge,
 //   signed from the center); w, h — px; numbers are px of a screen UI_REF_HEIGHT tall;
-//   parent (optional) — id of the element this one sits in: anchor, x, y then count from the
-//   parent's box, the parent clips it and hides it together with itself;
-//   stretch (optional) — 'h' | 'v' | 'both': fills the container on that axis, x (y) — the inset
-//   from both edges, w (h) is ignored;
 //   colors — '#rrggbb', '' — none; visible: 0 — hidden until the game calls show().
 //   Records go in drawing order: later — on top.
 `;
@@ -263,26 +236,20 @@ const UI_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 // Fields of a record by kind, in file order — the same set as UI.DEFAULTS in js/UI.js
 // (tests/ui.test.mjs compares them). type: px — a number, size — a number ≥ 0, unit — 0..1,
-// color — '#rrggbb' or '', text — a string, flag — 0 | 1, id — an element id, stretch — an axis.
-// An empty parent or stretch is not written: the screen and a fixed size are the defaults.
+// color — '#rrggbb' or '', text — a string, flag — 0 | 1.
 const UI_TYPES = {
   x: 'px', y: 'px', w: 'size', h: 'size', radius: 'size', fontSize: 'size', value: 'unit', alpha: 'unit',
   color: 'color', fill: 'color', border: 'color', shadow: 'color', text: 'text', visible: 'flag',
-  parent: 'id', stretch: 'stretch',
 };
-const UI_OPTIONAL = ['parent', 'stretch'];
-const UI_STRETCH = ['h', 'v', 'both'];
 export const UI_FIELDS = {
-  text: ['parent', 'x', 'y', 'text', 'fontSize', 'color', 'shadow', 'alpha', 'visible'],
-  panel: ['parent', 'x', 'y', 'w', 'h', 'stretch', 'fill', 'border', 'radius', 'alpha', 'visible'],
-  bar: ['parent', 'x', 'y', 'w', 'h', 'stretch', 'value', 'color', 'fill', 'border', 'radius', 'alpha', 'visible'],
-  button: ['parent', 'x', 'y', 'w', 'h', 'stretch', 'text', 'fontSize', 'color', 'fill', 'border', 'radius', 'alpha', 'visible'],
+  text: ['x', 'y', 'text', 'fontSize', 'color', 'shadow', 'alpha', 'visible'],
+  panel: ['x', 'y', 'w', 'h', 'fill', 'border', 'radius', 'alpha', 'visible'],
+  bar: ['x', 'y', 'w', 'h', 'value', 'color', 'fill', 'border', 'radius', 'alpha', 'visible'],
+  button: ['x', 'y', 'w', 'h', 'text', 'fontSize', 'color', 'fill', 'border', 'radius', 'alpha', 'visible'],
 };
 
 // A field value -> its literal in the file; invalid — null.
 function fmtUIField(type, v) {
-  if (type === 'id') return UI_ID.test(String(v)) ? `'${v}'` : null;
-  if (type === 'stretch') return UI_STRETCH.includes(v) ? `'${v}'` : null;
   if (type === 'text') return JSON.stringify(String(v == null ? '' : v).replace(/[\x00-\x09\x0b-\x1f]/g, '').slice(0, 200));
   if (type === 'color') return v === '' || v == null ? "''" : (UI_COLOR.test(v) ? `'${String(v).toLowerCase()}'` : null);
   if (type === 'flag') return v === 0 || v === false ? '0' : '1';
@@ -304,21 +271,11 @@ export function formatUI(elements) {
     ids.add(e.id);
     const parts = [`id: '${e.id}'`, `kind: '${e.kind}'`, `anchor: '${e.anchor}'`];
     for (const f of fields) {
-      if (UI_OPTIONAL.includes(f) && (e[f] == null || e[f] === '')) continue;
       const lit = fmtUIField(UI_TYPES[f], e[f]);
       if (lit === null) return failure('bad_element', { index: i, field: f });
       parts.push(`${f}: ${lit}`);
     }
     lines.push(`    { ${parts.join(', ')} },\n`);
-  }
-  // A parent is another element of the list, and the chain up from it never comes back.
-  const parentOf = new Map(elements.map(e => [e.id, e.parent || '']));
-  for (let i = 0; i < elements.length; i++) {
-    const seen = new Set([elements[i].id]);
-    for (let id = elements[i].parent; id; id = parentOf.get(id)) {
-      if (!parentOf.has(id) || seen.has(id)) return failure('bad_element', { index: i, field: 'parent' });
-      seen.add(id);
-    }
   }
   return { ok: true, src: UI_HEADER + 'const UI_LAYOUT = [\n' + lines.join('') + '];\n', count: lines.length };
 }
@@ -331,4 +288,87 @@ export async function saveUI(root, elements) {
   const backup = fs.existsSync(file) ? await backupFile(root, file, 'UILayout') : null;
   await fsp.writeFile(file, r.src, 'utf8');
   return { ok: true, count: r.count, backup };
+}
+
+// --- Rigs, Clips, Levels & Assets ---------------------------------------------
+
+export async function saveRig(root, name, rigData) {
+  if (!name || typeof rigData !== 'object') return failure('bad_value');
+  const clean = cleanName(name);
+  if (!clean) return failure('bad_name');
+  const dir = path.join(root, 'assets', 'rigs');
+  await fsp.mkdir(dir, { recursive: true });
+  const file = path.join(dir, `${clean}.json`);
+  const backup = fs.existsSync(file) ? await backupFile(root, file, 'Rig-' + clean) : null;
+  await fsp.writeFile(file, JSON.stringify(rigData, null, 2), 'utf8');
+  return { ok: true, name: clean, path: `assets/rigs/${clean}.json`, backup };
+}
+
+export async function saveClip(root, name, clipData) {
+  if (!name || typeof clipData !== 'object') return failure('bad_value');
+  const clean = cleanName(name);
+  if (!clean) return failure('bad_name');
+  const dir = path.join(root, 'assets', 'clips');
+  await fsp.mkdir(dir, { recursive: true });
+  const file = path.join(dir, `${clean}.json`);
+  const backup = fs.existsSync(file) ? await backupFile(root, file, 'Clip-' + clean) : null;
+  await fsp.writeFile(file, JSON.stringify(clipData, null, 2), 'utf8');
+  return { ok: true, name: clean, path: `assets/clips/${clean}.json`, backup };
+}
+
+export async function saveLevel(root, levelData) {
+  if (!levelData || typeof levelData !== 'object') return failure('bad_value');
+  const dir = path.join(root, 'assets', 'levels');
+  await fsp.mkdir(dir, { recursive: true });
+  const name = cleanName(levelData.name || 'raid_level');
+  const file = path.join(dir, `${name}.json`);
+  let existing = {};
+  try {
+    if (fs.existsSync(file)) {
+      existing = JSON.parse(await fsp.readFile(file, 'utf8'));
+    }
+  } catch (_) {}
+  const merged = Object.assign({}, existing, levelData);
+  const backup = fs.existsSync(file) ? await backupFile(root, file, 'Level-' + name) : null;
+  await fsp.writeFile(file, JSON.stringify(merged, null, 2), 'utf8');
+
+  // Also write js/RaidLevel.js so the game can load it via <script> tag seamlessly
+  const jsFile = path.join(root, 'js', 'RaidLevel.js');
+  const jsSrc = `// RaidLevel.js — custom raid level data saved by ArcEngine Level Editor\nconst RAID_CUSTOM_LEVEL = ${JSON.stringify(merged, null, 2)};\n`;
+  await fsp.writeFile(jsFile, jsSrc, 'utf8');
+
+  return { ok: true, name, path: `assets/levels/${name}.json`, jsPath: 'js/RaidLevel.js', backup };
+}
+
+export async function listAssets(root) {
+  const modelsDir = path.join(root, 'assets', 'models');
+  const rigsDir = path.join(root, 'assets', 'rigs');
+  const clipsDir = path.join(root, 'assets', 'clips');
+  const levelsDir = path.join(root, 'assets', 'levels');
+  await fsp.mkdir(modelsDir, { recursive: true });
+  await fsp.mkdir(rigsDir, { recursive: true });
+  await fsp.mkdir(clipsDir, { recursive: true });
+  await fsp.mkdir(levelsDir, { recursive: true });
+
+  const readDirSafe = async (dir, extFilter) => {
+    try {
+      const files = await fsp.readdir(dir);
+      return files.filter(f => extFilter.some(ext => f.toLowerCase().endsWith(ext)));
+    } catch {
+      return [];
+    }
+  };
+
+  const models = await readDirSafe(modelsDir, ['.glb', '.fbx']);
+  const rigs = await readDirSafe(rigsDir, ['.json']);
+  const clips = await readDirSafe(clipsDir, ['.json']);
+  const levels = await readDirSafe(levelsDir, ['.json']);
+
+  return {
+    ok: true,
+    models: models.map(f => ({ name: path.parse(f).name, file: f, path: `assets/models/${f}` })),
+    rigs: rigs.map(f => ({ name: path.parse(f).name, file: f, path: `assets/rigs/${f}` })),
+    clips: clips.map(f => ({ name: path.parse(f).name, file: f, path: `assets/clips/${f}` })),
+    levels: levels.map(f => ({ name: path.parse(f).name, file: f, path: `assets/levels/${f}` })),
+  };
 }

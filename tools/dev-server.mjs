@@ -107,6 +107,8 @@ const server = http.createServer(async (req, res) => {
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'Pragma': 'no-cache',
     'Expires': '0',
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
   };
 
   // Range — Chrome sends it for <audio>/decodeAudioData
@@ -146,8 +148,8 @@ function listen(port, attempt = 0) {
     console.error(`${C.red}Не удалось поднять сервер: ${err.message}${C.r}`);
     process.exit(1);
   });
-  server.listen(port, '127.0.0.1', async () => {
-    const addr = `http://localhost:${port}/`;
+  server.listen(port, '0.0.0.0', async () => {
+    const addr = `http://0.0.0.0:${port}/`;
     console.log(`\n${C.cyn}${C.b}  ArcEngine${C.r} ${C.dim}— dev server${C.r}`);
     console.log(`${C.dim}  ${'-'.repeat(46)}${C.r}`);
     console.log(`  ${C.grn}${C.b}${addr}${C.r}`);

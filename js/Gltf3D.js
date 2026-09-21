@@ -5,16 +5,15 @@
 //
 // UNITS: glTF is meters, the kit's world is px = centimeters — the model is scaled by 100.
 // AXES: the glTF front is +Z, the kit's model nose is +X — the model is turned by 90° about Y.
-// MATERIALS: glTF gives PBR, the toon shader lives on StandardMaterial — every build gets its
-// own StandardMaterial: base color (linear -> gamma, like FBX), base color texture, normal map,
-// alpha, culling and sideOrientation (glTF front faces are counter-clockwise — the loader
-// sets the flag on the material, losing it turns the model inside out).
+// MATERIALS: retain native PBR for smooth rendering; lazily derive StandardMaterial for toon.
+// Both variants preserve shared source textures and winding. The editor can switch live.
 // CLIPS: glTF animations by name — Clips3D: play('run') cross-fades from the current clip.
 
 /** @satisfies {Record<string, any>} */
 const Gltf3D = {
     UNITS: 100,              // glTF meters -> world px (1 cm = 1 px, like FBX)
     _cache: new Map(),       // scene uid + url -> Promise<model>: the file is loaded once per scene
+    _renders: new WeakMap(), // scene -> live material bindings
     _clips: new WeakMap(),   // model root -> Clips3D
 
     is(url) {
@@ -27,7 +26,7 @@ const Gltf3D = {
         const key = scene.uid + '|' + url;
         let p = this._cache.get(key);
         if (!p) {
-            p = BABYLON.LoadAssetContainerAsync(url, scene).then((container) => {
+            p = BABYLON.LoadAssetContainerAsync(url, scene, { pluginOptions: { gltf: { createInstances: false } } }).then((container) => {
                 for (const g of container.animationGroups) g.stop();   // the loader starts the first one
                 scene.onDisposeObservable.addOnce(() => {
                     this._cache.delete(key);
@@ -54,10 +53,29 @@ const Gltf3D = {
         for (const node of inst.rootNodes) node.parent = fit;
 
         const mats = new Map();
+        let bindings = this._renders.get(scene);
+        if (!bindings) { bindings = new Set(); this._renders.set(scene, bindings); }
         for (const mesh of root.getChildMeshes(false)) {
             if (!mesh.material) continue;
-            if (!mats.has(mesh.material)) mats.set(mesh.material, this._standard(mesh.material, name, scene));
-            mesh.material = mats.get(mesh.material);
+            const source = mesh.material;
+            if (!mats.has(source)) {
+                const binding = { source, name, meshes: [], pbr: null, toon: null };
+                mats.set(source, binding); bindings.add(binding);
+            }
+            mats.get(source).meshes.push(mesh);
+        }
+        this.applyMaterialMode(scene, World3D.cfg().toon);
+        root.onDisposeObservable.addOnce(() => {
+            for (const binding of mats.values()) {
+                bindings.delete(binding);
+                // Active materials belong to Model3D.dispose; release the cached alternative.
+                const active = binding.meshes[0].material;
+                for (const m of [binding.pbr, binding.toon]) if (m && m !== active) m.dispose(false, false);
+            }
+        });
+
+        if (inst.skeletons) {
+            for (const s of inst.skeletons) s.useTextureToStoreBoneMatrices = true;
         }
 
         const clips = new Clips3D(scene, inst.animationGroups, model.clips);
@@ -67,6 +85,24 @@ const Gltf3D = {
             for (const s of inst.skeletons) s.dispose();
         });
         return root;
+    },
+
+    applyMaterialMode(scene, toon) {
+        const bindings = this._renders.get(scene);
+        if (!bindings) return;
+        for (const binding of bindings) {
+            const key = toon ? 'toon' : 'pbr';
+            let material = binding[key];
+            if (!material) {
+                material = binding[key] = toon ? this._standard(binding.source, binding.name, scene)
+                    : binding.source.clone(binding.name + '/' + binding.source.name + '/pbr');
+            }
+            for (const mesh of binding.meshes) {
+                const previous = mesh.material;
+                if (previous && previous.metadata) material.metadata = Object.assign({}, previous.metadata);
+                mesh.material = material;
+            }
+        }
     },
 
     clips(root) {
@@ -103,6 +139,7 @@ class Clips3D {
     constructor(scene, groups, names) {
         this.scene = scene;
         this.current = '';
+        this.paused = false;
         /** @type {Map<string, { group: BABYLON.AnimationGroup, weight: number }>} */
         this.tracks = new Map();
         groups.forEach((group, i) => this.tracks.set(names[i] || group.name, { group, weight: 0 }));
@@ -156,7 +193,7 @@ class Clips3D {
 
     // Weights: the current clip rises to 1, the rest fall to 0 over blend seconds; the sum is kept at 1.
     _tick(dt) {
-        if (!this.current) return;
+        if (this.paused || !this.current) return;
         const step = this.blend > 0 ? Math.max(0, dt) / this.blend : 1;
         let sum = 0;
         for (const [name, t] of this.tracks) {

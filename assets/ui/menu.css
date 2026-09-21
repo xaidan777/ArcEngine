@@ -1,0 +1,151 @@
+/* Build references for relative CSS URLs: 'assets/ui/sector-map.svg', 'assets/ui/rifle.svg'. */
+.arc-ui button{font-family:inherit;transition:filter .12s,box-shadow .12s}
+.arc-ui button:hover:not(:disabled){filter:brightness(1.25);box-shadow:inset 0 0 0 1px #e4dac3}
+.arc-ui button:focus-visible{outline:2px solid #f2d582;outline-offset:3px}
+.arc-ui button:disabled{cursor:not-allowed!important;filter:grayscale(.7);opacity:.45!important}
+.arc-ui button[aria-pressed=true]{box-shadow:inset 0 0 0 1px #eee7d7;background-color:#292c35!important}
+.arc-ui[data-mode=menu]{background:radial-gradient(ellipse at 65% 40%,#282b34 0,transparent 65%),#090c14}
+.arc-ui[data-mode=menu]::before{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(125deg,transparent 20%,#90969e08 48%,transparent 70%)}
+.arc-ui[data-screen=HUB]::after{content:'';position:absolute;left:35%;right:3.5%;top:22%;height:49%;background:url('./sector-map.svg') center/contain no-repeat;opacity:.85;pointer-events:none}
+.arc-ui [data-ui=mapPanel]{background:#111722 url('./sector-map.svg') center/contain no-repeat!important}
+.arc-ui [data-ui^=stash_slot_]::before,.arc-ui [data-ui=loadoutWeapon]::before{content:'';position:absolute;inset:8px 6px 22px;background:url('./rifle.svg') center/contain no-repeat;pointer-events:none}
+.arc-ui [data-ui^=stash_slot_] > div{align-items:flex-end!important;padding-bottom:5px;position:relative}
+.arc-ui [data-ui^=stash_slot_][data-item=ammo]::before{background:repeating-linear-gradient(90deg,#b8a675 0 5px,#605a43 6px 8px,transparent 9px 13px);inset:16px 16px 28px;transform:rotate(-20deg);border-radius:3px}
+.arc-ui [data-ui^=stash_slot_][data-item=consumables]::before{background:linear-gradient(90deg,transparent 40%,#ebebe0 40% 60%,transparent 60%),linear-gradient(transparent 40%,#ebebe0 40% 60%,transparent 60%),#567d75;inset:15px 17px 25px;border:3px solid #899e98;border-radius:5px;transform:rotate(-12deg)}
+.arc-ui [data-ui^=stash_slot_][data-item=materials]::before{background:repeating-linear-gradient(30deg,#586169 0 7px,#88928b 8px 10px);inset:14px 17px 26px;border:3px solid #9c9e8e;transform:rotate(-10deg)}
+.arc-ui [data-ui=loadoutWeapon] > div{align-items:flex-start!important;padding-top:10px;font-size:11px!important;letter-spacing:1px}
+.arc-ui [data-ui=loadoutWeapon]::before{inset:32px 25px 25px}
+.arc-ui [data-ui=itemInspectDesc] > div{line-height:1.3!important;font-weight:400!important}
+.arc-ui [data-ui=itemInspectTitle],.arc-ui [data-ui=itemInspectDesc],.arc-ui [data-ui=inspectTag]{width:262px}
+.arc-ui [data-ui=itemInspectTitle] > div,.arc-ui [data-ui=itemInspectDesc] > div,.arc-ui [data-ui=inspectTag] > div{text-align:left!important}
+.arc-ui [data-ui^=stash_slot_][data-item=armor]::before{background:linear-gradient(125deg,#abb6ab,#4f6766);inset:14px 19px 26px;clip-path:polygon(0 0,100% 0,90% 70%,50% 100%,10% 70%);border:3px solid #b9c5b9}
+.arc-ui [data-ui=hubSector],.arc-ui [data-ui=hubTitle]{letter-spacing:1.5px}
+.arc-ui [data-ui^=upgrade] > div,.arc-ui [data-ui^=system] > div{justify-content:space-between!important;padding:0 22px;white-space:pre-wrap!important;text-align:left!important}
+@media(max-width:1000px){
+ .arc-ui[data-mode=menu]{transform:none!important;left:0!important;top:0!important;width:100%!important;height:100%!important;overflow-y:auto!important;pointer-events:auto!important;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-content:start;gap:14px;padding:20px;box-sizing:border-box}
+ .arc-ui[data-mode=menu]::before,.arc-ui[data-mode=menu]::after{display:none}
+ .arc-ui[data-mode=menu] > [data-ui]{position:relative!important;left:auto!important;right:auto!important;top:auto!important;bottom:auto!important;transform:none!important;grid-column:1/-1;width:100%!important;max-width:100%;order:10}
+ .arc-ui[data-mode=menu] > [data-ui] > div{white-space:pre-wrap!important;text-align:left!important}
+ .arc-ui[data-mode=menu] > [data-ui^=nav]{grid-column:auto;order:1;height:40px!important}
+ .arc-ui[data-mode=menu] > [data-ui^=nav] > div{text-align:center!important;font-size:10px!important}
+ .arc-ui[data-mode=menu] > [data-ui=menuBrand]{order:0}
+ .arc-ui[data-mode=menu] > [data-ui=currencyTag],.arc-ui[data-mode=menu] > [data-ui=profileTag]{order:2;font-size:12px}
+ .arc-ui[data-mode=menu] > [data-ui=topNavPanel],.arc-ui[data-mode=menu] > [data-ui=menuBottomBar],.arc-ui[data-mode=menu] > [data-ui=liveEventCard],.arc-ui[data-mode=menu] > [data-ui=featsCard],.arc-ui[data-mode=menu] > [data-ui=questsCard],.arc-ui[data-mode=menu] > [data-ui=squadPanel],.arc-ui[data-mode=menu] > [data-ui=stashPanel],.arc-ui[data-mode=menu] > [data-ui=loadoutPanel],.arc-ui[data-mode=menu] > [data-ui=itemInspectCard],.arc-ui[data-mode=menu] > [data-ui=workshopPanel],.arc-ui[data-mode=menu] > [data-ui=raiderPanel]{display:none!important}
+ .arc-ui[data-mode=menu] > [data-ui=hubTitle],.arc-ui[data-mode=menu] > [data-ui=mapTitle],.arc-ui[data-mode=menu] > [data-ui=stashTitle],.arc-ui[data-mode=menu] > [data-ui=workshopTitle],.arc-ui[data-mode=menu] > [data-ui=raiderTitle]{order:3;margin-top:15px}
+ .arc-ui[data-mode=menu] > [data-ui=hubSector]{order:4}
+ .arc-ui[data-mode=menu] > [data-ui=mainPlayBtn],.arc-ui[data-mode=menu] > [data-ui=deployLaunchBtn]{order:80}
+ .arc-ui[data-mode=menu] > [data-ui=mapPanel]{order:5;height:300px!important}
+ .arc-ui[data-mode=menu] > [data-ui=menuBackBtn],.arc-ui[data-mode=menu] > [data-ui=inventoryHotkeyBtn],.arc-ui[data-mode=menu] > [data-ui=menuHint]{order:90}
+ .arc-ui[data-mode=menu] > [data-ui^=stash_slot_]{grid-column:auto;order:12;width:100%!important;height:95px!important}
+ .arc-ui[data-mode=menu] > [data-ui=catalogNote]{order:11}
+ .arc-ui[data-mode=menu] > [data-ui^=loadout],.arc-ui[data-mode=menu] > [data-ui^=item],.arc-ui[data-mode=menu] > [data-ui=inspectTag]{order:15}
+ .arc-ui[data-mode=menu] > [data-ui=itemInspectTitle],.arc-ui[data-mode=menu] > [data-ui=itemInspectDesc],.arc-ui[data-mode=menu] > [data-ui=inspectTag]{background:#eee3d2!important;padding:16px;box-sizing:border-box;border-radius:4px}
+}
+
+/* Deployment shell: quiet surfaces, clear type hierarchy and one primary action. */
+.arc-ui[data-mode=menu]{font-family:Inter,'Segoe UI',Arial,sans-serif!important;background:radial-gradient(ellipse at 28% 34%,#22373955,transparent 60%),#0c1316;color:#e4eee6}
+.arc-ui[data-mode=menu]::before{background:linear-gradient(115deg,#85aa9b04,transparent 55%);inset:72px 0 45px}
+.arc-ui[data-screen=HUB]::after{display:none}
+.arc-ui[data-mode=menu] button{padding:0;transition:background-color .18s,filter .18s,box-shadow .18s}
+.arc-ui[data-mode=menu] button:hover:not(:disabled){filter:brightness(1.12);box-shadow:inset 0 0 0 1px #b7d5c755}
+.arc-ui[data-mode=menu] button:focus-visible{outline:2px solid #cfe8b3;outline-offset:3px}
+.arc-ui[data-mode=menu] [data-ui^=nav][aria-pressed=true]{background:transparent!important;box-shadow:inset 0 -2px #d4e5b4;color:#e9f1e6!important}
+.arc-ui[data-mode=menu] [data-ui^=nav][aria-pressed=true]>div{color:#e9f1e6!important}
+.arc-ui[data-mode=menu] [data-ui^=nav]>div{font-weight:500!important;letter-spacing:.35px}
+.arc-ui[data-mode=menu] [data-ui=topNavPanel]{border-bottom:1px solid #ffffff0c!important;width:100%!important}
+.arc-ui[data-mode=menu] [data-ui=menuBottomBar]{width:100%!important;border-top:1px solid #ffffff0b!important}
+.arc-ui [data-ui=hubMap]{background:linear-gradient(180deg,#112327b0,transparent 35%,#0d191b55),url('./sector-map.svg') center 52%/cover no-repeat!important;border:1px solid #3a525544!important;box-shadow:0 18px 60px #0003}
+.arc-ui [data-ui=hubTitle]>div{font-weight:750!important;letter-spacing:-2.5px;line-height:1!important}
+.arc-ui [data-ui=hubSector],.arc-ui [data-ui=hubMapCaption],.arc-ui [data-ui=hubEventTitle],.arc-ui [data-ui=hubBriefTitle],.arc-ui [data-ui=hubCareerTitle]{letter-spacing:1.25px}
+.arc-ui [data-ui=hubEventTitle],.arc-ui [data-ui=hubEventBody],.arc-ui [data-ui=hubBriefTitle],.arc-ui [data-ui=hubBriefBody]{width:262px}
+.arc-ui [data-ui=hubEventTitle]>div,.arc-ui [data-ui=hubEventBody]>div,.arc-ui [data-ui=hubBriefTitle]>div,.arc-ui [data-ui=hubBriefBody]>div{text-align:left!important}
+.arc-ui [data-ui=hubEventBody]>div{font-weight:550!important;line-height:1.4!important;letter-spacing:-.6px}
+.arc-ui [data-ui=hubBriefBody]>div,.arc-ui [data-ui=hubSubtitle]>div{font-weight:400!important;line-height:1.6!important}
+.arc-ui [data-ui=liveEventCard]{border-top:2px solid #bcd3a2!important}
+.arc-ui [data-ui=mainPlayBtn]>div{justify-content:space-between!important;padding:0 23px;box-sizing:border-box;letter-spacing:.5px}
+.arc-ui [data-ui=hubMap],.arc-ui[data-screen=HUB] [data-ui=featsCard]{width:calc(100% - 412px)!important}
+.arc-ui[data-mode=menu] [data-ui=profileTag]>div{font-weight:400!important;letter-spacing:1px}
+.arc-ui[data-mode=menu] [data-ui=currencyTag]>div{font-variant-numeric:tabular-nums;letter-spacing:.3px}
+.arc-ui[data-mode=menu] [data-ui=menuBrand]>div{font-weight:800!important;letter-spacing:-1px}
+.arc-ui[data-mode=menu] [data-ui=menuBackBtn],.arc-ui[data-mode=menu] [data-ui=inventoryHotkeyBtn]{background:transparent!important}
+@media(min-width:1001px) and (max-aspect-ratio:3/2){
+ .arc-ui[data-mode=menu] [data-ui^=nav]{width:82px!important}
+ .arc-ui[data-mode=menu] [data-ui=navPlay]{left:110px!important}.arc-ui[data-mode=menu] [data-ui=navWorkshop]{left:194px!important}.arc-ui[data-mode=menu] [data-ui=navRaider]{left:278px!important}.arc-ui[data-mode=menu] [data-ui=navTraders]{left:362px!important}.arc-ui[data-mode=menu] [data-ui=navDecks]{left:446px!important}.arc-ui[data-mode=menu] [data-ui=navStore]{left:530px!important}
+ .arc-ui [data-ui=hubCareerBody]>div{font-size:11px!important}
+}
+@media(max-width:1000px){
+ .arc-ui[data-mode=menu]{gap:12px;padding:24px;grid-template-columns:repeat(3,minmax(0,1fr));padding-bottom:30px}
+ .arc-ui[data-mode=menu] > [data-ui=menuBrand]{grid-column:1;order:0}
+ .arc-ui[data-mode=menu] > [data-ui=profileTag]{display:none!important}
+ .arc-ui[data-mode=menu] > [data-ui=currencyTag]{grid-column:2/4;order:0;align-self:center}
+ .arc-ui[data-mode=menu] > [data-ui=currencyTag]>div{text-align:right!important;font-size:12px!important}
+ .arc-ui[data-mode=menu] > [data-ui=hubSector]{order:3;margin-top:20px}
+ .arc-ui[data-mode=menu] > [data-ui=hubSector]>div{font-size:9px!important}
+ .arc-ui[data-mode=menu] > [data-ui=hubTitle]{order:4;margin-top:0}
+ .arc-ui[data-mode=menu] > [data-ui=hubTitle]>div{font-size:clamp(34px,8vw,53px)!important}
+ .arc-ui[data-mode=menu] > [data-ui=hubSubtitle]{order:5}
+ .arc-ui[data-mode=menu] > [data-ui=hubMap]{order:6;height:260px!important;width:100%!important;margin:8px 0}
+ .arc-ui[data-mode=menu] > [data-ui=hubMapCaption]{display:none!important}
+ .arc-ui[data-mode=menu] > [data-ui=hubEventTitle]{order:7;margin-top:8px}
+ .arc-ui[data-mode=menu] > [data-ui=hubEventBody]{order:8}
+ .arc-ui[data-mode=menu] > [data-ui=hubLoadoutBtn]{order:9;height:44px!important;margin-top:8px}
+ .arc-ui[data-mode=menu] > [data-ui=hubSolo]{order:10;margin-top:10px}
+ .arc-ui[data-mode=menu] > [data-ui=mainPlayBtn]{order:11;height:56px!important;margin-bottom:12px}
+ .arc-ui[data-mode=menu] > [data-ui=hubCareerTitle]{order:12;border-top:1px solid #314244;padding-top:22px}
+ .arc-ui[data-mode=menu] > [data-ui=hubCareerBody]{order:13}
+ .arc-ui[data-mode=menu] > [data-ui=hubBriefTitle]{order:14;margin-top:15px}
+ .arc-ui[data-mode=menu] > [data-ui=hubBriefBody]{order:15}
+ .arc-ui[data-mode=menu] > [data-ui=hubBriefBody]>div{font-size:13px!important}
+ .arc-ui[data-mode=menu] > [data-ui=menuHint]{margin-top:10px}
+}
+@media(prefers-reduced-motion:reduce){.arc-ui button{transition:none!important}}
+.arc-ui [data-ui=hubMap]{background-size:auto,contain!important;background-position:center,center!important;background-color:#132327!important}
+@media(max-width:1000px){
+ .arc-ui[data-mode=menu]>[data-ui=menuBrand]{grid-row:1;grid-column:1;align-self:center}
+ .arc-ui[data-mode=menu]>[data-ui=currencyTag]{grid-row:1;grid-column:2/4}
+ .arc-ui[data-mode=menu]>[data-ui^=nav]{font-size:11px!important}
+}
+/* Inventory panels and all runtime item records share the same UI layout source. */
+.arc-ui[data-screen=INVENTORY] [data-ui=stashPanel]{pointer-events:auto!important;overflow-y:auto!important;overflow-x:hidden!important;padding:10px;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-content:start;scrollbar-width:thin;scrollbar-color:#5a7770 #142124;scrollbar-gutter:stable}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_]{position:relative!important;inset:auto!important;transform:none!important;width:100%!important;height:113px!important;min-width:0;border:1px solid #ffffff08!important;box-shadow:inset 0 2px #819690}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-rarity=Rare]{box-shadow:inset 0 2px #699fa4}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-rarity=Epic]{box-shadow:inset 0 2px #ad92be}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-rarity=Legendary]{box-shadow:inset 0 2px #dac483}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][aria-pressed=true]{background:#34463e!important;outline:1px solid #d4e5b4;outline-offset:-1px}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_]>div{padding:65px 9px 9px!important;white-space:pre-wrap!important;line-height:1.35!important;display:block!important;box-sizing:border-box;text-align:left!important;font-weight:500!important;font-size:10px!important}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_]::before{inset:12px 12px 52px}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-item=materials]::before,.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-item=consumables]::before,.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-item=ammo]::before,.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-item=armor]::before{inset:14px 45px 55px}
+.arc-ui[data-screen=INVENTORY] [data-ui=loadoutSupplies]{width:282px}
+.arc-ui[data-screen=INVENTORY] [data-ui=loadoutSupplies]>div{font-weight:400!important;line-height:1.45!important;white-space:pre-wrap!important}
+.arc-ui[data-screen=INVENTORY] [data-ui=itemInspectTitle],.arc-ui[data-screen=INVENTORY] [data-ui=itemInspectDesc],.arc-ui[data-screen=INVENTORY] [data-ui=inspectTag]{width:250px}
+.arc-ui[data-screen=INVENTORY] [data-ui=itemInspectDesc]>div{white-space:pre-wrap!important;line-height:1.45!important}
+.arc-ui[data-screen=INVENTORY] [data-ui=stashTitle]>div{letter-spacing:-1px;font-weight:650!important}
+@media(min-width:1001px){
+ .arc-ui[data-screen=INVENTORY] [data-ui=stashPanel]{width:calc(100% - 760px)!important;min-width:320px}
+ .arc-ui[data-screen=INVENTORY] [data-ui=loadoutPanel],.arc-ui[data-screen=INVENTORY] [data-ui=loadoutTitle]{left:calc(100% - 704px)!important}
+ .arc-ui[data-screen=INVENTORY] [data-ui=loadoutWeapon],.arc-ui[data-screen=INVENTORY] [data-ui=loadoutSupplies],.arc-ui[data-screen=INVENTORY] [data-ui=loadoutNote]{left:calc(100% - 685px)!important}
+ .arc-ui[data-screen=INVENTORY] [data-ui=loadoutAmmo]{left:calc(100% - 669px)!important}
+ .arc-ui[data-screen=INVENTORY] [data-ui=itemInspectCard]{width:330px!important}
+ .arc-ui[data-screen=INVENTORY] [data-ui=itemInspectTitle],.arc-ui[data-screen=INVENTORY] [data-ui=itemInspectDesc],.arc-ui[data-screen=INVENTORY] [data-ui=inspectTag]{width:290px!important}
+ .arc-ui[data-screen=INVENTORY] [data-ui=itemEquipBtn],.arc-ui[data-screen=INVENTORY] [data-ui=itemSellBtn]{width:290px!important}
+ .arc-ui[data-screen=INVENTORY] [data-ui=stashSellAllBtn]{width:calc((100% - 770px)/2)!important;min-width:150px}
+ .arc-ui[data-screen=INVENTORY] [data-ui=stashSellJunkBtn]{left:calc(34px + (100% - 740px)/2)!important;width:calc((100% - 770px)/2)!important;min-width:150px}
+}
+@media(max-width:1000px){
+ .arc-ui[data-screen=INVENTORY]>[data-ui=stashPanel]{display:grid!important;order:12;height:370px!important;grid-template-columns:repeat(2,minmax(0,1fr));padding:8px}
+ .arc-ui[data-screen=INVENTORY]>[data-ui=stashSellAllBtn],.arc-ui[data-screen=INVENTORY]>[data-ui=stashSellJunkBtn]{order:13;height:42px!important}
+ .arc-ui[data-screen=INVENTORY]>[data-ui^=loadout]{order:14}
+ .arc-ui[data-screen=INVENTORY]>[data-ui=loadoutTitle]{margin-top:20px}
+ .arc-ui[data-screen=INVENTORY]>[data-ui=itemInspectTitle],.arc-ui[data-screen=INVENTORY]>[data-ui=itemInspectDesc],.arc-ui[data-screen=INVENTORY]>[data-ui=inspectTag]{background:#1b292c!important;color:#d3dfd6!important}
+ .arc-ui[data-screen=INVENTORY]>[data-ui=itemInspectTitle]>div,.arc-ui[data-screen=INVENTORY]>[data-ui=itemInspectDesc]>div{color:#d3dfd6!important}
+ .arc-ui[data-screen=INVENTORY]>[data-ui=itemEquipBtn],.arc-ui[data-screen=INVENTORY]>[data-ui=itemSellBtn]{height:44px!important}
+}
+/* Asset references: 'assets/ui/shotgun.svg', 'assets/ui/pistol.svg'. */
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-weapon=shotgun][data-item=weapons]::before{background-image:url('./shotgun.svg')}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-weapon=pistol][data-item=weapons]::before{background-image:url('./pistol.svg')}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-item=materials]::before,.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-item=consumables]::before,.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-item=ammo]::before,.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_][data-item=armor]::before{inset:15px auto auto 50%;width:28px;height:29px;transform:translateX(-50%) rotate(-12deg)}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_]{height:123px!important}
+.arc-ui[data-screen=INVENTORY] [data-ui^=stash_slot_]>div{overflow-wrap:anywhere}
+@media(min-width:1001px) and (max-aspect-ratio:3/2){
+ .arc-ui[data-screen=INVENTORY] [data-ui=stashPanel]{min-width:200px;grid-template-columns:repeat(2,minmax(0,1fr))}
+}

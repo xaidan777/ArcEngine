@@ -13,7 +13,19 @@ const DESKTOP = { userAgent: 'Mozilla/5.0 (Windows NT 10.0)', platform: 'Win32',
 // files — paths from the project root; globals — fields of the global object (navigator,
 // localStorage, BABYLON…). window — the global object itself.
 export function loadScripts(files, globals = {}) {
-  const ctx = vm.createContext({ console, navigator: DESKTOP, innerWidth: 1920, innerHeight: 1080 });
+  const ctx = vm.createContext({
+    console,
+    setTimeout,
+    clearTimeout,
+    setInterval,
+    clearInterval,
+    Float32Array,
+    Uint8Array,
+    ArrayBuffer,
+    navigator: DESKTOP,
+    innerWidth: 1920,
+    innerHeight: 1080,
+  });
   ctx.window = ctx;
   for (const [key, desc] of Object.entries(Object.getOwnPropertyDescriptors(globals))) {
     Object.defineProperty(ctx, key, desc);

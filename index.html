@@ -3,10 +3,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>ArcEngine</title>
-    <script src="libs/simplex-noise.js"></script>
-    <script src="libs/babylon.js"></script>
-    <script src="libs/babylonjs.loaders.min.js"></script>
+    <title>Blackwater Protocol</title>
+    <link rel="stylesheet" href="assets/ui/menu.css">
+    <link rel="stylesheet" href="assets/ui/raider-theme.css">
+    <link rel="stylesheet" href="assets/ui/astra-polish.css">
+    <link rel="stylesheet" href="assets/ui/desktop-game.css">
+    <script src="libs/simplex-noise.js?v=1789839673"></script>
+    <script src="libs/babylon.js?v=1789839673"></script>
+    <script src="libs/babylonjs.loaders.min.js?v=1789839673"></script>
     <style>
         html, body {
             margin: 0;
@@ -39,6 +43,12 @@
             background: #222;
             z-index: 1000;
         }
+        .game-logo {
+            font: 700 30px system-ui, sans-serif;
+            letter-spacing: 0.22em;
+            color: #dbe7df;
+            text-shadow: 0 0 22px rgba(82, 227, 146, 0.25);
+        }
         .loading-text {
             font: 14px system-ui, sans-serif;
             color: #c8d0d8;
@@ -61,28 +71,68 @@
     </style>
 </head>
 <body>
+    <!-- Bundled attribution manifest: 'assets/LICENSES.md' -->
     <canvas id="world3d"></canvas>
     <div id="loading-screen">
+        <div class="game-logo">BLACKWATER PROTOCOL</div>
         <div class="loading-bar"><div class="loading-progress"></div></div>
         <div class="loading-text"></div>
     </div>
 
     <!-- Order matters: Constants.js first (the others read its globals), main.js last -->
-    <script src="js/Constants.js"></script>
-    <script src="js/Objects.js"></script>
-    <script src="js/UILayout.js"></script>
-    <script src="js/Sound3D.js"></script>
-    <script src="js/World3D.js"></script>
-    <script src="js/Terrain3D.js"></script>
-    <script src="js/CameraControl.js"></script>
-    <script src="js/Model3D.js"></script>
-    <script src="js/Gltf3D.js"></script>
+    <script src="js/Constants.js?v=1789839673"></script>
+    <script src="js/Objects.js?v=1789839673"></script>
+    <script src="js/UILayout.js?v=1789839673"></script>
+    <script src="js/World3D.js?v=1789839673"></script>
+    <script src="js/DayNightCycle.js?v=1789839673"></script>
+    <script src="js/Terrain3D.js?v=1789839673"></script>
+    <script src="js/CameraControl.js?v=1789839673"></script>
+    <script src="js/Model3D.js?v=1789839673"></script>
+    <script src="js/Gltf3D.js?v=1789839673"></script>
+    <script src="js/BotRig3D.js?v=1789839673"></script>
     <script src="js/Instances3D.js"></script>
-    <script src="js/Location3D.js"></script>
-    <script src="js/Debug3D.js"></script>
-    <script src="js/UI.js"></script>
-    <script src="js/Game.js"></script>
-    <script src="js/main.js"></script>
+    <script src="js/Location3D.js?v=1789839673"></script>
+    <script src="js/Debug3D.js?v=1789839673"></script>
+    <script src="js/UI.js?v=1789839673"></script>
+    <script src="js/ShooterRules.js?v=1789839673"></script>
+    <script src="js/RaidLevel.js?v=1789839673"></script>
+    <script src="js/RaidWorld.js?v=1789839673"></script>
+    <script src="js/NavGrid.js?v=1789839673"></script>
+    <script src="js/RaidRules.js?v=1789839673"></script>
+    <script src="js/RaidClient.js?v=1789839673"></script>
+    <script src="js/ProgressionSystem.js?v=1789839673"></script>
+    <script src="js/OnlineLobby.js?v=1789839673"></script>
+    <script src="js/OnlineBridge.js?v=1789839673"></script>
+    <script src="js/RaidEnvironment.js?v=1789839673"></script>
+    <script src="js/WeatherSystem.js?v=1789839673"></script>
+    <script src="js/TacticalMap.js?v=1789839673"></script>
+    <script src="js/TacticalRange.js?v=1789839673"></script>
+    <script src="js/RaidInventory.js?v=1789839673"></script>
+    <script src="js/LoadoutScreen.js?v=1789839673"></script>
+    <script src="js/MenuSystem.js?v=1789839673"></script>
+    <script src="js/audio/AudioCore.js?v=1789839673"></script>
+    <script src="js/audio/WeaponSynth.js?v=1789839673"></script>
+    <script src="js/audio/AmbienceSynth.js?v=1789839673"></script>
+    <script src="js/audio/FoleySynth.js?v=1789839673"></script>
+    <script src="js/audio/CombatSynth.js?v=1789839673"></script>
+    <script src="js/audio/ArcMachineSynth.js?v=1789839673"></script>
+    <script src="js/audio/VoiceManager.js?v=1789839673"></script>
+    <script src="js/ProceduralAudio.js?v=1789839673"></script>
+    <script src="js/engine/ArcSpatialGrid.js?v=1789839673"></script>
+    <script src="js/engine/ArcEventBus.js?v=1789839673"></script>
+    <script src="js/engine/ArcStateMachine.js?v=1789839673"></script>
+    <script src="js/engine/ArcActor.js?v=1789839673"></script>
+    <script src="js/engine/ArcPostProcess.js?v=1789839673"></script>
+    <script src="js/engine/ArcInspector.js?v=1789839673"></script>
+    <script src="js/engine/ArcPerformanceOverlay.js"></script>
+    <script src="js/engine/workers/ArcJobWorker.js"></script>
+    <script src="js/engine/ArcJobSystem.js"></script>
+    <script src="js/engine/ArcEngine.js?v=1789839673"></script>
+    <script src="js/KeyBindings.js?v=1789839673"></script>
+    <script src="js/ControlsMenu.js?v=1789839673"></script>
+    <script src="js/MapPool.js"></script>
+    <script src="js/Game.js?v=1789839673"></script>
+    <script src="js/main.js?v=1789839673"></script>
     <script>
         // A long tap and RMB must not open the browser menu.
         document.addEventListener('contextmenu', e => e.preventDefault());

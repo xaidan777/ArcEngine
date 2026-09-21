@@ -133,3 +133,8 @@ class Instances3D {
         this.ok = false;
     }
 }
+
+// Classic script: the kit attaches every module to the page global (invariant 2/8).
+if (typeof module !== 'undefined' && module.exports) module.exports = Instances3D;
+if (typeof window !== 'undefined') /** @type {any} */ (window).Instances3D = Instances3D;
+if (typeof globalThis !== 'undefined') /** @type {any} */ (globalThis).Instances3D = Instances3D;

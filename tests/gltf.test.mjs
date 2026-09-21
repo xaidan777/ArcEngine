@@ -98,3 +98,14 @@ test('клипы: stop возвращает позу покоя', () => {
   assert.equal(idle.isPlaying, false);
   assert.equal(clips.current, '');
 });
+
+
+test('paused clips preserve cross-fade weights until resumed', () => {
+  const { clips, idle, run, blend } = makeClips();
+  clips.play('idle'); clips.play('run'); clips._tick(blend / 4);
+  const weights = [idle.weight, run.weight];
+  clips.paused = true; clips._tick(blend);
+  assert.deepEqual([idle.weight, run.weight], weights);
+  clips.paused = false; clips._tick(blend);
+  assert.equal(run.weight, 1);
+});

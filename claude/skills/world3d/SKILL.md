@@ -1,6 +1,6 @@
 ---
 name: world3d
-description: The kit's 3D engine — World3D (engine, View3D, light, shadows, toon shader, ink edges and silhouette outline, addObject), Terrain3D (ground), Location3D (location), Model3D and Gltf3D (FBX and GLB models, skeleton, animation clips), Instances3D (many copies in one draw call), CameraControl (camera), Game.js (sample game). Read before editing World3D.js, Terrain3D.js, Location3D.js, Model3D.js, Gltf3D.js, Instances3D.js, CameraControl.js, Game.js, main.js and the CAMERA_*/WORLD3D_*/TERRAIN_*/LOCATION_* blocks of Constants.js, before adding objects, many copies of one object, or animated characters to the scene.
+description: The kit's 3D engine — World3D (engine, View3D, light, shadows, toon shader, ink edges and silhouette outline, addObject), Terrain3D (ground), Location3D (location), Model3D and Gltf3D (FBX and GLB models, skeleton, animation clips), CameraControl (camera), Game.js (sample game). Read before editing World3D.js, Terrain3D.js, Location3D.js, Model3D.js, Gltf3D.js, CameraControl.js, Game.js, main.js and the CAMERA_*/WORLD3D_*/TERRAIN_*/LOCATION_* blocks of Constants.js, before adding objects or animated characters to the scene.
 ---
 
 # 3D world: World3D, Terrain3D, Location3D, camera
@@ -10,21 +10,20 @@ belongs to the owner: `main.js` in the game, `_utils/editor/lab.js` in the edito
 
 ```
 main.js: World3D.init(canvas) -> new Location3D() -> new CameraController(view) -> UI.init(canvas) -> new Game(app)
-         runRenderLoop: game.update(dt) -> location.update(dt) -> camera.update(dt) -> Sound3D.update(camera) -> World3D.renderFrame()
+         runRenderLoop: game.update(dt) -> location.update(dt) -> camera.update(dt) -> World3D.renderFrame()
 ```
 
 ## Files (`js/`)
 
 | File | What |
 |---|---|
-| `World3D.js` | `World3D`: `init(canvas)`, `renderFrame()`, `createView(opts)`, `cfg()` (all render constants), `applyRenderConstants(view)`, `addObject/removeObject`, ink edges (`inkMesh`, `InkSkin` — lines on the bones of a skinned mesh), outline (`outlineAdd/Remove`, fog tint `outlineFog`, `fogFactor`), `sunDirection()`, `hexColor3()`. `ArcToonPlugin` + `World3D.toon` (the `ArcToon` object). `View3D`: scene, camera, light, shadows, `pointerToGround`, `projectToScreen`, `dispose` |
+| `World3D.js` | `World3D`: `init(canvas)`, `renderFrame()`, `createView(opts)`, `cfg()` (all render constants), `applyRenderConstants(view)`, `addObject/removeObject`, ink edges (`inkMesh`), outline (`outlineAdd/Remove`, fog tint `outlineFog`, `fogFactor`), `sunDirection()`, `hexColor3()`. `ArcToonPlugin` + `World3D.toon` (the `ArcToon` object). `View3D`: scene, camera, light, shadows, `pointerToGround`, `projectToScreen`, `dispose` |
 | `Terrain3D.js` | height field from noise, grid `[0..W]×[0..H]`, ground ring beyond the edge, `heightAt`, `tiltAt`, `setGroundImage`, `applyTileSize` |
 | `Location3D.js` | location = `View3D` + `Terrain3D` + ground texture (`GROUNDS`) + objects (`opts.objects` = `LOCATION_OBJECTS`); `ready` (promise: ground, models, shaders), `buildTerrain()` (objects settle on the new ground), `loadGround()`, `objects` (`{ def, mesh, error, loaded }`), `addObject(def)`, `placeObject(rec)`, `removeObject(rec)`, `update(dt)` (every frame: `spinPart` per `def.anim`, `playClip` per `def.clip`) |
 | `Model3D.js` | binary FBX -> meshes: `load(url)` (parse with cache), `build(model, scene, { name })` (root without geometry, parts with `MultiMaterial`; a part mesh has `metadata = { part, pivot, axes }` — FBX object name, its origin and unit local axes in file coordinates), `dispose(view, root)` (with materials). 1 cm in the file = 1 px, the origin comes from the file. A `.glb` / `.gltf` url goes through the same `load(url, scene)` / `build` / `dispose` into `Gltf3D`; `clips(root)` — its `Clips3D` (null for FBX) |
 | `Gltf3D.js` | glTF/GLB through Babylon's loader (`libs/babylonjs.loaders.min.js`): skeleton, textures, animation clips; PBR -> `StandardMaterial` for the toon shader. `Clips3D`: `names()`, `has(name)`, `play(name, { loop, speed, blend, then })`, `stop()`, `current` — §GLB models |
-| `Objects.js` | `LOCATION_OBJECTS`: `{ name, model: 'assets/models/….fbx' \| '….glb', kind, x, y, h, rot: [x, y, z]°, scale: [x, y, z], anim?, clip?, tag?, hidden?, sound? }`; `rot[1]` is the heading (`rotation.y = −rot[1]`); `anim: { part, axis: 'x'\|'-x'\|'y'\|…, speed: rpm, dir: 'cw'\|'ccw' }` (FBX part spin); `clip: 'idle'` — looped clip of a GLB; `tag`, `hidden`, `sound` — §The scene as data. Written by the editor |
+| `Objects.js` | `LOCATION_OBJECTS`: `{ name, model: 'assets/models/….fbx' \| '….glb', kind, x, y, h, rot: [x, y, z]°, scale: [x, y, z], anim?, clip? }`; `rot[1]` is the heading (`rotation.y = −rot[1]`); `anim: { part, axis: 'x'\|'-x'\|'y'\|…, speed: rpm, dir: 'cw'\|'ccw' }` (FBX part spin); `clip: 'idle'` — looped clip of a GLB. Written by the editor |
 | `Game.js` | the sample game — where game logic starts: `constructor(app)`, `update(dt)` before the render; keeps its own state (`running`, `energy`) and shows it through `Model3D.clips` and `UI.get` (skill `ui`) |
-| `Instances3D.js` | `World3D.addInstances(view, source, kind, items, opts)` — many copies of one mesh or model in one draw call per part (thin instances): `set(i, item)`, `setAll(items)`, `flush()`, `dispose()`, `ok`; pure `Instances3D.fill` — §Many copies |
 | `Debug3D.js` | dev tools, inert until called: `lint(view?)` (inside-out meshes, normal map convention, light limit and sun order, WebGL2 shader limits, heavy meshes, blank frame — zero findings on the kit's scene), `hold(pose)`/`release()` (a view that bypasses the camera controller, eye kept above the ground), `frames(n)`, `bench()`/`benchToggle(target)`, `setMode('backfaces' \| 'normals' \| 'wireframe' \| 'off')`. Skills `render-conventions` and `verify` |
 | `CameraControl.js` | `CameraController`: target, azimuth, pitch, zoom; DOM input; game and free modes; `ignorePointer(e)` — a press that is not for the camera |
 
@@ -68,55 +67,6 @@ frame (ink/outline level 1), `prop` — environment (level 2). The ground is gro
 Everything created in the scene dies with `view.dispose()`. A separate `removeObject` is
 needed only for what dies before the scene.
 
-### The scene as data: tag, hidden, sound
-
-The user places objects in the editor; game code takes them from there instead of creating them.
-Three fields make that possible without naming every object in code:
-
-```js
-for (const coin of app.location.findByTag('coin')) { … }   // every object of the group, in list order
-const hero = app.location.findByTag('player')[0] || null;  // one of a kind: [0], guard the null
-app.location.setHidden(door, false);                       // a hidden object enters the scene
-```
-
-- **`tag`** — a group name (`'coin'`, `'spawn'`, `'enemy'`). It is the contract between the scene
-  and the code: the user may rename or duplicate an object, and the code still finds it.
-  Prefer it to `objects.find(o => o.def.name === …)` — a name is the user’s to change.
-  The sample game takes its character by `Game.HERO_TAG`.
-- **`hidden`** — placed but not in the scene: no mesh in the frame, no sound, until
-  `setHidden(rec, false)`. This is how a level lays out what appears later — a boss, a bridge,
-  a reward. In the EDITOR a hidden object stays visible as a ghost (`opts.showHidden`,
-  `Location3D.GHOST_ALPHA`), otherwise there would be nothing to click and drag.
-- **`sound`** — a sound standing at the object; the location plays it itself (skill `sound`).
-
-A record field is live: assign it and call what reads it (`placeObject`, `applyHidden`);
-`anim`, `clip` and `sound` are re-read every frame by `update(dt)`.
-
-### Many copies of one thing
-
-```js
-const forest = World3D.addInstances(view, treeMesh, 'prop', items);   // items: [{ x, y, h, heading?, scale? }]
-forest.set(7, { x, y, h, heading }); forest.flush();                  // move copies; every frame — opts.dynamic
-forest.setAll(items);  forest.dispose();
-```
-
-More than a couple of hundred copies of one mesh or model (a forest, identical props, bullets,
-fence posts) go through `addInstances`, not through a loop of `addObject`. A separate mesh is a
-draw call of its own in the main pass, the shadow map, the outline mask and the ink edges:
-10–15 µs of CPU per frame. Measured in the kit: 1000 two-part trees as 2000 separate meshes —
-26 ms of CPU per frame (the whole frame budget is 16.6); as instances — 0.1 ms, with the same
-toon, shadows, outline and ink edges. `Debug3D.lint()` warns from 200 look-alike meshes
-(`many-copies`) and 1000 separate meshes (`many-meshes`).
-
-- `item.h` is the height of the copy's origin — the helper does not ask the terrain:
-  `h: terrain.heightAt(x, y)`. `heading` — rad, `scale` — a number or `[x, y, z]`.
-- `source` — a mesh with geometry or a model root from `Model3D.build`; its own position is
-  reset, parts with their own transforms are baked into vertices once. A SKINNED model is
-  refused (`ok === false`, a console warning): one skeleton is one pose.
-- The copies share the material, the kind and everything else of the mesh: no per-copy color,
-  visibility or picking. `opts.dynamic` — copies that move every frame: the mesh is always drawn
-  and its bounds are not refreshed on `flush()`.
-
 ## Light, shadows, toon, ink edges
 
 All render numbers are read in ONE place — `World3D.cfg()` (typeof per name + default: in
@@ -127,16 +77,9 @@ the game the constants are lexical, in the editor they live on `window`).
   Flat ground ≈1.0 at `SUN 0.8 + SKYLIGHT 0.45`; sums > ~1.2 clamp to white.
 - **Shadows:** `ShadowGenerator`, darkness always 0 — shadow color and strength are painted
   by the plugin (define `ARCSHADOW`): light in shadow = unshadowed light × `mix(1, SHADOW_COLOR, STRENGTH)`.
-  The sun's ortho frustum is built around the SHADOW CASTER NEAREST THE CAMERA and shrinks to the
-  caster BOUNDS (`fitShadowFrustum(cam, maxR)`, `cam` = the ground point under the eye + the
-  heading: world bounding box + height × cos of sun elevation, 32 px quantum, center snapped to
-  the texel grid, hysteresis, the nearest caster kept inside). Fitting by positions cut the shadow
-  of a big model. The box is at most `WORLD3D_SHADOW_RADIUS` and cannot cover a whole frame, so it
-  covers what is CLOSE, where a shadow is large on screen; `maxR` (the frame's footprint) is only a
-  request. Do NOT lead it by `groundFocus()` — the ground at the frame center is not where the
-  player is looking: fly up to a building and raise the head and it is a thousand px past the
-  building, fly forward and down and it falls behind the camera, look from above and it sits under
-  the eye. Each of those lost the frame's shadows entirely.
+  The sun's ortho frustum follows the camera target and shrinks to the caster BOUNDS
+  (`fitShadowFrustum`: world bounding box + height × cos of sun elevation, 32 px quantum,
+  center snapped to the texel grid, hysteresis). Fitting by positions cut the shadow of a big model.
   `shadowMinZ/MaxZ = LIGHT_DIST ∓ 1200` — a narrow range, otherwise shadows vanish.
   Shadow acne (stripes and a sawtooth on faces at a sharp angle to the sun) is removed by the
   normal offset `WORLD3D_SHADOW_NORMAL_BIAS` — in shadow map TEXELS: the frustum "breathes"
@@ -150,17 +93,12 @@ the game the constants are lexical, in the editor they live on `window`).
   uniforms; toggling `WORLD3D_TOON` — `markAllDefinesAsDirty`.
   `metadata.toon = false` removes bands from a material; unlit materials are left alone.
 - **Ink edges:** `EdgesRenderer` (`inkMesh`), `checkVerticesInsteadOfIndices` — lowpoly
-  triangles are disconnected. Width ≈ world px × 100. EVERY object of the scene gets them,
-  including a skinned character: `EdgesRenderer` builds its lines once from the rest pose and
-  its shader knows nothing about bones, so `InkSkin` maps each line end to the mesh vertex it
-  came from and writes the posed ends into the line buffers before every draw (the mesh itself
-  is still skinned on the GPU; ~0.05 ms per frame for the kit's character, 812 vertices). Like
-  the outline, the ink is part of the toon look: at `WORLD3D_TOON = 0` there are no lines.
+  triangles are disconnected. Width ≈ world px × 100.
 - **Silhouette outline:** `HighlightLayer` with `isStroke`, one layer per "view × rendering
   group" pair (`view._outlines['actor@0']`, `meshes`: mesh -> its line color). Width in screen
   px. Part of the toon look: at `WORLD3D_TOON = 0` (the editor's "toon shader" checkbox)
-  `outlineAdd` does not add the mesh, `applyOutlines` removes and restores the outline live
-  (ink edges go off and on with it). The line is drawn over the finished frame — scene
+  `outlineAdd` does not add the mesh, `applyOutlines` removes and restores the outline live;
+  ink edges do not depend on `WORLD3D_TOON`. The line is drawn over the finished frame — scene
   fog does not touch it, so `outlineFog` (from `renderFrame`, before `scene.render()`) tints
   each mesh's line every frame with Babylon's fog formula: `mix(fogColor, WORLD3D_TOON_INK_COLOR, f)`,
   `f` — by the distance from the camera to the mesh center (`fogFactor`). No constants of its
@@ -232,7 +170,7 @@ camera descends). Pitch is the angle below the horizon: negative — looking up.
 
 | | game mode | free (`setFree(true)`, editor) |
 |---|---|---|
-| WASD, arrows | flight: W/S along the view (pitch included), A/D — strafe; speed `CAMERA_FLY_SPEED` screen px/s (÷ zoom over the world; the editor has a slider for it at the bottom right of the view) | same |
+| WASD, arrows | flight: W/S along the view (pitch included), A/D — strafe; speed `CAMERA_FLY_SPEED` screen px/s (÷ zoom over the world) | same |
 | Q / E | down / up along the world vertical | same |
 | RMB | look around if `CAMERA_ORBIT = 1`: the camera stays, the target swings around it (`_look`); while `follow` is active — orbit around the object | look around |
 | LMB | not taken (game input) | orbit around the target; Shift — pan |
@@ -248,9 +186,8 @@ world vector normalized to the step, keeps absolute height (`_setTarget3` turns 
 `lift`) and holds the camera above the ground (`_floorEye` raises `lift`, the view direction
 stays). Pan keeps the ground point under the cursor by intersecting the plane at its height,
 in two passes. `groundFocus()` — the ground point at the frame center (`{ x, y, h, k }`): in
-flight it is ahead of the target (`k` — how many times farther than the target, capped at 4 and
-below 1 when the target dips under the ground). The editor drops new objects there. NOT for the
-shadow frustum — `_apply` hands `fitShadowFrustum` the ground under the eye and the heading.
+flight it is ahead of the target; the shadow frustum is fitted around it, the editor drops new
+objects there.
 
 ## Pitfalls (each one already cost an iteration)
 
@@ -263,12 +200,8 @@ shadow frustum — `_apply` hands `fitShadowFrustum` the ground under the eye an
 - Outline width is in blur texels (`outlineKernel`), otherwise the line is four times thicker on mobile.
 - An outline layer draws only meshes of its rendering group: a layer is created per group.
 - `preserveDrawingBuffer: false`: a skipped frame shows garbage — render every tick.
-- Instances cast no shadows if only the prototype is among the casters: use thin instances
-  (`World3D.addInstances`) or `addShadowCaster` for each instance.
-- A thin instance matrix is applied in the mesh's LOCAL space: the mesh has to stand at the
-  origin with no rotation or scale (`Instances3D.prepare` resets the root and bakes the parts).
-  A static thin instance buffer ignores `thinInstanceBufferUpdated` without a word — set the
-  buffer again (`flush()` does) or create it dynamic.
+- Instances cast no shadows if only the prototype is among the casters: use thin instances or
+  `addShadowCaster` for each instance.
 - The outline compose runs in `ALPHA_PREMULTIPLIED`: the STROKE merge shader already
   multiplies color by alpha, and `ALPHA_COMBINE` multiplied a second time — a fog-colored
   line got a rim darker than the background, the far object dissolved while a "ghost" of the
@@ -295,14 +228,9 @@ shadow frustum — `_apply` hands `fitShadowFrustum` the ground under the eye an
   `DiffuseColor` in the file is linear (Blender) — without `toGammaSpace()` colors are darker.
 - A quoted `'assets/…'` path even in a COMMENT is treated by the builder's asset scanner as an
   asset reference — the build fails on a "missing" file. In comments — no quotes.
-- A skinned mesh keeps its ink edges only through `InkSkin`: `EdgesRenderer` builds the lines
-  once from the rest pose and Babylon's `line` shader has no bones, so without the per-frame
-  re-pose the ink hangs in the rest pose. Its line buffers are created static
-  (`updatable = false`) and `updateDirectly` on them does nothing WITHOUT A WORD — `InkSkin`
-  replaces the pair with updatable buffers (private `er._buffers`, check it when upgrading
-  Babylon). A line end is found by exact vertex coordinates; when several vertices share a
-  position, the pair that shares a triangle wins, or a line at a seam would fly off with the
-  wrong bone. The silhouette outline and shadows follow the skeleton by themselves.
+- A skinned mesh gets no ink edges (`addObject` skips `mesh.skeleton`): `EdgesRenderer` builds
+  its lines once from the rest pose, and they stay behind while the bones move the mesh. The
+  silhouette outline and shadows follow the skeleton.
 - glTF front faces are counter-clockwise: the loader marks it with `sideOrientation` on the
   material — a material made by hand for a glTF mesh must copy it, or the model is inside out
   (skill `render-conventions`).
@@ -312,8 +240,7 @@ shadow frustum — `_apply` hands `fitShadowFrustum` the ground under the eye an
 ## Constants
 
 Groups in `Constants.js`: `LOCATION_*`/`GROUND_TILE_SIZE`/`TERRAIN_*` (location),
-`CAMERA_*` (camera), `WORLD3D_*` (render), `MODEL_*` (clips), `UI_*` (skill `ui`),
-`AUDIO_*` (skill `sound`), `GAME_*` (the sample game). Values live in the file; the editor tunes them.
+`CAMERA_*` (camera), `WORLD3D_*` (render), `MODEL_*` (clips), `UI_*` (skill `ui`), `GAME_*` (the sample game). Values live in the file; the editor tunes them.
 
 ## Edit checklist
 

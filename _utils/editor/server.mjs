@@ -13,25 +13,25 @@
 //
 //  Location objects (Objects tab):
 //   - POST /api/save-objects — Objects.js from a validated list;
-//   - GET /api/sounds — the files of assets/sounds an object's sound field can point to;
 //   - POST /api/pick-model — a system model (.fbx, .glb) picker dialog opened in
 //     assets/models (Windows: PowerShell + WinForms); a file from outside assets/
 //     is copied to assets/models. Other OSes — code 'unsupported', the client sends
 //     the file itself: POST /api/import-model?name=<name> with the file bytes.
 // ============================================================================
+import { listMaps, loadMap, saveMap, deleteMap } from './maps.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import url from 'node:url';
 import { execFile } from 'node:child_process';
-import { failure, isModelPath, isSoundPath, saveConstants, saveObjects, saveUI } from './save.mjs';
+import { failure, isModelPath, saveConstants, saveObjects, saveUI, saveRig, saveClip, saveLevel, listAssets } from './save.mjs';
 
 // Server contract version. Bump on EVERY change of the endpoints or the
 // response format — the client checks it against EDITOR_API_VERSION in schema.js.
-const EDITOR_API_VERSION = 20;
+const EDITOR_API_VERSION = 21;
 
-const ROOT = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..');
+const ROOT = process.env.ARC_EDITOR_ROOT ? path.resolve(process.env.ARC_EDITOR_ROOT) : path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..', '..');
 const MODELS_DIR = path.join(ROOT, 'assets', 'models');
 const EDITOR_URL_PATH = '/_utils/editor/';
 
@@ -64,6 +64,19 @@ const C = {
   r: '\x1b[0m', b: '\x1b[1m', dim: '\x1b[2m',
   red: '\x1b[31m', grn: '\x1b[32m', ylw: '\x1b[33m', cyn: '\x1b[36m',
 };
+
+// --- Live Builder SSE Broadcast -----------------------------------------------
+const liveClients = new Set();
+export function broadcastLiveAction(data) {
+  const payload = 'data: ' + JSON.stringify(data) + '\n\n';
+  for (const client of liveClients) {
+    try {
+      client.write(payload);
+    } catch (_) {
+      liveClients.delete(client);
+    }
+  }
+}
 
 // --- Model import: assets/models/ ---------------------------------------------
 
@@ -155,7 +168,7 @@ function readRaw(req, limit) {
 }
 
 async function readBody(req) {
-  return (await readRaw(req, 1024 * 1024)).toString('utf8');
+  return (await readRaw(req, 40 * 1024 * 1024)).toString('utf8');
 }
 
 const server = http.createServer(async (req, res) => {
@@ -167,6 +180,49 @@ const server = http.createServer(async (req, res) => {
   }
 
   // --- Editor API ---
+  if (pathname === '/api/maps' || pathname.startsWith('/api/maps/')) {
+    try {
+      const id = new URL(req.url, 'http://x').searchParams.get('id');
+      if (pathname === '/api/maps' && req.method === 'GET') return sendJson(res, 200, { ok: true, maps: await listMaps(ROOT) });
+      if (pathname === '/api/maps/load' && req.method === 'POST') return sendJson(res, 200, { ok: true, level: await loadMap(ROOT, id) });
+      if (pathname === '/api/maps/delete' && req.method === 'DELETE') return sendJson(res, 200, await deleteMap(ROOT, id));
+      if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error: 'Method Not Allowed' });
+      const body = JSON.parse(await readBody(req));
+      if (pathname === '/api/maps/save' || pathname === '/api/maps/create') return sendJson(res, 200, await saveMap(ROOT, body.level, pathname.endsWith('/create')));
+      if (pathname === '/api/maps/duplicate') {
+        const level = await loadMap(ROOT, body.sourceId);
+        level.id = body.id;
+        level.name = body.name || body.id;
+        return sendJson(res, 200, await saveMap(ROOT, level, true));
+      }
+      return sendJson(res, 404, { ok: false, error: 'Unknown map action' });
+    } catch (e) { return sendJson(res, e.code === 'ENOENT' ? 404 : e.code === 'EEXIST' ? 409 : 400, { ok: false, error: e.message }); }
+  }
+  // --- Live Agent Stream API ---
+  if (pathname === '/api/live-stream') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+    });
+    res.write(': heartbeat\n\n');
+    res.write('data: ' + JSON.stringify({ type: 'CONNECTED', message: 'ArcEngine Live Stream connected' }) + '\n\n');
+    liveClients.add(res);
+    req.on('close', () => liveClients.delete(res));
+    return;
+  }
+  if (pathname === '/api/live-action') {
+    if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
+    try {
+      const body = JSON.parse(await readBody(req) || '{}');
+      broadcastLiveAction(body);
+      return sendJson(res, 200, { ok: true, recipients: liveClients.size });
+    } catch (e) {
+      return sendJson(res, 400, { ok: false, error: e.message });
+    }
+  }
+
   if (pathname === '/api/status') {
     return sendJson(res, 200, { ok: true, editor: 'arcengine', api: EDITOR_API_VERSION, root: ROOT });
   }
@@ -174,7 +230,11 @@ const server = http.createServer(async (req, res) => {
     if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
     try {
       const body = JSON.parse(await readBody(req) || '{}');
-      const result = await saveConstants(ROOT, body.changes);
+      let changes = body.changes;
+      if (changes && !Array.isArray(changes) && typeof changes === 'object') {
+        changes = Object.entries(changes).map(([name, value]) => ({ name, value }));
+      }
+      const result = await saveConstants(ROOT, changes);
       const failed = result.results ? result.results.filter(r => !r.ok) : [];
       if (result.patched > 0) {
         console.log(`  ${C.grn}save${C.r} ${result.patched} value(s) -> Constants.js ${C.dim}(backup: ${result.backup})${C.r}`);
@@ -212,11 +272,44 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 500, { ok: false, error: e.message });
     }
   }
-  // The sound files an object can play: assets/sounds/*.wav|mp3|ogg (the folder may be absent).
-  if (pathname === '/api/sounds') {
-    const names = await fsp.readdir(path.join(ROOT, 'assets', 'sounds')).catch(() => []);
-    const sounds = names.map(n => 'assets/sounds/' + n).filter(isSoundPath).sort();
-    return sendJson(res, 200, { ok: true, sounds });
+  if (pathname === '/api/list-assets') {
+    return sendJson(res, 200, await listAssets(ROOT));
+  }
+  if (pathname === '/api/save-rig') {
+    if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
+    try {
+      const body = JSON.parse(await readBody(req) || '{}');
+      const result = await saveRig(ROOT, body.name, body.rig);
+      if (result.ok) console.log(`  ${C.grn}save${C.r} rig -> ${result.path}`);
+      return sendJson(res, 200, result);
+    } catch (e) {
+      console.log(`  ${C.red}save-rig FAILED${C.r} ${e.message}`);
+      return sendJson(res, 500, { ok: false, error: e.message });
+    }
+  }
+  if (pathname === '/api/save-clip') {
+    if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
+    try {
+      const body = JSON.parse(await readBody(req) || '{}');
+      const result = await saveClip(ROOT, body.name, body.clip);
+      if (result.ok) console.log(`  ${C.grn}save${C.r} clip -> ${result.path}`);
+      return sendJson(res, 200, result);
+    } catch (e) {
+      console.log(`  ${C.red}save-clip FAILED${C.r} ${e.message}`);
+      return sendJson(res, 500, { ok: false, error: e.message });
+    }
+  }
+  if (pathname === '/api/save-level') {
+    if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
+    try {
+      const body = JSON.parse(await readBody(req) || '{}');
+      const result = await saveLevel(ROOT, body.level);
+      if (result.ok) console.log(`  ${C.grn}save${C.r} level -> ${result.path}`);
+      return sendJson(res, 200, result);
+    } catch (e) {
+      console.log(`  ${C.red}save-level FAILED${C.r} ${e.message}`);
+      return sendJson(res, 500, { ok: false, error: e.message });
+    }
   }
   if (pathname === '/api/pick-model' || pathname === '/api/import-model') {
     if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
@@ -236,6 +329,27 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, e.code === 'too_large' ? 413 : 500, e.code === 'too_large' ? failure('too_large') : { ok: false, error: e.message });
     }
   }
+  if (pathname === '/api/upload-texture') {
+    if (req.method !== 'POST') return send(res, 405, { 'Content-Type': 'text/plain' }, 'Method Not Allowed');
+    try {
+      const parsedUrl = new URL(req.url, 'http://x');
+      const rawName = path.basename(String(parsedUrl.searchParams.get('name') || 'custom_texture.png'));
+      const ext = (path.extname(rawName) || '.png').toLowerCase();
+      const base = path.basename(rawName, ext).replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'custom_texture';
+      const cleanName = base + ext;
+      const targetDir = path.join(ROOT, 'assets', 'textures', 'custom');
+      await fsp.mkdir(targetDir, { recursive: true });
+      const targetFile = path.join(targetDir, cleanName);
+      const data = await readRaw(req, 50 * 1024 * 1024);
+      await fsp.writeFile(targetFile, data);
+      const relPath = '/assets/textures/custom/' + cleanName;
+      console.log(`  ${C.grn}texture${C.r} uploaded -> ${relPath} (${(data.length / 1024).toFixed(1)} KB)`);
+      return sendJson(res, 200, { ok: true, path: relPath, name: cleanName });
+    } catch (e) {
+      console.log(`  ${C.red}texture upload FAILED${C.r} ${e.message}`);
+      return sendJson(res, e.code === 'too_large' ? 413 : 500, { ok: false, error: e.message });
+    }
+  }
 
   // --- Static files from the project root ---
   if (pathname === '/') {
@@ -243,6 +357,14 @@ const server = http.createServer(async (req, res) => {
   }
   if (pathname === EDITOR_URL_PATH || pathname === EDITOR_URL_PATH.slice(0, -1)) {
     pathname = EDITOR_URL_PATH + 'index.html';
+  }
+  // Any relative asset, lib or js reference made from /_utils/editor/ resolves against ROOT
+  if (pathname.startsWith('/_utils/editor/assets/')) {
+    pathname = pathname.slice('/_utils/editor'.length);
+  } else if (pathname.startsWith('/_utils/editor/libs/')) {
+    pathname = pathname.slice('/_utils/editor'.length);
+  } else if (pathname.startsWith('/_utils/editor/js/')) {
+    pathname = pathname.slice('/_utils/editor'.length);
   }
 
   const filePath = path.join(ROOT, pathname);
@@ -266,6 +388,8 @@ const server = http.createServer(async (req, res) => {
     'Content-Type': type,
     'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
     'Content-Length': st.size,
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
   });
   if (req.method === 'HEAD') return res.end();
   fs.createReadStream(filePath).pipe(res);
@@ -273,16 +397,9 @@ const server = http.createServer(async (req, res) => {
 
 // Port busy -> try the next one, up to +20 (as in tools/dev-server.mjs).
 function listen(port, attempt = 0) {
-  server.once('error', err => {
-    if (err.code === 'EADDRINUSE' && attempt < 20) {
-      console.log(`${C.dim}  port ${port} is busy, trying ${port + 1}${C.r}`);
-      return listen(port + 1, attempt + 1);
-    }
-    console.error(`${C.red}Could not start the server: ${err.message}${C.r}`);
-    process.exit(1);
-  });
-  server.listen(port, '127.0.0.1', () => {
-    const addr = `http://localhost:${port}${EDITOR_URL_PATH}`;
+  const onListening = () => {
+    server.removeListener('error', onError);
+    const addr = `http://localhost:${server.address().port}${EDITOR_URL_PATH}`;
     console.log(`\n${C.cyn}${C.b}  ArcEngine${C.r} ${C.dim}— editor: location, camera, render${C.r}`);
     console.log(`${C.dim}  ${'-'.repeat(46)}${C.r}`);
     console.log(`  ${C.grn}${C.b}${addr}${C.r}`);
@@ -295,7 +412,21 @@ function listen(port, attempt = 0) {
       const args = process.platform === 'win32' ? ['/c', 'start', '', addr] : [addr];
       execFile(cmd, args, () => {});
     }
-  });
+  };
+
+  const onError = err => {
+    server.removeListener('listening', onListening);
+    if (err.code === 'EADDRINUSE' && attempt < 20) {
+      console.log(`${C.dim}  port ${port} is busy, trying ${port + 1}${C.r}`);
+      return listen(port + 1, attempt + 1);
+    }
+    console.error(`${C.red}Could not start the server: ${err.message}${C.r}`);
+    process.exit(1);
+  };
+
+  server.once('error', onError);
+  server.once('listening', onListening);
+  server.listen(port, '127.0.0.1');
 }
 
 listen(PORT_BASE);

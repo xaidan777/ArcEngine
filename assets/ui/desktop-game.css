@@ -1,0 +1,232 @@
+/* Desktop game composition. World/character remain the visual focus of the hub;
+   inventory cells have a bounded size independent of monitor width. */
+.arc-ui[data-mode="menu"] [data-ui^="nav"]:focus { outline: none !important; }
+.arc-ui[data-mode="menu"] [data-ui^="nav"]:focus-visible {
+    outline: 1px solid #a6bcb0 !important;
+    outline-offset: -5px !important;
+}
+.arc-ui[data-mode="menu"][data-screen="HUB"] [data-ui="mainPlayBtn"] {
+    padding: 0 14px !important;
+    font-size: 20px !important;
+    letter-spacing: .4px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+}
+.arc-ui[data-mode="menu"][data-screen="HUB"] [data-ui="mainPlayBtn"] > div {
+    font-size: 17px !important;
+    white-space: normal !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    text-align: center !important;
+    line-height: 1.2 !important;
+    letter-spacing: .4px !important;
+}
+.bw-filter-context,.bw-filter-empty { padding: 10px 4px; color: #a6bcb0; font-size: 12px; }
+.bw-filter-context { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bw-filter-context button { background: transparent; border: 1px solid #a6bcb055; color: #eee9df; padding: 5px 8px; cursor: pointer; }
+#arc-loadout-screen .drop-ready { outline: 2px solid #e9694b; outline-offset: -2px; background: #355140 !important; }
+#arc-loadout-screen [data-targeted="true"] { border-color: #a6bcb0; box-shadow: inset 0 0 0 1px #a6bcb0; }
+.arc-ui[data-mode="menu"][data-screen="HUB"] [data-ui="squadInviteBtn"] > div {
+    font-size: 22px !important;
+    letter-spacing: 0 !important;
+}
+.arc-ui[data-mode="menu"][data-screen="HUB"] [data-ui="squadInviteBtn"] {
+    font-size: 22px !important;
+    letter-spacing: 0 !important;
+    white-space: pre !important;
+}
+.arc-ui[data-mode="menu"][data-screen="HUB"] [data-ui="hubTitle"] > div { font-size: 34px !important; }
+.arc-ui[data-mode="menu"] [data-ui="raiderPanel"] {
+    background: linear-gradient(110deg,#16231df2,#16231da6) !important;
+    border: 0 !important;
+    border-left: 2px solid #e9694b !important;
+}
+.arc-ui[data-mode="menu"] :is([data-ui="operatorCardLeft"],[data-ui="operatorCardRight"]) {
+    background: #18282080 !important;
+    border: 0 !important;
+    border-top: 1px solid #9aafa54d !important;
+}
+.arc-ui[data-screen="WORKSHOP"][data-workshop="overview"] [data-ui="workshopPanel"] {
+    background: linear-gradient(90deg,#142019ed,#142019b8) !important;
+    border: 0 !important;
+}
+.arc-ui[data-screen="WORKSHOP"] [data-ui^="ws_select_"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    padding: 16px 12px 16px 94px !important;
+    text-align: left !important;
+    font-size: 11px !important;
+    line-height: 1.7 !important;
+    background: linear-gradient(115deg,#354c3f99,#19271fe8) !important;
+    border: 1px solid #9aafa530 !important;
+    border-radius: 3px !important;
+    box-shadow: none !important;
+}
+.arc-ui[data-screen="WORKSHOP"] [data-ui^="ws_select_"]:hover {
+    background: linear-gradient(115deg,#46604ecc,#24392eee) !important;
+    border-color: #a6bcb0 !important;
+}
+.arc-ui[data-screen="WORKSHOP"] [data-ui^="ws_select_"] > div {
+    font-size: 11px !important;
+    line-height: 1.7 !important;
+    white-space: pre-line !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+}
+.bw-station-art {
+    position: absolute;
+    left: 8px;
+    top: 10px;
+    width: 80px;
+    height: 76px;
+    pointer-events: none;
+}
+#arc-loadout-screen { padding: 32px 28px 24px; backdrop-filter: none; background: #101a17f7; }
+.bw-loadout-layout { grid-template-columns: minmax(280px,26%) minmax(0,1fr); gap: 16px; }
+.bw-loadout-content {
+    grid-template-columns: minmax(190px,.9fr) minmax(250px,1.35fr) minmax(132px,.6fr);
+    align-content: start;
+    gap: 16px;
+    padding: 18px;
+}
+.bw-sub-section { min-width: 0; }
+.bw-backpack-grid {
+    grid-template-columns: repeat(4,minmax(0,104px));
+    align-content: start;
+    gap: 6px;
+}
+.bw-quick-grid,.bw-safe-grid {
+    grid-template-columns: repeat(2,minmax(0,88px));
+    align-content: start;
+    gap: 6px;
+}
+.bw-panel { box-shadow: none; border-radius: 4px; }
+.bw-panel-title { font-size: 16px; }
+.bw-sub-title { color: #b2c1b8; letter-spacing: .8px; }
+.bw-slot-count { font-size: 12px; }
+.bw-slot-tier,.bw-slot-key { font-size: 10px; }
+.bw-inspect-desc { font-size: 13px; }
+.bw-inspect-title .bw-slot-tier { position: static; margin-left: 8px; }
+.bw-btn:disabled { opacity: .5; cursor: not-allowed; }
+.arc-ui[data-screen="STORE"] [data-ui="workshopPanel"] {
+    height: 440px !important;
+    background: linear-gradient(110deg,#16231df2,#16231da6) !important;
+    border: 0 !important;
+}
+.arc-ui[data-screen="STORE"] :is([data-ui="systemQuality"],[data-ui="systemSensitivity"],[data-ui="systemLanguage"],[data-ui="systemControls"]) {
+    background: #26372b85 !important;
+    border: 0 !important;
+    border-bottom: 1px solid #a6bcb040 !important;
+    border-radius: 0 !important;
+    padding: 8px 20px !important;
+}
+.arc-ui[data-screen="STORE"] :is([data-ui="systemQuality"],[data-ui="systemSensitivity"],[data-ui="systemLanguage"],[data-ui="systemControls"]) > div {
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    min-width: 0;
+    justify-content: space-between !important;
+    gap: 20px;
+    text-align: left !important;
+}
+.bw-setting-copy { display: grid; gap: 5px; }
+.bw-setting-copy strong { font-size: 12px; }
+.bw-setting-copy small { color: #a6bcb0; font-size: 10px; font-weight: 400; }
+.bw-setting-value { color: #eee9df; white-space: nowrap; font-size: 12px; }
+.bw-setting-value > span { margin-left: 16px; color: #e9694b; }
+.arc-ui[data-screen="TRADERS"] [data-ui="tradersPanel"] {
+    background: linear-gradient(110deg,#16231df2,#16231da6) !important;
+    border: 0 !important;
+}
+.arc-ui[data-screen="TRADERS"] [data-ui^="traderItem"] > div {
+    justify-content: flex-start !important;
+    gap: 12px;
+    text-align: left !important;
+}
+.bw-trade-icon { display: grid; place-items: center; width: 50px; height: 36px; flex-shrink: 0; color: #a6bcb0; }
+.bw-trade-icon svg { width: 100%; height: 100%; }
+.bw-trade-copy { display: grid; gap: 5px; }
+.bw-trade-copy strong { font-size: 10px; }
+.bw-trade-copy small { font-size: 10px; color: #cbb687; }
+.arc-ui[data-screen="TRADERS"] [data-ui="traderBuyFeedback"] { width: 665px !important; }
+.arc-ui[data-screen="TRADERS"] [data-ui="traderBuyFeedback"] > div { white-space: normal !important; font-size: 10px !important; line-height: 1.5 !important; }
+.bw-weapon-slot { min-height: 132px; }
+.bw-item-slot.selected { box-shadow: inset 0 0 0 1px #a6bcb0; }
+#arc-loadout-screen * { scrollbar-width: thin; scrollbar-color: #71877b #142019; }
+#arc-loadout-screen button:focus-visible { outline: 2px solid #a6bcb0; outline-offset: -3px; }
+@media (max-height: 820px) {
+    #arc-loadout-screen { padding: 20px 22px 14px; }
+    .bw-loadout-content { gap: 12px; padding: 12px; }
+    .bw-backpack-grid { grid-template-columns: repeat(4,minmax(0,82px)); }
+    .bw-quick-grid,.bw-safe-grid { grid-template-columns: repeat(2,minmax(0,68px)); }
+    .bw-weapon-slot { min-height: 110px; }
+    .bw-panel-header { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    #arc-loadout-screen *, .arc-ui[data-mode="menu"] button { transition: none !important; }
+}
+
+/* Original Blackwater workshop environment: a place first, station controls second. */
+.arc-ui[data-mode="menu"][data-screen="WORKSHOP"] {
+    background: linear-gradient(0deg,#101714f5 0%,#10171400 48%,#10171466 85%),url('./blackwater-workshop.png') center/cover no-repeat !important;
+}
+.arc-ui[data-mode="menu"][data-screen="WORKSHOP"][data-workshop="overview"] [data-ui="workshopPanel"] {
+    background: none !important; border: 0 !important; box-shadow: none !important; pointer-events: none;
+}
+.arc-ui[data-screen="WORKSHOP"][data-workshop="overview"] [data-ui="workshopTitle"] {
+    top: 111px !important; text-shadow: 0 2px 12px #000 !important;
+}
+.arc-ui[data-screen="WORKSHOP"][data-workshop="overview"] [data-ui^="ws_select_"] {
+    padding: 79px 5px 8px !important;
+    justify-content: center !important;
+    background: linear-gradient(160deg,#2b3934e8,#111a17f5) !important;
+    border: 1px solid #a6bcb04d !important;
+    border-bottom: 2px solid #657f70 !important;
+    border-radius: 2px !important;
+}
+.arc-ui[data-screen="WORKSHOP"][data-workshop="overview"] [data-ui^="ws_select_"] > div {
+    font-size: 9px !important; line-height: 1.5 !important;
+    text-align: center !important; padding: 0 !important;
+    white-space: pre-line !important; letter-spacing: .2px !important;
+}
+.arc-ui[data-screen="WORKSHOP"][data-workshop="overview"] .bw-station-art {
+    width: 86px; height: 68px; left: 7px; top: 8px;
+}
+.arc-ui[data-screen="WORKSHOP"] [data-ui^="ws_select_"]:is(:hover,:focus-visible) {
+    border-color: #e9694b !important; background: #34473ef5 !important;
+    outline: 1px solid #e9694b !important; outline-offset: 3px;
+}
+.arc-ui[data-mode="menu"] [data-ui="navBar"] { background: #111a17d9 !important; }
+/* Inventory: focused columns, restrained material and an unmistakable selection. */
+#arc-loadout-screen {
+    background: radial-gradient(ellipse at 55% 0%,#29403860,transparent 65%),#101815fa;
+}
+.bw-panel { border-color: #91a79b33; background: #16211dec; }
+.bw-item-slot { background: linear-gradient(145deg,#2d3a3266,#17221eaa); border-color: #91a79b30; }
+.bw-item-slot:not(.empty):hover { border-color: #eee9df; background: #35473c; }
+.bw-item-slot.selected { border-color: #e9694b; box-shadow: inset 0 -3px #e9694b; }
+.bw-inspect-bar { border-top: 1px solid #91a79b40; background: #101a17; }
+.arc-raid-inventory-overlay { backdrop-filter: none; background: #101815f5; }
+.arc-raid-inventory-overlay .bw-loadout-content {
+    grid-template-columns: minmax(220px,.9fr) minmax(400px,1.7fr) minmax(150px,.6fr);
+    align-content: start; gap: 24px; overflow-y: auto; min-height: 0;
+}
+.arc-raid-inventory-overlay .bw-backpack-grid {
+    grid-template-columns: repeat(6,minmax(0,100px)) !important;
+    grid-template-rows: none !important; align-content: start;
+}
+.arc-tactical-map-overlay { backdrop-filter: none; background: #080e0cdd; }
+.arc-tactical-map-window { width: calc(100vw - 48px); height: calc(100vh - 48px); box-shadow: none; }
+.arc-map-header { padding: 18px 24px; }
+.arc-map-body { flex: 1; overflow: hidden; }
+.arc-map-canvas-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; }
+#arc-map-canvas { width: auto; height: 100%; max-width: 100%; object-fit: contain; }
+.arc-map-sidebar { flex-basis: clamp(300px,25vw,420px); overflow-y: auto; padding: 20px; gap: 18px; }
+.arc-map-title { font-size: clamp(18px,1.5vw,26px); }
+.arc-map-sub { font-size: 11px; letter-spacing: 1px; }
+@media (max-height: 820px) {
+    .arc-raid-inventory-overlay { padding: 14px 20px; }
+    .arc-raid-inventory-overlay .bw-loadout-content { gap: 14px; padding: 12px; }
+    .arc-map-header { padding: 12px 18px; }
+    .arc-map-sidebar { padding: 14px; gap: 12px; }
+}

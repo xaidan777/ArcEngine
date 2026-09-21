@@ -64,7 +64,7 @@ const EditHistory = {
             if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
             const t = /** @type {HTMLInputElement | null} */ (e.target);
             // Text and numbers in fields are undone by the browser itself.
-            if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && /^(text|number|search)$/.test(t.type)))) return;
+            if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
             // The key — by e.code (in the Russian keyboard layout the key of Z is "я"); without code — by key.
             const is = (letter) => e.code ? e.code === 'Key' + letter : String(e.key).toUpperCase() === letter;
             if (is('Z') && !e.shiftKey) { e.preventDefault(); this.undo(); }

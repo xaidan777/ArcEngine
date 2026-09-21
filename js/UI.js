@@ -15,11 +15,6 @@
 //            A 'bottom-right' element at x 20, y 20 keeps its bottom right corner 20 px from
 //            the screen corner at any screen size.
 //   w, h   — size in px; a text sizes itself by its content.
-//   parent — id of the element this one sits in ('' or none — the screen): anchor, x and y then
-//            count from the PARENT's box, the parent clips it, and hiding the parent hides it too.
-//   stretch — 'h' | 'v' | 'both' (sized kinds): the element fills its container on that axis,
-//            x (y) is the inset from BOTH edges, w (h) is ignored. A full-screen dim:
-//            { kind: 'panel', stretch: 'both', x: 0, y: 0 }.
 //   Colors — '#rrggbb' strings, '' — none. Records go in drawing order: later — on top.
 // SCALE: layout numbers are px of a screen UI_REF_HEIGHT tall — the whole UI scales with the
 //   real height (a 1440 px screen draws a 720 px layout twice as big). UI_REF_HEIGHT = 0 — CSS px.
@@ -33,10 +28,10 @@ const UI = {
 
     // Fields of a record by kind and their defaults — a new element in the editor starts from them.
     DEFAULTS: {
-        text: { parent: '', anchor: 'top-left', x: 20, y: 20, text: 'Text', fontSize: 24, color: '#ffffff', shadow: '#000000', alpha: 1, visible: 1 },
-        panel: { parent: '', anchor: 'top-left', x: 20, y: 20, w: 240, h: 80, stretch: '', fill: '#10202c', border: '', radius: 10, alpha: 0.7, visible: 1 },
-        bar: { parent: '', anchor: 'top-left', x: 20, y: 20, w: 240, h: 18, stretch: '', value: 0.6, color: '#5ad05a', fill: '#10202c', border: '#ffffff', radius: 9, alpha: 1, visible: 1 },
-        button: { parent: '', anchor: 'bottom-center', x: 0, y: 40, w: 180, h: 48, stretch: '', text: 'Button', fontSize: 20, color: '#ffffff', fill: '#2a6fb0', border: '', radius: 10, alpha: 1, visible: 1 },
+        text: { anchor: 'top-left', x: 20, y: 20, text: 'Text', fontSize: 24, color: '#ffffff', shadow: '#000000', alpha: 1, visible: 1 },
+        panel: { anchor: 'top-left', x: 20, y: 20, w: 240, h: 80, fill: '#10202c', border: '', radius: 10, alpha: 0.7, visible: 1 },
+        bar: { anchor: 'top-left', x: 20, y: 20, w: 240, h: 18, value: 0.6, color: '#5ad05a', fill: '#10202c', border: '#ffffff', radius: 9, alpha: 1, visible: 1 },
+        button: { anchor: 'bottom-center', x: 0, y: 40, w: 180, h: 48, text: 'Button', fontSize: 20, color: '#ffffff', fill: '#2a6fb0', border: '', radius: 10, alpha: 1, visible: 1 },
     },
 
     /** @type {HTMLElement | null} */
@@ -94,10 +89,7 @@ const UI = {
         const old = this.elements;
         this.elements = new Map();
         this.root.textContent = '';
-        // All elements first, then the nesting: a child may stand before its parent in the file.
-        for (const def of this.layout) this.elements.set(def.id, new UIElement(def, old.get(def.id)));
-        for (const def of this.layout) this._attach(this.elements.get(def.id));
-        for (const def of this.layout) this.elements.get(def.id).apply();
+        for (const def of this.layout) this._create(def, old.get(def.id));
         this.resize();
     },
 
@@ -105,45 +97,29 @@ const UI = {
     add(def) {
         if (!this.root || !def || !def.id) return null;
         this.remove(def.id);
-        const e = new UIElement(def, null);
-        this.elements.set(def.id, e);
-        this._attach(e);
-        e.apply();
-        return e;
+        return this._create(def, null);
     },
 
-    // Removes the element together with everything nested in it.
+    // Keep dynamic records in a scrollable panel without creating untracked UI nodes.
+    placeInPanel(id, panelId) {
+        const element = this.get(id), panel = this.get(panelId);
+        if (element && panel) panel.el.appendChild(element.el);
+        return element;
+    },
+
     remove(id) {
         const e = this.elements.get(id);
         if (!e) return;
-        const inside = [...this.elements.values()].filter(c => this.isInside(c.def, id));
-        for (const c of inside) this.elements.delete(c.def.id);
         e.el.remove();
         this.elements.delete(id);
     },
 
-    // The element def sits in (def.parent), null — the screen. A missing parent or a cycle in
-    // the chain also gives null: a bad record lands on the screen instead of breaking the tree.
-    parentOf(def) {
-        const seen = new Set([def.id]);
-        for (let id = def.parent; id; ) {
-            const e = this.elements.get(id);
-            if (!e || seen.has(id)) return null;
-            seen.add(id);
-            id = e.def.parent;
-        }
-        return def.parent ? this.elements.get(def.parent) : null;
-    },
-
-    // Is def nested in the element id — directly or through its ancestors?
-    isInside(def, id) {
-        for (let e = this.parentOf(def); e; e = this.parentOf(e.def)) if (e.def.id === id) return true;
-        return false;
-    },
-
-    _attach(e) {
-        const parent = this.parentOf(e.def);
-        (parent ? parent.el : this.root).appendChild(e.el);
+    _create(def, prev) {
+        const e = new UIElement(def, prev);
+        this.elements.set(def.id, e);
+        this.root.appendChild(e.el);
+        e.apply();
+        return e;
     },
 
     // UI px per CSS px: screen height / UI_REF_HEIGHT.
@@ -179,19 +155,12 @@ const UI = {
         return { v: p[0], h: p[1] };
     },
 
-    // def.stretch -> the stretched axes; a text has no size of its own to stretch.
-    stretchOf(def) {
-        const s = def.kind === 'text' ? '' : def.stretch;
-        return { h: s === 'h' || s === 'both', v: s === 'v' || s === 'both' };
-    },
-
-    // Record -> the top left corner of an element of size w × h in a container W × H (the screen
-    // or the parent's inside). On a stretched axis x (y) is the inset, whatever the anchor.
+    // Record -> the top left corner of an element of size w × h on a screen W × H.
     resolve(def, w, h, W, H) {
-        const a = this.parseAnchor(def.anchor), st = this.stretchOf(def), x = Number(def.x) || 0, y = Number(def.y) || 0;
+        const a = this.parseAnchor(def.anchor), x = Number(def.x) || 0, y = Number(def.y) || 0;
         return {
-            left: st.h ? x : a.h === 'right' ? W - x - w : a.h === 'center' ? W / 2 + x - w / 2 : x,
-            top: st.v ? y : a.v === 'bottom' ? H - y - h : a.v === 'middle' ? H / 2 + y - h / 2 : y,
+            left: a.h === 'right' ? W - x - w : a.h === 'center' ? W / 2 + x - w / 2 : x,
+            top: a.v === 'bottom' ? H - y - h : a.v === 'middle' ? H / 2 + y - h / 2 : y,
         };
     },
 
@@ -211,29 +180,42 @@ class UIElement {
     /** @param {UIRecord} def @param {UIElement | null} prev — the same id before a rebuild */
     constructor(def, prev) {
         this.def = def;
-        this.el = document.createElement('div');
+        this.el = document.createElement(def.kind === 'button' ? 'button' : 'div');
         this.el.dataset.ui = def.id;
+        if (def.kind === 'button') {
+            this.el.setAttribute('type', 'button');
+            this.el.setAttribute('aria-label', String(def.text || def.id));
+        }
         /** @type {HTMLElement | null} */
         this.inner = null;       // bar: the filled part; text and button: the label
         this._text = prev ? prev._text : null;
         this._value = prev ? prev._value : null;
         this._shown = prev ? prev._shown : null;
         this._click = prev ? prev._click : null;
+        this._disabled = prev ? prev._disabled : false;
+        this._selected = prev ? prev._selected : false;
+        this._color = prev ? prev._color : null;
         this.el.addEventListener('click', (e) => {
-            if (UI.editing || this.def.kind !== 'button' || !this._click) return;
+            if (UI.editing || this._disabled || this.def.kind !== 'button' || !this._click) return;
             e.stopPropagation();
             this._click(this);
         });
     }
 
-    setText(text) { this._text = String(text); this.apply(); return this; }
+    setText(text) { const next = String(text); if (this._text === next) return this; this._text = next; this.apply(); return this; }
 
     // Bar fill 0..1.
-    setValue(v) { this._value = Math.max(0, Math.min(1, Number(v) || 0)); this.apply(); return this; }
+    setValue(v) { const next = Math.max(0, Math.min(1, Number(v) || 0)); if (this._value === next) return this; this._value = next; this.apply(); return this; }
 
-    show(on) { this._shown = on !== false; this.apply(); return this; }
+    show(on) { const next = on !== false; if (this._shown === next) return this; this._shown = next; this.apply(); return this; }
 
     onClick(fn) { this._click = fn || null; return this; }
+
+    setDisabled(on) { const next = !!on; if (this._disabled === next) return this; this._disabled = next; this.apply(); return this; }
+
+    setSelected(on) { const next = !!on; if (this._selected === next) return this; this._selected = next; this.apply(); return this; }
+
+    setColor(color) { this._color = color ? String(color) : null; this.apply(); return this; }
 
     get visible() {
         return this._shown != null ? this._shown : this.def.visible !== 0;
@@ -243,19 +225,20 @@ class UIElement {
     apply() {
         const d = this.def, s = this.el.style, a = UI.parseAnchor(d.anchor);
         const x = Number(d.x) || 0, y = Number(d.y) || 0, px = (v) => (Number(v) || 0) + 'px';
-        const sized = d.kind !== 'text', st = UI.stretchOf(d);
+        const sized = d.kind !== 'text';
+        if (d.kind === 'button') {
+            /** @type {HTMLButtonElement} */ (this.el).disabled = !UI.editing && this._disabled;
+            this.el.setAttribute('aria-pressed', String(this._selected));
+        }
         s.cssText = '';
         s.position = 'absolute';
         s.boxSizing = 'border-box';
-        // The container is the parent's box (an absolute element positions its children) or the
-        // root. A stretched axis pins both edges with the same inset; w (h) is not used there.
-        s.left = st.h || a.h === 'left' ? px(x) : a.h === 'center' ? 'calc(50% + ' + px(x) + ')' : '';
-        s.right = st.h || a.h === 'right' ? px(x) : '';
-        s.top = st.v || a.v === 'top' ? px(y) : a.v === 'middle' ? 'calc(50% + ' + px(y) + ')' : '';
-        s.bottom = st.v || a.v === 'bottom' ? px(y) : '';
-        s.transform = 'translate(' + (!st.h && a.h === 'center' ? '-50%' : '0') + ', ' + (!st.v && a.v === 'middle' ? '-50%' : '0') + ')';
-        if (sized && !st.h) s.width = px(d.w);
-        if (sized && !st.v) s.height = px(d.h);
+        s.left = a.h === 'left' ? px(x) : a.h === 'center' ? 'calc(50% + ' + px(x) + ')' : '';
+        s.right = a.h === 'right' ? px(x) : '';
+        s.top = a.v === 'top' ? px(y) : a.v === 'middle' ? 'calc(50% + ' + px(y) + ')' : '';
+        s.bottom = a.v === 'bottom' ? px(y) : '';
+        s.transform = 'translate(' + (a.h === 'center' ? '-50%' : '0') + ', ' + (a.v === 'middle' ? '-50%' : '0') + ')';
+        if (sized) { s.width = px(d.w); s.height = px(d.h); }
         s.opacity = String(d.alpha == null ? 1 : Math.max(0, Math.min(1, Number(d.alpha))));
         s.display = this.visible || UI.editing ? 'block' : 'none';
         if (UI.editing && !this.visible) s.opacity = String(Number(s.opacity) * 0.35);
@@ -280,20 +263,26 @@ class UIElement {
         }
         if (label) {
             const t = this.inner.style;
-            t.cssText = '';
-            this.inner.textContent = this._text != null ? this._text : String(d.text == null ? '' : d.text);
-            t.whiteSpace = 'pre';
+            const rawVal = this._text != null ? this._text : String(d.text == null ? '' : d.text);
+            if (typeof rawVal === 'string' && rawVal.startsWith('<')) {
+                this.inner.innerHTML = rawVal;
+                t.whiteSpace = 'normal';
+            } else {
+                this.inner.textContent = rawVal;
+                t.whiteSpace = 'pre';
+            }
+            if (d.kind === 'button') this.el.setAttribute('aria-label', this.inner.textContent || d.id);
             t.fontSize = px(d.fontSize || 20);
             t.fontWeight = '600';
             t.lineHeight = '1.2';
-            t.color = d.color || '#ffffff';
+            t.color = this._color || d.color || '#ffffff';
             t.textAlign = a.h === 'center' ? 'center' : a.h;
             if (d.shadow) t.textShadow = '0 1px 2px ' + d.shadow + ', 0 0 3px ' + d.shadow;
             if (d.kind === 'button') Object.assign(t, { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' });
         } else if (d.kind === 'bar') {
             const v = this._value != null ? this._value : Math.max(0, Math.min(1, Number(d.value) || 0));
             this.inner.textContent = '';
-            this.inner.style.cssText = 'height: 100%; width: ' + (v * 100) + '%; background: ' + (d.color || '#5ad05a') + ';';
+            this.inner.style.cssText = 'height: 100%; width: ' + (v * 100) + '%; background: ' + (this._color || d.color || '#5ad05a') + ';';
         }
     }
 }

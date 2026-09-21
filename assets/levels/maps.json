@@ -1,0 +1,7 @@
+[
+  {
+    "id": "default_raid",
+    "name": "test_pipeline_raid",
+    "file": "assets/levels/default_raid.json"
+  }
+]
