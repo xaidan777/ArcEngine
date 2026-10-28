@@ -1,7 +1,0 @@
-# Do not upload to GitHub: personal stuff and what gets built by itself. A leading "/" — root only
-# (without it build/ would also hide claude/skills/build/).
-/.claude/
-/upload.bat
-/_utils/.backups/
-/build/
-/dist/

@@ -1,9 +1,0 @@
-{
-  "name": "ArcEngine.Runtime",
-  "rootNamespace": "ArcEngine",
-  "references": ["Unity.TextMeshPro", "UnityEngine.UI", "Unity.InputSystem"],
-  "versionDefines": [
-    { "name": "com.unity.inputsystem", "expression": "1.0.0", "define": "ARC_INPUT_SYSTEM" }
-  ],
-  "autoReferenced": true
-}

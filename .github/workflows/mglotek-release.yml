@@ -1,0 +1,40 @@
+name: MGLOTEK - Publish Windows game to GitHub Releases
+
+on:
+  push:
+    branches: [mglotek-cloud-render]
+    paths:
+      - '.github/workflows/mglotek-release.yml'
+      - 'release/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'SemVer without v, for example 1.0.2; empty uses release/request.json'
+        required: false
+        type: string
+      source_run:
+        description: 'Successful Actions run ID containing MGLOTEK-Game-Windows artifact'
+        required: false
+        type: string
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      INPUT_VERSION: ${{ inputs.version || '' }}
+      INPUT_RUN: ${{ inputs.source_run || '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check requested publication
+        run: |
+          python3 -m unittest discover -s release/tests -v
+          python3 release/publish.py check
+      - name: Download, validate and publish only explicitly requested release
+        run: python3 release/publish.py publish

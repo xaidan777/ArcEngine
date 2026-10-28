@@ -1,0 +1,67 @@
+name: MGLOTEK - bridges for 15 GitHub tools
+on:
+  push:
+    branches: [mglotek-cloud-render]
+    paths:
+      - '.github/workflows/mglotek-tool-bridges.yml'
+      - 'bridge/**'
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 'audit repositories, prepare one source, or make a handoff'
+        type: choice
+        required: true
+        default: audit
+        options: [audit, prepare, handoff]
+      tool_id:
+        description: 'Tool id from manifest; all valid only with audit'
+        type: string
+        default: all
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: mglotek-bridges-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: false
+jobs:
+  bridge:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate registry and test Python
+        run: |
+          python3 bridge/bridge.py validate
+          python3 -m unittest discover -s bridge/tests -v
+      - name: Audit, prepare, or create a handoff
+        shell: bash
+        env:
+          DISPATCH_MODE: ${{ inputs.operation || '' }}
+          DISPATCH_TOOL: ${{ inputs.tool_id || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -p bridge_output
+          if [[ -n "$DISPATCH_MODE" ]]; then
+            MODE="$DISPATCH_MODE"
+            TOOL="$DISPATCH_TOOL"
+          else
+            MODE="$(python3 -c 'import json;print(json.load(open("bridge/request.json"))["operation"])')"
+            TOOL="$(python3 -c 'import json;print(json.load(open("bridge/request.json"))["tool_id"])')"
+          fi
+          case "$MODE" in
+            audit) python3 bridge/bridge.py audit --id "$TOOL" --out bridge_output ;;
+            prepare) python3 bridge/bridge.py prepare --id "$TOOL" --out bridge_output ;;
+            handoff) python3 bridge/handoff.py --id "$TOOL" --out bridge_output/handoff.json ;;
+            *) echo "Unsupported mode: $MODE" >&2; exit 2 ;;
+          esac
+          printf 'operation=%s\ntool_id=%s\n' "$MODE" "$TOOL" > bridge_output/request.txt
+      - name: Publish bridge results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: MGLOTEK-Bridge-${{ github.run_number }}
+          path: bridge_output/
+          retention-days: 14
+          if-no-files-found: warn

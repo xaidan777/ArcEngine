@@ -1,0 +1,48 @@
+name: MGLOTEK - Cloud Blender stage expansion
+on:
+  push:
+    branches: [mglotek-cloud-render]
+    paths:
+      - '.github/workflows/mglotek-blender.yml'
+      - 'cloud_blender/build_levels.py'
+      - 'cloud_blender/architectural_detail.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    name: Blender ${{ matrix.theme }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        theme: [birch, nursery, bakery, kern, station, depot, carriage, conductor, archive, cistern, vault]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Blender on cloud runner only
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y blender python3-numpy libegl1 libgl1 libgl1-mesa-dri libopengl0 xvfb
+          blender --version | head -3
+      - name: Render editable level, transparent image and 3D GLB
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p cloud_output
+          export PYTHONPATH=/usr/lib/python3/dist-packages
+          blender --background --threads 2 --python cloud_blender/build_levels.py -- --scene "${{ matrix.theme }}" --out cloud_output 2>&1 | tee cloud_output/blender-log.txt
+          if grep -q "Traceback (most recent call last)" cloud_output/blender-log.txt; then exit 1; fi
+          test -s "cloud_output/${{ matrix.theme }}_mid.png"
+          test -s "cloud_output/${{ matrix.theme }}.glb"
+          test -s "cloud_output/${{ matrix.theme }}.blend"
+      - name: Upload scene as GitHub Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MGLOTEK-Blender-${{ matrix.theme }}-${{ github.run_number }}
+          path: cloud_output/
+          retention-days: 14
+          if-no-files-found: error

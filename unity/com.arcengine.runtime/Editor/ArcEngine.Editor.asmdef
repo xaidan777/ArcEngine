@@ -1,9 +1,0 @@
-{
-  "name": "ArcEngine.Editor",
-  "rootNamespace": "ArcEngine.Editor",
-  "references": ["ArcEngine.Runtime", "Unity.TextMeshPro", "UnityEngine.UI", "Unity.InputSystem"],
-  "includePlatforms": ["Editor"],
-  "versionDefines": [
-    { "name": "com.unity.inputsystem", "expression": "1.0.0", "define": "ARC_INPUT_SYSTEM" }
-  ]
-}

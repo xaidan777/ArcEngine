@@ -1,0 +1,8 @@
+{
+  "mode": "draft",
+  "version": "1.0.1",
+  "source_run": "",
+  "source_url": "",
+  "source_sha256": "0a448f236046cc7938ddf2df042575cca1d52d18177099689e15bdc393a9b4a7",
+  "note": "Create GitHub draft for the REAL v1.0.1 ZIP. The release remains unpublished until the binary is attached and SHA256 validated by finalize mode."
+}

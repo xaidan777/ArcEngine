@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "project": "MGLOTEK 2.5D",
+  "engine": "Python + pygame",
+  "host": "kivnufki121-dot/ArcEngine",
+  "branch": "mglotek-cloud-render",
+  "tools": [
+    {
+      "id": "wan_video",
+      "repo": "kijai/ComfyUI-WanVideoWrapper",
+      "ref": "main",
+      "stage": "cutscene",
+      "backend": "gpu",
+      "note": "ComfyUI custom nodes; weights and GPU required"
+    },
+    {
+      "id": "comfy_manager",
+      "repo": "Comfy-Org/ComfyUI-Manager",
+      "ref": "main",
+      "stage": "environment",
+      "backend": "cpu",
+      "note": "ComfyUI extension manager, not a model runner"
+    },
+    {
+      "id": "rea",
+      "repo": "morluto/rea",
+      "ref": "main",
+      "stage": "research",
+      "backend": "docs-only",
+      "note": "Reverse engineering reference; never run against third-party software here"
+    },
+    {
+      "id": "asset_furnace",
+      "repo": "Bingeljell/image-to-3dlab",
+      "ref": "main",
+      "stage": "model",
+      "backend": "gpu",
+      "note": "AssetFurnace; models/services and runtime required"
+    },
+    {
+      "id": "unimate",
+      "repo": "Friedrich-M/UniMate",
+      "ref": "main",
+      "stage": "animation",
+      "backend": "gpu",
+      "note": "Motion/skeleton generation, model weights required"
+    },
+    {
+      "id": "ultratex",
+      "repo": "visualbruno/ComfyUI-UltraTex",
+      "ref": "main",
+      "stage": "texture",
+      "backend": "gpu",
+      "note": "ComfyUI texture node, FLUX models required"
+    },
+    {
+      "id": "ultratex_modular",
+      "repo": "Mstafa-awad/UltraTex-ComfyUI-nodes",
+      "ref": "main",
+      "stage": "texture",
+      "backend": "gpu",
+      "note": "Alternative UltraTex node suite; isolate from ultratex"
+    },
+    {
+      "id": "comfy_easy_install",
+      "repo": "Tavris1/ComfyUI-Easy-Install",
+      "ref": "Windows",
+      "stage": "environment",
+      "backend": "windows-only",
+      "note": "Windows installer; not executed on Linux Actions"
+    },
+    {
+      "id": "motion2mixamo",
+      "repo": "MaxLiu22/Motion2MixamoRig",
+      "ref": "main",
+      "stage": "animation",
+      "backend": "cpu",
+      "note": "Requires Blender 4.2+ for rig workflow; staged source only"
+    },
+    {
+      "id": "charakuru",
+      "repo": "nanocle/Charakuru",
+      "ref": "main",
+      "stage": "character",
+      "backend": "service",
+      "note": "Node.js/Tripo integration; service credentials may be needed"
+    },
+    {
+      "id": "partllm",
+      "repo": "czvvd/PartLLM",
+      "ref": "main",
+      "stage": "model",
+      "backend": "gpu",
+      "note": "3D segmentation, not dialogue generation"
+    },
+    {
+      "id": "edenlive",
+      "repo": "VAST-AI-Research/EdenLive",
+      "ref": "main",
+      "stage": "cutscene",
+      "backend": "gpu",
+      "note": "Generative rendering, weights and GPU required"
+    },
+    {
+      "id": "dirtymocap",
+      "repo": "WangLongZJU/DirtyMoCap",
+      "ref": "main",
+      "stage": "animation",
+      "backend": "docs-only",
+      "note": "Research README; executable pipeline not yet provided"
+    },
+    {
+      "id": "blender",
+      "repo": "blender/blender",
+      "ref": "main",
+      "stage": "render",
+      "backend": "cpu",
+      "note": "Installed from Ubuntu packages in cloud Actions; do not clone enormous source tree"
+    },
+    {
+      "id": "arcengine",
+      "repo": "kivnufki121-dot/ArcEngine",
+      "ref": "main",
+      "stage": "host",
+      "backend": "host",
+      "note": "Own hosting repository for GitHub Actions bridge; NOT pygame engine"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+name: MGLOTEK - Cloud Blender humanoid animation
+on:
+  push:
+    branches: [mglotek-cloud-render]
+    paths:
+      - 'cloud_blender/build_characters.py'
+      - 'cloud_blender/stitch_characters.py'
+      - 'cloud_blender/hero_concept.py'
+      - '.github/workflows/mglotek-characters.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  characters:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        character: [ash]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install CPU Blender and Pillow in ephemeral runner
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y blender python3-numpy python3-pil libegl1 libgl1 libgl1-mesa-dri libopengl0
+          blender --version | head -2
+      - name: Render animation poses to transparent RGBA frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p char_output
+          export PYTHONPATH=/usr/lib/python3/dist-packages
+          blender --background --threads 2 --python cloud_blender/build_characters.py -- --name "${{ matrix.character }}" --out char_output 2>&1 | tee char_output/blender-log.txt
+          test -s "char_output/${{ matrix.character }}.blend"
+          test -s "char_output/${{ matrix.character }}.glb"
+          test -f "char_output/${{ matrix.character }}_frames/09_05.png"
+      - name: Assemble and validate pygame sprite sheet
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH=/usr/lib/python3/dist-packages
+          python3 cloud_blender/stitch_characters.py --name "${{ matrix.character }}" --folder char_output
+          rm -rf "char_output/${{ matrix.character }}_frames"
+          test -s "char_output/${{ matrix.character }}.png"
+      - name: Publish fully rendered Blender character
+        uses: actions/upload-artifact@v4
+        with:
+          name: MGLOTEK-character-${{ matrix.character }}-${{ github.run_number }}
+          path: |
+            char_output/*.blend
+            char_output/*.glb
+            char_output/*.png
+            char_output/*_sprite_metadata.json
+          retention-days: 14
+          if-no-files-found: error

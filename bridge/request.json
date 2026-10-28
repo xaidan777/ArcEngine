@@ -1,0 +1,5 @@
+{
+  "operation": "audit",
+  "tool_id": "all",
+  "note": "Edit on mglotek-cloud-render to invoke one bridge operation. Never automatically executes third-party programs."
+}
